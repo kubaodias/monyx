@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Android 13+ requires this at runtime, and without it every push is
+         dropped SILENTLY — the server sees a successful delivery and the phone
+         shows nothing (PRD §9). Asked on first visit to the Budget screen. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
+    <application
+        android:name=".MonioApp"
+        android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:supportsRtl="false"
+        android:theme="@style/Theme.Monio"
+        android:enableOnBackInvokedCallback="true"
+        tools:targetApi="33"
+        xmlns:tools="http://schemas.android.com/tools"
+        android:localeConfig="@xml/locales_config"
+        android:allowBackup="false">
+        <!-- allowBackup defaults to true, and Google Auto Backup would copy Room
+             and DataStore to the cloud and restore them onto a NEW phone,
+             session token included. Two devices would then share one `devices`
+             row, so revoking one revokes both (PRD §11). -->
+
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:launchMode="singleTop"
+            android:windowSoftInputMode="adjustResize"
+            android:theme="@style/Theme.Monio">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+
+            <!-- A home screen shortcut saves taps, not milliseconds — it is the
+                 same cold start. Point it at MainActivity with an extra and
+                 branch the start destination. Do not add a second Activity (§9). -->
+            <meta-data
+                android:name="android.app.shortcuts"
+                android:resource="@xml/shortcuts" />
+        </activity>
+
+        <service
+            android:name=".notifications.MonioMessagingService"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.google.firebase.MESSAGING_EVENT" />
+            </intent-filter>
+        </service>
+        <!-- AppCompat persists the chosen language itself when this holder
+             service carries autoStoreLocales. Without it the selection is lost
+             on process death below API 33, where there is no framework
+             LocaleManager to remember it. The service is never started; it
+             exists only to carry the meta-data. -->
+        <service
+            android:name="androidx.appcompat.app.AppLocalesMetadataHolderService"
+            android:enabled="false"
+            android:exported="false">
+            <meta-data
+                android:name="autoStoreLocales"
+                android:value="true" />
+        </service>
+
+    </application>
+</manifest>

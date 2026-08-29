@@ -1,0 +1,244 @@
+// The sync protocol. §14 names the sync bug that loses rows silently as a High
+// risk whose failure mode is invisible by nature — no error, and each phone
+// looks complete. These tests are the only thing standing in front of it.
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import { FakeDb, expense, seedHousehold } from "./fake-db.ts";
+import { forHousehold } from "../src/db.ts";
+import { pull, push, MAX_PUSH_CHANGES } from "../src/sync.ts";
+
+function setup() {
+  const fake = new FakeDb();
+  const { householdId, now } = seedHousehold(fake);
+  return { fake, db: forHousehold(householdId, fake), now };
+}
+
+test("seq is allocated per row and runs across the whole batch, not per table", async () => {
+  const { fake, db } = setup();
+  const result = await push(db, [
+    { table: "accounts", row: { id: "a9", name: "Konto", initial_balance_minor: 0, sort_order: 0, deleted: 0 } },
+    { table: "categories", row: { id: "c9", name: "Dom", kind: "expense", sort_order: 0, deleted: 0 } },
+    expense("t9", 1000, "c9"),
+  ]);
+
+  assert.equal(result.applied, 3);
+  assert.deepEqual(result.rejected, []);
+
+  const rows = fake.db
+    .prepare(
+      `SELECT seq FROM accounts WHERE id='a9'
+       UNION ALL SELECT seq FROM categories WHERE id='c9'
+       UNION ALL SELECT seq FROM transactions WHERE id='t9'`,
+    )
+    .all() as { seq: number }[];
+  const seqs = rows.map((r) => r.seq).sort((a, b) => a - b);
+
+  // The likeliest implementation error is resetting the offset per table, which
+  // produces duplicate seqs across tables and is silent (§13, M0 step 2).
+  assert.equal(new Set(seqs).size, 3, "seqs must be distinct across tables");
+  assert.equal(seqs[2]! - seqs[0]!, 2, "seqs must be consecutive");
+  assert.equal(result.seq, seqs[2], "push returns the top of the reserved range");
+});
+
+test("successive pushes never reuse a seq", async () => {
+  const { fake, db } = setup();
+  const seen = new Set<number>();
+  for (let i = 0; i < 20; i += 1) {
+    await push(db, [expense(`t${i}`, 100 + i, "cat1")]);
+  }
+  const rows = fake.db.prepare("SELECT seq FROM transactions").all() as { seq: number }[];
+  for (const row of rows) {
+    assert.ok(!seen.has(row.seq), `seq ${row.seq} was reused`);
+    seen.add(row.seq);
+  }
+  assert.equal(seen.size, 20);
+});
+
+test("a row touched twice in one batch ends in its final state and pull emits it once", async () => {
+  const { db } = setup();
+  await push(db, [
+    expense("dup", 500, "cat1"),
+    { table: "transactions", row: { ...expense("dup", 900, "cat1").row } },
+  ]);
+  const page = await pull(db, 0);
+  const rows = page.changes.filter((c) => c.row["id"] === "dup");
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0]!.row["amount_minor"], 900);
+});
+
+test("invalid rows are rejected and never reach the batch", async () => {
+  const { db } = setup();
+  const result = await push(db, [
+    expense("ok1", 100, "cat1"),
+    { table: "transactions", row: { ...expense("bad1", 0, "cat1").row, amount_minor: 0 } },
+    { table: "transactions", row: { ...expense("bad2", 100, "cat1").row, amount_minor: 12.5 } },
+    { table: "transactions", row: { ...expense("bad3", 100, "cat1").row, kind: "gift" } },
+    { table: "unknown_table", row: { id: "x", deleted: 0 } },
+  ]);
+
+  assert.equal(result.applied, 1);
+  assert.equal(result.rejected.length, 4);
+  const reasons = result.rejected.map((r) => r.reason).sort();
+  assert.deepEqual(reasons, ["bad_amount_minor", "bad_amount_minor", "bad_kind", "unknown_table"]);
+});
+
+test("money is an integer in minor units — a float amount is rejected, never rounded", async () => {
+  const { fake, db } = setup();
+  await push(db, [{ table: "transactions", row: { ...expense("f", 100, "cat1").row, amount_minor: 45.99 } }]);
+  const count = fake.db.prepare("SELECT COUNT(*) AS c FROM transactions").get() as { c: number };
+  assert.equal(count.c, 0);
+});
+
+test("a transfer may not carry a category, and may not target its own account", async () => {
+  const { db } = setup();
+  const result = await push(db, [
+    { table: "transactions", row: { id: "tr1", kind: "transfer", amount_minor: 100, account_id: "acc1", transfer_account_id: "acc2", category_id: "cat1", occurred_at: 1, occurred_on: "2026-08-15", created_by: "mem1", created_at: 1, deleted: 0 } },
+    { table: "transactions", row: { id: "tr2", kind: "transfer", amount_minor: 100, account_id: "acc1", transfer_account_id: "acc1", occurred_at: 1, occurred_on: "2026-08-15", created_by: "mem1", created_at: 1, deleted: 0 } },
+    { table: "transactions", row: { id: "tr3", kind: "transfer", amount_minor: 100, account_id: "acc1", transfer_account_id: "acc2", occurred_at: 1, occurred_on: "2026-08-15", created_by: "mem1", created_at: 1, deleted: 0 } },
+  ]);
+  assert.equal(result.applied, 1);
+  assert.deepEqual(result.rejected.map((r) => r.reason).sort(), ["transfer_has_category", "transfer_to_self"]);
+});
+
+test("a foreign key outside the household is rejected rather than taking the push down", async () => {
+  const { fake, db } = setup();
+  seedHousehold(fake, "hh2");
+  fake.db.exec(
+    `INSERT INTO categories (id, household_id, name, kind, sort_order, seq, deleted)
+     VALUES ('other-cat', 'hh2', 'Obce', 'expense', 0, 1, 0)`,
+  );
+  const result = await push(db, [expense("t1", 100, "other-cat"), expense("t2", 100, "cat1")]);
+  assert.equal(result.applied, 1);
+  assert.equal(result.rejected[0]!.reason, "missing_category_id");
+});
+
+test("a category and a transaction in it push together, in dependency order", async () => {
+  const { db } = setup();
+  const result = await push(db, [
+    { table: "categories", row: { id: "new-cat", name: "Nowa", kind: "expense", sort_order: 0, deleted: 0 } },
+    expense("t-new", 250, "new-cat"),
+  ]);
+  assert.equal(result.applied, 2, "a row created earlier in the batch is a legitimate FK target");
+});
+
+test("household_id is stamped from the token, never taken from the request", async () => {
+  const { fake, db } = setup();
+  seedHousehold(fake, "hh2");
+  await push(db, [
+    { table: "transactions", row: { ...expense("spoof", 100, "cat1").row, household_id: "hh2" } },
+  ]);
+  const row = fake.db.prepare("SELECT household_id FROM transactions WHERE id='spoof'").get() as {
+    household_id: string;
+  };
+  assert.equal(row.household_id, "hh1");
+});
+
+test("a deletion is a full-row upsert with deleted = 1, and pull carries the tombstone", async () => {
+  const { db } = setup();
+  await push(db, [expense("gone", 700, "cat1")]);
+  await push(db, [{ table: "transactions", row: { ...expense("gone", 700, "cat1").row, deleted: 1 } }]);
+  const page = await pull(db, 0);
+  const row = page.changes.find((c) => c.row["id"] === "gone");
+  assert.ok(row, "a tombstone must reach the other devices");
+  assert.equal(row!.row["deleted"], 1);
+});
+
+test("pull orders by seq, paginates, and never splits a seq across a page boundary", async () => {
+  const { db } = setup();
+  for (let i = 0; i < 12; i += 1) {
+    await push(db, [expense(`p${i}`, 100 + i, "cat1")]);
+  }
+
+  const first = await pull(db, 0, 5);
+  assert.equal(first.changes.length, 5);
+  assert.equal(first.has_more, true);
+
+  const seqs = first.changes.map((c) => Number(c.row["seq"]));
+  assert.deepEqual([...seqs].sort((a, b) => a - b), seqs, "page must be ordered by seq");
+  assert.equal(new Set(seqs).size, seqs.length, "no two rows share a seq");
+  assert.equal(first.seq, seqs[seqs.length - 1], "cursor is the highest seq actually applied");
+
+  // Walk the whole stream and prove nothing is dropped or repeated.
+  const collected: number[] = [];
+  let cursor = 0;
+  for (;;) {
+    const page = await pull(db, cursor, 5);
+    for (const change of page.changes) collected.push(Number(change.row["seq"]));
+    cursor = page.seq;
+    if (!page.has_more) break;
+  }
+  assert.equal(new Set(collected).size, collected.length, "no row is delivered twice");
+  const txRows = collected.length;
+  assert.ok(txRows >= 12, `expected at least the 12 transactions, saw ${txRows}`);
+});
+
+test("has_more is false on the last page", async () => {
+  const { db } = setup();
+  await push(db, [expense("only", 100, "cat1")]);
+  const page = await pull(db, 0, 500);
+  assert.equal(page.has_more, false);
+});
+
+test("the push seq is not a pull cursor", async () => {
+  const { fake, db } = setup();
+  const other = forHousehold("hh1", fake);
+
+  const mine = await push(db, [expense("mine", 100, "cat1")]);
+  // Another device commits in between.
+  await push(other, [expense("theirs", 200, "cat1")]);
+
+  // Advancing the pull cursor to the push seq would skip nothing here, but
+  // pulling from 0 must still see both rows — the cursor only ever moves to the
+  // highest seq actually applied.
+  const page = await pull(db, 0);
+  const ids = page.changes.map((c) => c.row["id"]);
+  assert.ok(ids.includes("mine") && ids.includes("theirs"));
+  assert.ok(mine.seq < page.seq, "another device's later commit sits above the push seq");
+});
+
+test("restore: bumping epoch tells every device to reset its cursor and re-pull", async () => {
+  const { fake, db } = setup();
+  await push(db, [expense("before", 100, "cat1")]);
+  const before = await pull(db, 0);
+  assert.equal(before.epoch, 1);
+
+  // Step 2 of the restore runbook (§10).
+  fake.db.exec("UPDATE households SET epoch = 2 WHERE id = 'hh1'");
+
+  const after = await pull(db, before.seq);
+  assert.equal(after.epoch, 2, "the client compares this against its stored epoch");
+
+  // A full re-pull from zero is safe because upserts are idempotent by id.
+  const full = await pull(db, 0);
+  assert.ok(full.changes.some((c) => c.row["id"] === "before"));
+});
+
+test("re-upload everything is idempotent — the same rows push twice without duplicating", async () => {
+  const { fake, db } = setup();
+  const change = expense("reup", 4599, "cat1");
+  await push(db, [change]);
+  await push(db, [change]);
+  const count = fake.db.prepare("SELECT COUNT(*) AS c FROM transactions WHERE id='reup'").get() as {
+    c: number;
+  };
+  assert.equal(count.c, 1, "upserts are idempotent by id (§10 step 3)");
+});
+
+test("a push over the 200-change cap reports the overflow instead of silently dropping it", async () => {
+  const { db } = setup();
+  const changes = [];
+  for (let i = 0; i < MAX_PUSH_CHANGES + 3; i += 1) changes.push(expense(`c${i}`, 100, "cat1"));
+  const result = await push(db, changes);
+  assert.equal(result.applied, MAX_PUSH_CHANGES);
+  assert.equal(result.rejected.length, 3);
+  assert.equal(result.rejected[0]!.reason, "batch_too_large");
+});
+
+test("a rejected row is reported with its id so the client can flag it, not drop it", async () => {
+  const { db } = setup();
+  const result = await push(db, [
+    { table: "transactions", row: { ...expense("keeps-id", 100, "cat1").row, amount_minor: -5 } },
+  ]);
+  assert.equal(result.rejected[0]!.id, "keeps-id");
+  assert.equal(result.rejected[0]!.table, "transactions");
+});

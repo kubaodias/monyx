@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut
+        android:shortcutId="add_expense"
+        android:enabled="true"
+        android:icon="@mipmap/ic_launcher"
+        android:shortcutShortLabel="@string/nav_add"
+        android:shortcutLongLabel="@string/add_expense">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetPackage="com.monio"
+            android:targetClass="com.monio.MainActivity">
+            <extra android:name="start" android:value="add" />
+        </intent>
+    </shortcut>
+</shortcuts>

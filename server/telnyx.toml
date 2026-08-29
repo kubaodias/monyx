@@ -1,0 +1,34 @@
+name = "monio-api"
+main = "src/index.ts"
+compatibility_date = "2026-05-01"
+
+# The shared source of truth. Bound as env.DB — see §5: bindings come from
+# `import { env } from "@telnyx/edge-runtime"`, never from the fetch argument.
+[storage.sqldb.DB]
+id = "4091855b-6def-489b-87e9-cb928e683541"
+
+# Caches the FCM OAuth access token (key "fcm/token" — KV keys may not
+# contain a colon). The cached value carries its own expires_at; see §8.
+[storage.kv.KV]
+id = "d273e743-54f9-4400-a105-d330449c00a3"
+
+# Whole service-account JSON, parsed in code: a bare PEM in an env var loses
+# its newlines (§8).
+[[secrets]]
+binding = "FCM_SERVICE_ACCOUNT"
+name = "FCM_SERVICE_ACCOUNT"
+
+# Shared secret for POST /cron/daily. No device calls that route (§7).
+[[secrets]]
+binding = "CRON_SECRET"
+name = "CRON_SECRET"
+
+# Second layer on enrolment; 10-character invite codes are the real defence (§11).
+[[ratelimits]]
+name = "ENROLL_LIMIT"
+limit = 10
+period = 60
+
+[edge_compute]
+func_id = "db2fb8bb-e93f-4bb3-aa04-58217ac83ff8"
+func_name = "monio-api"

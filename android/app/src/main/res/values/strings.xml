@@ -1,0 +1,183 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  English — the source language (PRD §9) and the default resources, so an
+  unsupported system language lands here rather than on a missing key.
+
+  Polish lives in values-pl/. Keep the two in step: a key added there and not
+  here does not exist as far as R is concerned and will not compile; a key
+  added here and not there simply shows in English.
+
+  No string is hardcoded in a composable, even a one-off — the moment one is,
+  the rule stops being checkable.
+
+  "zł" is a currency symbol, not a word: it is identical in every translation.
+-->
+<resources>
+    <string name="app_name">Monia</string>
+
+    <!-- Navigation -->
+    <string name="nav_overview">Overview</string>
+    <string name="nav_add">Add</string>
+    <string name="nav_transactions">History</string>
+    <string name="nav_budget">Budget</string>
+    <string name="nav_settings">Settings</string>
+
+    <!-- Add screen -->
+    <string name="add_expense">Expense</string>
+    <string name="add_income">Income</string>
+    <string name="add_transfer">Transfer</string>
+    <string name="add_save">Save</string>
+    <string name="add_note_hint">Note</string>
+    <string name="add_pick_category">Pick a category</string>
+    <string name="add_pick_account">Account</string>
+    <string name="add_transfer_to">To account</string>
+    <string name="add_saved">Saved</string>
+    <string name="add_needs_amount">Enter an amount</string>
+    <string name="add_needs_category">Pick a category</string>
+    <string name="add_needs_account">Add an account first</string>
+    <string name="add_needs_transfer_account">Pick the other account</string>
+    <string name="add_clear">Clear</string>
+    <string name="add_backspace">Delete character</string>
+    <string name="add_today">Today</string>
+    <string name="add_yesterday">Yesterday</string>
+    <string name="add_pick_date">Pick a date</string>
+
+    <!-- Overview -->
+    <string name="overview_income">Income</string>
+    <string name="overview_expenses">Expenses</string>
+    <string name="overview_balance">Balance</string>
+    <string name="overview_breakdown">Where the money goes</string>
+    <string name="overview_recent">Recent transactions</string>
+    <string name="overview_no_data">No spending this month</string>
+    <string name="overview_accounts">Accounts</string>
+    <string name="overview_see_all">See all</string>
+    <string name="overview_previous_month">Previous month</string>
+    <string name="overview_next_month">Next month</string>
+    <string name="overview_percent">%1$d%%</string>
+
+    <!-- Transactions -->
+    <string name="transactions_search">Search</string>
+    <string name="transactions_empty">No transactions</string>
+    <string name="transactions_filter_all">All</string>
+    <string name="transactions_filter_category">Category</string>
+    <string name="transactions_filter_account">Account</string>
+    <string name="transactions_clear_filters">Clear filters</string>
+    <string name="transactions_delete">Delete</string>
+    <string name="transactions_deleted">Deleted</string>
+    <string name="transactions_undo">Undo</string>
+    <string name="transactions_pending">Waiting to sync</string>
+    <string name="transactions_rejected">Rejected by the server</string>
+    <string name="transactions_filter_period">Period</string>
+    <string name="transactions_delete_confirm_title">Delete this transaction?</string>
+    <string name="transactions_delete_confirm_message">This cannot be undone.</string>
+
+    <!-- Budget -->
+    <string name="budget_title">Budget</string>
+    <string name="budget_empty">No limits set yet</string>
+    <string name="budget_set_limit">Set a limit</string>
+    <string name="budget_edit_limit">Change limit</string>
+    <string name="budget_remove_limit">Remove limit</string>
+    <string name="budget_limit">Limit</string>
+    <string name="budget_spent_of">%1$s of %2$s</string>
+    <string name="budget_left">%1$s left</string>
+    <string name="budget_over">%1$s over</string>
+    <string name="budget_add_category">Add a category to the budget</string>
+    <string name="budget_save">Save</string>
+    <string name="budget_cancel">Cancel</string>
+    <string name="budget_carries_forward">The limit also applies in later months</string>
+    <string name="budget_view_transactions">View transactions</string>
+
+    <!-- Notifications. The server sends a key and its arguments; this file
+         supplies the wording. Every placeholder is %1$s, never %d: getString()
+         handed a String for a %d specifier throws (§8). -->
+    <string name="channel_budget_alerts">Budget alerts</string>
+    <string name="channel_budget_alerts_description">A heads-up when spending approaches a limit</string>
+    <string name="budget_alert_title">Monia</string>
+    <string name="budget_alert">%1$s: %2$s of %3$s zł (%4$s%%)</string>
+    <string name="notifications_permission_rationale">Monia will warn you before you go over budget</string>
+    <string name="notifications_enable">Turn on notifications</string>
+
+    <!-- Settings -->
+    <string name="settings_accounts">Accounts</string>
+    <string name="settings_categories">Categories</string>
+    <string name="settings_members">Household</string>
+    <string name="settings_invite">Invite someone</string>
+    <string name="settings_invite_code">Invite code</string>
+    <string name="settings_invite_expires">The code expires after 24 hours</string>
+    <string name="settings_invite_copy">Copy</string>
+    <string name="settings_invite_copied">Copied</string>
+    <string name="settings_invite_create">Create a code</string>
+    <string name="settings_sync">Sync</string>
+    <string name="settings_sync_now">Sync now</string>
+    <string name="settings_last_sync">Last sync: %1$s</string>
+    <string name="settings_never_synced">Not synced yet</string>
+    <string name="settings_rejected_rows">Rejected rows: %1$d</string>
+    <string name="settings_reupload">Re-upload everything</string>
+    <string name="settings_reupload_description">Use this after restoring the server from a backup</string>
+    <string name="settings_reupload_done">Re-upload scheduled</string>
+    <string name="settings_backup">Backup</string>
+    <string name="settings_last_backup">Last backup: %1$s</string>
+    <string name="settings_backup_stale">No backup for more than 3 days</string>
+    <string name="settings_backup_unknown">No backup information</string>
+    <string name="settings_app_version">App version</string>
+    <string name="settings_build">Version %1$s (%2$d)</string>
+    <string name="settings_add_account">Add an account</string>
+    <string name="settings_add_category">Add a category</string>
+    <string name="settings_account_name">Account name</string>
+    <string name="settings_account_balance">Opening balance</string>
+    <string name="settings_category_name">Category name</string>
+    <string name="settings_category_parent">Parent category</string>
+    <string name="settings_category_none">None</string>
+    <string name="settings_save">Save</string>
+    <string name="settings_cancel">Cancel</string>
+    <string name="settings_delete">Delete</string>
+    <string name="settings_kind_expense">Expense</string>
+    <string name="settings_kind_income">Income</string>
+
+    <!-- Language. Each language is named in its own language, which is what a
+         person scanning the list for their own actually looks for. -->
+    <string name="settings_language">Language</string>
+    <string name="settings_language_system">System default</string>
+    <string name="language_en" translatable="false">English</string>
+    <string name="language_pl" translatable="false">Polski</string>
+
+    <!-- Onboarding -->
+    <string name="onboarding_title">Welcome to Monia</string>
+    <string name="onboarding_subtitle">A shared household budget</string>
+    <string name="onboarding_invite_code">Invite code</string>
+    <string name="onboarding_your_name">Your name</string>
+    <string name="onboarding_join">Join</string>
+    <string name="onboarding_joining">Connecting…</string>
+    <string name="onboarding_error_invite_not_found">No such code</string>
+    <string name="onboarding_error_invite_already_used">That code has already been used</string>
+    <string name="onboarding_error_invite_expired">The code has expired</string>
+    <string name="onboarding_error_network">Cannot reach the server</string>
+    <string name="onboarding_error_generic">Something went wrong</string>
+    <string name="onboarding_need_code">Enter the invite code</string>
+    <string name="onboarding_need_name">Enter your name</string>
+
+    <!-- Shared -->
+    <string name="common_back">Back</string>
+    <string name="common_close">Close</string>
+    <string name="common_more">More</string>
+    <string name="common_none">None</string>
+    <string name="currency_suffix" translatable="false">zł</string>
+
+    <!-- Settings — additions (accounts, categories, invite, backup) -->
+    <string name="settings_invite_loading">Generating…</string>
+    <string name="settings_invite_error">Could not create an invite</string>
+    <string name="settings_reupload_confirm_title">Re-upload everything?</string>
+    <string name="settings_delete_account_confirm">Delete account \"%1$s\"?</string>
+    <string name="settings_delete_category_confirm">Delete category \"%1$s\"?</string>
+    <string name="settings_icon">Icon</string>
+    <string name="settings_color">Colour</string>
+    <string name="settings_edit">Edit</string>
+    <string name="settings_edit_account">Edit account</string>
+    <string name="settings_edit_category">Edit category</string>
+    <string name="settings_no_accounts">No accounts</string>
+    <string name="settings_no_categories">No categories</string>
+    <string name="settings_no_members">Nobody yet</string>
+    <string name="settings_add_subcategory">Add a subcategory</string>
+    <string name="settings_kind">Kind</string>
+    <string name="settings_member_since">Joined: %1$s</string>
+</resources>

@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- The system splash on Android 12+ is not optional and cannot be removed.
+         What must be avoided is a CUSTOM splash Activity and any
+         setKeepOnScreenCondition (PRD §9).
+
+         The parent is an AppCompat theme because MainActivity is an
+         AppCompatActivity, which is what applies a chosen locale to the
+         Activity's Configuration below API 33. Compose still owns every colour
+         and type style the user actually sees. -->
+    <style name="Theme.Monio" parent="Theme.AppCompat.Light.NoActionBar">
+        <item name="android:windowBackground">@android:color/white</item>
+    </style>
+</resources>

@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- A coin with a zloty stroke: the app is about money in one currency. -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M54,30a24,24 0 1,0 0.001,0zM54,38a16,16 0 1,1 -0.001,0z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M48,46h5.5c4.2,0 7,2.4 7,6.2c0,3.9 -2.9,6.3 -7.3,6.3h-2.4V64h-2.8zM50.8,48.4v7.7h2.3c2.7,0 4.4,-1.4 4.4,-3.9c0,-2.4 -1.6,-3.8 -4.3,-3.8z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M45,55.5h9v2.2h-9z" />
+</vector>

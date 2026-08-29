@@ -1,0 +1,176 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Polish. The source language is English (PRD §9), which lives in
+  values/strings.xml; this file is the translation.
+
+  Keep both files in step: a key added here and not there falls back to
+  English, and a key added there and not here is simply untranslated.
+
+  No string is hardcoded in a composable, even a one-off — the moment one is,
+  the rule stops being checkable.
+-->
+<resources>
+    <string name="app_name">Monia</string>
+
+    <!-- Navigation -->
+    <string name="nav_overview">Przegląd</string>
+    <string name="nav_add">Dodaj</string>
+    <string name="nav_transactions">Transakcje</string>
+    <string name="nav_budget">Budżet</string>
+    <string name="nav_settings">Ustawienia</string>
+
+    <!-- Add screen -->
+    <string name="add_expense">Wydatek</string>
+    <string name="add_income">Przychód</string>
+    <string name="add_transfer">Przelew</string>
+    <string name="add_save">Zapisz</string>
+    <string name="add_note_hint">Notatka</string>
+    <string name="add_pick_category">Wybierz kategorię</string>
+    <string name="add_pick_account">Konto</string>
+    <string name="add_transfer_to">Na konto</string>
+    <string name="add_saved">Zapisano</string>
+    <string name="add_needs_amount">Podaj kwotę</string>
+    <string name="add_needs_category">Wybierz kategorię</string>
+    <string name="add_needs_account">Dodaj najpierw konto</string>
+    <string name="add_needs_transfer_account">Wybierz drugie konto</string>
+    <string name="add_clear">Wyczyść</string>
+    <string name="add_backspace">Usuń znak</string>
+    <string name="add_today">Dziś</string>
+    <string name="add_yesterday">Wczoraj</string>
+    <string name="add_pick_date">Wybierz datę</string>
+
+    <!-- Overview -->
+    <string name="overview_income">Przychody</string>
+    <string name="overview_expenses">Wydatki</string>
+    <string name="overview_balance">Bilans</string>
+    <string name="overview_breakdown">Na co idą pieniądze</string>
+    <string name="overview_recent">Ostatnie transakcje</string>
+    <string name="overview_no_data">Brak wydatków w tym miesiącu</string>
+    <string name="overview_accounts">Konta</string>
+    <string name="overview_see_all">Zobacz wszystkie</string>
+    <string name="overview_previous_month">Poprzedni miesiąc</string>
+    <string name="overview_next_month">Następny miesiąc</string>
+    <string name="overview_percent">%1$d%%</string>
+
+    <!-- Transactions -->
+    <string name="transactions_search">Szukaj</string>
+    <string name="transactions_empty">Brak transakcji</string>
+    <string name="transactions_filter_all">Wszystkie</string>
+    <string name="transactions_filter_category">Kategoria</string>
+    <string name="transactions_filter_account">Konto</string>
+    <string name="transactions_clear_filters">Wyczyść filtry</string>
+    <string name="transactions_delete">Usuń</string>
+    <string name="transactions_deleted">Usunięto</string>
+    <string name="transactions_undo">Cofnij</string>
+    <string name="transactions_pending">Czeka na wysłanie</string>
+    <string name="transactions_rejected">Odrzucona przez serwer</string>
+    <string name="transactions_filter_period">Okres</string>
+    <string name="transactions_delete_confirm_title">Usunąć transakcję?</string>
+    <string name="transactions_delete_confirm_message">Tej operacji nie można cofnąć.</string>
+
+    <!-- Budget -->
+    <string name="budget_title">Budżet</string>
+    <string name="budget_empty">Nie ustawiono jeszcze żadnych limitów</string>
+    <string name="budget_set_limit">Ustaw limit</string>
+    <string name="budget_edit_limit">Zmień limit</string>
+    <string name="budget_remove_limit">Usuń limit</string>
+    <string name="budget_limit">Limit</string>
+    <string name="budget_spent_of">%1$s z %2$s</string>
+    <string name="budget_left">Zostało %1$s</string>
+    <string name="budget_over">Przekroczono o %1$s</string>
+    <string name="budget_add_category">Dodaj kategorię do budżetu</string>
+    <string name="budget_save">Zapisz</string>
+    <string name="budget_cancel">Anuluj</string>
+    <string name="budget_carries_forward">Limit obowiązuje też w kolejnych miesiącach</string>
+    <string name="budget_view_transactions">Zobacz transakcje</string>
+
+    <!-- Notifications. The server sends a key and its arguments; this file
+         supplies the wording. Every placeholder is %1$s, never %d: getString()
+         handed a String for a %d specifier throws (§8). -->
+    <string name="channel_budget_alerts">Alerty budżetowe</string>
+    <string name="channel_budget_alerts_description">Powiadomienie, gdy wydatki zbliżają się do limitu</string>
+    <string name="budget_alert_title">Monia</string>
+    <string name="budget_alert">%1$s: %2$s z %3$s zł (%4$s%%)</string>
+    <string name="notifications_permission_rationale">Monia powiadomi Cię, zanim przekroczysz budżet</string>
+    <string name="notifications_enable">Włącz powiadomienia</string>
+
+    <!-- Settings -->
+    <string name="settings_accounts">Konta</string>
+    <string name="settings_categories">Kategorie</string>
+    <string name="settings_members">Domownicy</string>
+    <string name="settings_invite">Zaproś domownika</string>
+    <string name="settings_invite_code">Kod zaproszenia</string>
+    <string name="settings_invite_expires">Kod wygasa po 24 godzinach</string>
+    <string name="settings_invite_copy">Kopiuj</string>
+    <string name="settings_invite_copied">Skopiowano</string>
+    <string name="settings_invite_create">Utwórz kod</string>
+    <string name="settings_sync">Synchronizacja</string>
+    <string name="settings_sync_now">Synchronizuj teraz</string>
+    <string name="settings_last_sync">Ostatnia synchronizacja: %1$s</string>
+    <string name="settings_never_synced">Jeszcze nie synchronizowano</string>
+    <string name="settings_rejected_rows">Odrzucone wiersze: %1$d</string>
+    <string name="settings_reupload">Wyślij wszystko ponownie</string>
+    <string name="settings_reupload_description">Użyj po odtworzeniu serwera z kopii zapasowej</string>
+    <string name="settings_reupload_done">Zaplanowano ponowne wysłanie</string>
+    <string name="settings_backup">Kopia zapasowa</string>
+    <string name="settings_last_backup">Ostatnia kopia: %1$s</string>
+    <string name="settings_backup_stale">Brak kopii zapasowej od ponad 3 dni</string>
+    <string name="settings_backup_unknown">Brak informacji o kopii zapasowej</string>
+    <string name="settings_app_version">Wersja aplikacji</string>
+    <string name="settings_build">Wersja %1$s (%2$d)</string>
+    <string name="settings_add_account">Dodaj konto</string>
+    <string name="settings_add_category">Dodaj kategorię</string>
+    <string name="settings_account_name">Nazwa konta</string>
+    <string name="settings_account_balance">Saldo początkowe</string>
+    <string name="settings_category_name">Nazwa kategorii</string>
+    <string name="settings_category_parent">Kategoria nadrzędna</string>
+    <string name="settings_category_none">Brak</string>
+    <string name="settings_save">Zapisz</string>
+    <string name="settings_cancel">Anuluj</string>
+    <string name="settings_delete">Usuń</string>
+    <string name="settings_kind_expense">Wydatek</string>
+    <string name="settings_kind_income">Przychód</string>
+
+    <!-- Język -->
+    <string name="settings_language">Język</string>
+    <string name="settings_language_system">Domyślny systemowy</string>
+
+    <!-- Onboarding -->
+    <string name="onboarding_title">Witaj w Monii</string>
+    <string name="onboarding_subtitle">Wspólny budżet domowy</string>
+    <string name="onboarding_invite_code">Kod zaproszenia</string>
+    <string name="onboarding_your_name">Twoje imię</string>
+    <string name="onboarding_join">Dołącz</string>
+    <string name="onboarding_joining">Łączenie…</string>
+    <string name="onboarding_error_invite_not_found">Nie znaleziono takiego kodu</string>
+    <string name="onboarding_error_invite_already_used">Ten kod został już użyty</string>
+    <string name="onboarding_error_invite_expired">Kod wygasł</string>
+    <string name="onboarding_error_network">Brak połączenia z serwerem</string>
+    <string name="onboarding_error_generic">Coś poszło nie tak</string>
+    <string name="onboarding_need_code">Wpisz kod zaproszenia</string>
+    <string name="onboarding_need_name">Wpisz swoje imię</string>
+
+    <!-- Shared -->
+    <string name="common_back">Wstecz</string>
+    <string name="common_close">Zamknij</string>
+    <string name="common_more">Więcej</string>
+    <string name="common_none">Brak</string>
+
+    <!-- Settings — additions (accounts, categories, invite, backup) -->
+    <string name="settings_invite_loading">Generowanie…</string>
+    <string name="settings_invite_error">Nie udało się utworzyć zaproszenia</string>
+    <string name="settings_reupload_confirm_title">Wysłać wszystko ponownie?</string>
+    <string name="settings_delete_account_confirm">Usunąć konto \"%1$s\"?</string>
+    <string name="settings_delete_category_confirm">Usunąć kategorię \"%1$s\"?</string>
+    <string name="settings_icon">Ikona</string>
+    <string name="settings_color">Kolor</string>
+    <string name="settings_edit">Edytuj</string>
+    <string name="settings_edit_account">Edytuj konto</string>
+    <string name="settings_edit_category">Edytuj kategorię</string>
+    <string name="settings_no_accounts">Brak kont</string>
+    <string name="settings_no_categories">Brak kategorii</string>
+    <string name="settings_no_members">Brak domowników</string>
+    <string name="settings_add_subcategory">Dodaj podkategorię</string>
+    <string name="settings_kind">Rodzaj</string>
+    <string name="settings_member_since">Dołączenie: %1$s</string>
+</resources>

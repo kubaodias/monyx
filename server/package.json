@@ -1,0 +1,21 @@
+{
+  "name": "monio-api",
+  "version": "0.1.0",
+  "description": "Monio household budget \u2014 Telnyx Edge Compute backend",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "node --test test/*.test.ts"
+  },
+  "dependencies": {
+    "@telnyx/edge-runtime": "^0.14.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.6.0"
+  },
+  "engines": {
+    "node": ">=22.5.0"
+  }
+}

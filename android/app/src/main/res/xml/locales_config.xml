@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Declared so Android 13+ lists the app under Settings › System › Languages,
+  and so AppCompat knows which tags are real. A language added to values-*/
+  and forgotten here still works in-app but goes missing from system settings.
+-->
+<locale-config xmlns:android="http://schemas.android.com/apk/res/android">
+    <locale android:name="en" />
+    <locale android:name="pl" />
+</locale-config>
