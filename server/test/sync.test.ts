@@ -1,6 +1,6 @@
-// The sync protocol. §14 names the sync bug that loses rows silently as a High
-// risk whose failure mode is invisible by nature — no error, and each phone
-// looks complete. These tests are the only thing standing in front of it.
+// The sync protocol. A sync bug that loses rows silently is the highest risk in
+// this design: the failure mode is invisible by nature — no error, and each
+// phone looks complete. These tests are the only thing standing in front of it.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { FakeDb, expense, seedHousehold } from "./fake-db.ts";
@@ -34,7 +34,7 @@ test("seq is allocated per row and runs across the whole batch, not per table", 
   const seqs = rows.map((r) => r.seq).sort((a, b) => a - b);
 
   // The likeliest implementation error is resetting the offset per table, which
-  // produces duplicate seqs across tables and is silent (§13, M0 step 2).
+  // produces duplicate seqs across tables and is silent.
   assert.equal(new Set(seqs).size, 3, "seqs must be distinct across tables");
   assert.equal(seqs[2]! - seqs[0]!, 2, "seqs must be consecutive");
   assert.equal(result.seq, seqs[2], "push returns the top of the reserved range");
@@ -202,7 +202,7 @@ test("restore: bumping epoch tells every device to reset its cursor and re-pull"
   const before = await pull(db, 0);
   assert.equal(before.epoch, 1);
 
-  // Step 2 of the restore runbook (§10).
+  // Step 2 of the restore runbook.
   fake.db.exec("UPDATE households SET epoch = 2 WHERE id = 'hh1'");
 
   const after = await pull(db, before.seq);
@@ -221,7 +221,7 @@ test("re-upload everything is idempotent — the same rows push twice without du
   const count = fake.db.prepare("SELECT COUNT(*) AS c FROM transactions WHERE id='reup'").get() as {
     c: number;
   };
-  assert.equal(count.c, 1, "upserts are idempotent by id (§10 step 3)");
+  assert.equal(count.c, 1, "upserts are idempotent by id");
 });
 
 test("a push over the 200-change cap reports the overflow instead of silently dropping it", async () => {

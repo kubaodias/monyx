@@ -19,7 +19,7 @@ import java.util.concurrent.TimeUnit
  * Expedited work is the wrong tool: below API 31 it runs as a foreground
  * service, which crashes unless getForegroundInfo() is overridden and otherwise
  * shows the family a notification every time someone adds an expense — hostile
- * to everything §9 is for.
+ * to everything the design is for.
  */
 class SyncWorker(
     context: Context,
@@ -31,7 +31,7 @@ class SyncWorker(
         val session = Session(applicationContext)
         if (!session.isEnrolled()) return Result.success()
 
-        // WorkManager handles retry with backoff; we do not write our own (§9).
+        // WorkManager handles retry with backoff; we do not write our own.
         return SyncEngine(db, session).sync().fold(
             onSuccess = { Result.success() },
             onFailure = { Result.retry() },
@@ -52,7 +52,7 @@ class SyncWorker(
          *
          * A force-stopped app runs no WorkManager jobs at all until someone
          * launches it, and on several OEMs swiping from recents IS a force stop,
-         * which makes sync-on-open the load-bearing trigger (§9).
+         * which makes sync-on-open the load-bearing trigger.
          */
         fun enqueue(context: Context) {
             val request = OneTimeWorkRequestBuilder<SyncWorker>()
@@ -67,7 +67,7 @@ class SyncWorker(
          * Hourly, as a bonus on top of sync-on-open.
          *
          * UPDATE, not KEEP: KEEP on periodic work means a later change to the
-         * interval or constraints never reaches an installed app (§9).
+         * interval or constraints never reaches an installed app.
          */
         fun schedulePeriodic(context: Context) {
             val request = PeriodicWorkRequestBuilder<SyncWorker>(1, TimeUnit.HOURS)

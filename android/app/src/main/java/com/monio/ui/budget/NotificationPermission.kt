@@ -51,7 +51,7 @@ private fun hasPostNotificationsPermission(context: Context): Boolean {
 
 /**
  * Requests POST_NOTIFICATIONS on first visit to the Budget screen, Android 13+
- * only (PRD §9). This must NEVER be called from the Add screen — the
+ * only. This must NEVER be called from the Add screen — the
  * five-second rule forbids a permission dialog in that path. Without this
  * permission every push is dropped silently: the server sees a successful
  * delivery and the phone shows nothing.

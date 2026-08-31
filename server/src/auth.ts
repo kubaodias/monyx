@@ -4,7 +4,7 @@ import type { SqlDatabase } from "@telnyx/edge-runtime";
 import { forHousehold, resolveInvite, resolveSession, type SessionRow } from "./db.ts";
 
 /**
- * Invite codes are 10 random characters (~50 bits), not 4 (§11).
+ * Invite codes are 10 random characters (~50 bits), not 4.
  *
  * A four-character code is about a million possibilities, and enumerating that
  * at a modest request rate takes hours for a prize of the family's complete
@@ -72,7 +72,7 @@ export async function enroll(
 
   const invite = await resolveInvite(code, db);
   if (!invite) return { ok: false, status: 404, code: "invite_not_found" };
-  // Single-use, and expiring after 24 h (§7).
+  // Single-use, and expiring after 24 h.
   if (invite.used_at !== null) return { ok: false, status: 409, code: "invite_already_used" };
   if (invite.expires_at < nowMs) return { ok: false, status: 410, code: "invite_expired" };
 
@@ -126,7 +126,7 @@ export async function enroll(
 }
 
 /**
- * Mint an invite. Any enrolled device can do this (§7) — the alternative
+ * Mint an invite. Any enrolled device can do this — the alternative
  * strands people: a phone dies, someone reinstalls, someone clears app data,
  * and rejoining would wait on the author being at a laptop.
  */
@@ -147,7 +147,7 @@ export async function createInvite(
 
 /**
  * The session token does not expire — this is a family member's phone, not a
- * bank. Revocation is deleting the row in devices (§7).
+ * bank. Revocation is deleting the row in devices.
  */
 export async function authenticate(
   authorization: string | null,
@@ -162,7 +162,7 @@ export async function authenticate(
 /**
  * The FCM token rides along on /sync/push rather than a dedicated endpoint: a
  * fire-and-forget call at app start fails whenever the phone happens to be
- * offline at launch, with no retry and no state to retry from (§7).
+ * offline at launch, with no retry and no state to retry from.
  */
 export async function touchDevice(
   householdId: string,

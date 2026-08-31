@@ -1,7 +1,7 @@
 // Enrolment, invites and session resolution.
 //
 // This is the only path that runs before a household is known, so it is also
-// the only path where the isolation boundary in §11 could be got wrong.
+// the only path where the isolation boundary could be got wrong.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { FakeDb, seedHousehold } from "./fake-db.ts";
@@ -28,7 +28,7 @@ function addInvite(fake: FakeDb, code: string, expiresAt: number, usedAt: number
 test("an invite code is 10 characters of unambiguous alphabet", () => {
   // 10 random characters is ~50 bits. A four-character code is about a million
   // possibilities — hours of enumeration for the family's complete financial
-  // history plus write access (§11).
+  // history plus write access.
   for (let i = 0; i < 200; i += 1) {
     const code = generateInviteCode();
     assert.equal(code.length, 10);
@@ -58,7 +58,7 @@ test("enrolment consumes an invite and returns a session", async () => {
 
   assert.equal(result.value.household_id, "hh1");
   assert.equal(result.value.epoch, 1);
-  // A fresh device starts at zero and pulls everything (§7).
+  // A fresh device starts at zero and pulls everything.
   assert.equal(result.value.seq, 0);
   assert.ok(result.value.session_token.length >= 40);
 });
@@ -155,7 +155,7 @@ test("any enrolled device can mint an invite", async () => {
   assert.equal(invite.expires_at, NOW + DAY);
 
   // And that invite works — this is what stops a dead phone stranding someone
-  // until the author is next at a laptop (§7).
+  // until the author is next at a laptop.
   const result = await enroll(
     { invite_code: invite.code, member_name: "Nowy", device_label: null },
     NOW,
@@ -200,7 +200,7 @@ test("two households never see each other's rows", async () => {
   const page = await pull(forHousehold(session!.household_id, fake), 0);
 
   // Every query filters by the household_id from the token, never by a value
-  // from the request (§11).
+  // from the request.
   const foreign = page.changes.filter((c) => String(c.row["household_id"]) !== "hh1");
   assert.deepEqual(foreign, []);
 });

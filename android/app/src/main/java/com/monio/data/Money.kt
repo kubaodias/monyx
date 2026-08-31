@@ -12,7 +12,7 @@ import java.util.Locale
  * Money renders through NumberFormat in whatever locale the interface is set
  * to: 1 324,00 in Polish, 1,324.00 in English. What does NOT move with the
  * language is the currency — the household banks in złoty whichever language
- * it reads in, so "zł" is a symbol, not a translated word (§9).
+ * it reads in, so "zł" is a symbol, not a translated word.
  *
  * Formatters are cached against the locale that built them rather than held in
  * a val, because AppCompatDelegate.setApplicationLocales changes the default
@@ -96,7 +96,7 @@ object Money {
 }
 
 /**
- * Months are bucketed on a LOCAL date (§6). The client authors occurred_on, and
+ * Months are bucketed on a LOCAL date. The client authors occurred_on, and
  * every monthly aggregate groups on substr(occurred_on, 1, 7). Without it an
  * expense entered at 01:30 on 1 September in Warsaw falls into August for the
  * server and September for the phone.

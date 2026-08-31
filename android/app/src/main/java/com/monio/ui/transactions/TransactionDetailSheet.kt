@@ -45,8 +45,8 @@ import com.monio.ui.theme.Palette
 
 /**
  * The full view of one transaction, opened from a row in TransactionsScreen.
- * Offers delete (PRD §9). A rejected row is shown plainly here too — §7: a
- * rejected change is never silently dropped.
+ * Offers delete. A rejected row is shown plainly here too: a rejected change
+ * is never silently dropped.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

@@ -1,7 +1,7 @@
 // HTTP handler and routing, nothing else.
 //
 // The router does NOT consume the request body: each handler reads its own.
-// §12's voice webhooks sign over {timestamp}|{raw_body}, so a central
+// The planned voice webhooks sign over {timestamp}|{raw_body}, so a central
 // JSON.parse here would destroy the bytes needed to verify them. Costs nothing
 // to get right today and is irritating to retrofit.
 import { env } from "@telnyx/edge-runtime";
@@ -29,7 +29,7 @@ function json(body: unknown, status = 200): Response {
 
 function fail(status: number, code: string): Response {
   // The server never composes user-facing text: it returns codes, and the
-  // client maps them to Polish strings (§9).
+  // client maps them to Polish strings.
   return json({ error: code }, status);
 }
 
@@ -47,7 +47,7 @@ async function readJson(req: Request): Promise<Record<string, unknown> | null> {
 }
 
 /**
- * Claim, then send, then stamp (§8). Claiming already happened; this delivers
+ * Claim, then send, then stamp. Claiming already happened; this delivers
  * and stamps. A delivery that fails leaves notified_at at 0 for the sweep.
  */
 async function deliverAlerts(
@@ -84,7 +84,7 @@ async function deliverAlerts(
           .run();
       }
     } catch (error) {
-      // Leave notified_at at 0 — the daily sweep retries it (§8).
+      // Leave notified_at at 0 — the daily sweep retries it.
       console.error("alert delivery failed", error);
     }
   }
@@ -128,7 +128,7 @@ async function handlePush(req: Request, session: SessionLike, nowMs: number): Pr
   const result = await push(db, changes);
 
   // The threshold check runs inline right after the batch commits — not in an
-  // actor (§8). The alert lands seconds after the expense that crossed the
+  // actor. The alert lands seconds after the expense that crossed the
   // line, which is the only moment it is worth anything.
   const periods = new Set<string>();
   for (const row of result.acceptedTransactions) {
@@ -151,7 +151,7 @@ async function handlePull(url: URL, session: SessionLike): Promise<Response> {
   const db = forHousehold(session.household_id);
   const page = await pull(db, since, Number.isFinite(limit) ? limit : DEFAULT_PULL_LIMIT);
 
-  // An invisible backup is not a backup (§8): the app reads this on open and
+  // An invisible backup is not a backup: the app reads this on open and
   // Settings warns when it is more than three days old.
   let lastBackupAt: number | null = null;
   try {
@@ -177,7 +177,7 @@ async function handleCron(req: Request, nowMs: number): Promise<Response> {
   const body = (await readJson(req)) ?? {};
 
   // The workflow reports its own success: the export runs outside the platform,
-  // so the function would otherwise never learn it happened (§8).
+  // so the function would otherwise never learn it happened.
   const reported = body["last_backup_at"];
   if (typeof reported === "number" && Number.isFinite(reported)) {
     await env.KV.put(BACKUP_KEY, String(reported));
@@ -190,7 +190,7 @@ async function handleCron(req: Request, nowMs: number): Promise<Response> {
   for (const household of households) {
     const db = forHousehold(household.id);
     // What the push path cannot see: a month boundary, a budget revised
-    // downward, a delivery that failed, a phone that was offline (§8).
+    // downward, a delivery that failed, a phone that was offline.
     const fresh = await claimAlerts(db, period, nowMs);
     const retries = await undeliveredAlerts(db, period);
     const all = [...fresh, ...dedupe(retries, fresh)];
@@ -220,7 +220,7 @@ export default {
     const nowMs = Date.now();
 
     // Must be fast — it serves platform monitoring — and never touches the
-    // database (§7).
+    // database.
     if (path === "/health") return new Response("ok", { status: 200 });
 
     try {

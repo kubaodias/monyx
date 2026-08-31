@@ -3,8 +3,7 @@ package com.monio.notifications
 import com.monio.R
 
 /**
- * The key is resolved through an explicit map, never Resources.getIdentifier()
- * (PRD §8).
+ * The key is resolved through an explicit map, never Resources.getIdentifier().
  *
  * A string referenced only by name from the server has no code reference, and
  * shrinkResources on the R8-minified release build would strip it — leaving a

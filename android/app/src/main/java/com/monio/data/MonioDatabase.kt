@@ -32,7 +32,7 @@ abstract class MonioDatabase : RoomDatabase() {
                 /**
                  * Destructive migration is a legitimate strategy here, not a
                  * data-loss bug, because the sync cursor lives inside this same
-                 * database (§9). A wipe resets the cursor to zero, the next sync
+                 * database. A wipe resets the cursor to zero, the next sync
                  * re-pulls everything, and the only thing actually lost is what
                  * had not reached the server yet — normally nothing.
                  *

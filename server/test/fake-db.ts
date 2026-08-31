@@ -1,8 +1,8 @@
 // A SqlDatabase over node:sqlite.
 //
 // There is no local SQL database and no --local flag on the platform, and
-// secrets do not emulate either, so the protocol is exercised against a fake
-// (PRD §5). Node 22.5+ ships node:sqlite and a test runner, so this needs zero
+// secrets do not emulate either, so the protocol is exercised against a fake.
+// Node 22.5+ ships node:sqlite and a test runner, so this needs zero
 // devDependencies beyond TypeScript.
 import { DatabaseSync } from "node:sqlite";
 import { readFileSync } from "node:fs";
@@ -94,7 +94,7 @@ export class FakeDb implements SqlDatabase {
 
   constructor() {
     this.db = new DatabaseSync(":memory:");
-    // SQLDB has foreign keys on and stock SQLite does not (PRD §5).
+    // SQLDB has foreign keys on and stock SQLite does not.
     this.db.exec("PRAGMA foreign_keys = ON");
     const schema = readFileSync(join(HERE, "..", "migrations", "0001_init.sql"), "utf8");
     this.db.exec(schema);
@@ -131,7 +131,7 @@ export class FakeDb implements SqlDatabase {
 /** A household with one member, one account and a parent/child category pair. */
 export function seedHousehold(fake: FakeDb, id = "hh1") {
   const now = 1_756_000_000_000;
-  // Every synced row carries its own seq — no two rows share one (§6), so the
+  // Every synced row carries its own seq — no two rows share one, so the
   // fixture must not hand them all the same value either.
   const p = id === "hh1" ? "" : `${id}-`;
   fake.db.exec(

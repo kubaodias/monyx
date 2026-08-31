@@ -77,8 +77,8 @@ import kotlinx.coroutines.launch
 private const val BACKUP_STALE_MS = 3L * 24 * 60 * 60 * 1000
 
 /**
- * Settings holds accounts, categories, members, invite code and sync status
- * (PRD §9), plus the three items that make the design operable: the count of
+ * Settings holds accounts, categories, members, invite code and sync status,
+ * plus the three items that make the design operable: the count of
  * rejected rows, last_backup_at from the server, and re-upload everything.
  */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -360,7 +360,7 @@ private fun LanguageSection() {
         Locales.SUPPORTED.forEach { tag ->
             // An explicit map, never Resources.getIdentifier(): a string reached
             // only by a name built at runtime has no code reference, and
-            // shrinkResources strips it from the release build (§8).
+            // shrinkResources strips it from the release build.
             val label = when (tag) {
                 "pl" -> stringResource(R.string.language_pl)
                 else -> stringResource(R.string.language_en)

@@ -17,7 +17,7 @@ import com.monio.ui.theme.MonioTheme
 /**
  * One Activity. A home screen shortcut points here with an extra and branches
  * the start destination; launchMode is singleTop with onNewIntent. Do not add a
- * second Activity (PRD §9).
+ * second Activity.
  *
  * AppCompatActivity rather than ComponentActivity for one reason: below API 33
  * there is no framework LocaleManager, and AppCompat's back-port applies the
@@ -32,7 +32,7 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         // The system splash on Android 12+ is not optional and cannot be
         // removed. What must be avoided is a CUSTOM splash Activity and any
-        // setKeepOnScreenCondition (§9).
+        // setKeepOnScreenCondition.
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         readIntent(intent)
@@ -50,7 +50,7 @@ class MainActivity : AppCompatActivity() {
 
                 // Enqueue sync from a LaunchedEffect AFTER the first frame, never
                 // from Application.onCreate — everything before the first frame is
-                // what actually threatens the five-second target (§9).
+                // what actually threatens the five-second target.
                 LaunchedEffect(enrolled) {
                     if (enrolled == true) {
                         SyncWorker.enqueue(this@MainActivity)
@@ -74,7 +74,7 @@ class MainActivity : AppCompatActivity() {
      * With a notification block present, onMessageReceived is NOT called while
      * the app is backgrounded — the data arrives as extras on the launching
      * Activity's intent. So the deep link is read here, never in the messaging
-     * service (PRD §8).
+     * service.
      */
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)

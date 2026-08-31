@@ -56,8 +56,8 @@ import java.time.LocalDate
  * Launching the app must land directly on the numeric keypad. Type the amount,
  * tap a category, tap save. Account, date and author come from defaults.
  *
- * Target: two taps plus the amount, under five seconds from unlocking the phone
- * (PRD §9). Anything that stretches that — an animation, a save confirmation, a
+ * Target: two taps plus the amount, under five seconds from unlocking the phone.
+ * Anything that stretches that — an animation, a save confirmation, a
  * network requirement — is a bug, not a matter of taste.
  */
 @Composable
@@ -212,7 +212,7 @@ private fun KindSelector(selected: EntryKind, onSelect: (EntryKind) -> Unit) {
 
 /**
  * A Text, not a TextField. There is no focus to request and no keyboard to wait
- * for, which is the whole point (§9).
+ * for, which is the whole point.
  */
 @Composable
 private fun AmountDisplay(state: AddUiState) {

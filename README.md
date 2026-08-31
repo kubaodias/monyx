@@ -3,9 +3,6 @@
 A shared household budget app for one family. Native Android, backend on Telnyx
 Edge Compute. English and Polish interface, switchable in Settings.
 
-`PRD.md` is the specification and it governs; this file is only how to operate
-the thing.
-
 ## Layout
 
 ```
@@ -13,8 +10,7 @@ monio/
 ├── server/          Telnyx Edge Compute function (TypeScript)
 ├── android/         The app (Kotlin, Compose, Room)
 ├── scripts/         One-off operational scripts
-├── docs/decisions/  ADRs — written when something surprised us
-└── .github/workflows/cron.yml   The scheduler and the backup
+└── docs/decisions/  ADRs — written when something surprised us
 ```
 
 ## Prerequisites
@@ -127,24 +123,30 @@ and a formatter built at class-init would keep printing the old language.
 
 ## Scheduling and backup
 
-`.github/workflows/cron.yml` runs daily. It is the cron the platform lacks
-*and* the backup the function cannot take itself (`sqldb export` is CLI-only,
-with no REST equivalent).
+Nothing in this repository runs on a schedule. `POST /cron/daily` exists and is
+guarded by the `CRON_SECRET` secret; it sweeps the budget alerts the push path
+cannot see — a month boundary, a limit revised downward, a delivery that failed
+while a phone was offline. Something outside the function has to call it, and
+today nothing does.
 
-Required repository secrets: `TELNYX_API_KEY`, `CRON_SECRET`.
-Optional repository variable: `MONIO_API_URL`.
+Backups are manual for a harder reason: `sqldb export` is CLI-only, with no REST
+equivalent, so the function cannot dump its own database.
 
-Two properties of GitHub's scheduler worth knowing rather than rediscovering:
-its cron is **UTC-only**, so the 20:00 Warsaw sweep drifts by an hour across
-daylight saving; and GitHub **disables scheduled workflows after 60 days of
-repository inactivity** — precisely when the project succeeds and nobody touches
-the repo. That is why the workflow reports `last_backup_at` back to the
-function: the app reads it and Settings warns when it is more than three days
-old. An invisible backup is not a backup.
+```sh
+telnyx-edge storage sqldb export monio --remote --output monio-$(date -u +%Y%m%d).sql
+curl -X POST "$MONIO_API_URL/cron/daily" \
+  -H "x-cron-secret: $CRON_SECRET" -H 'content-type: application/json' \
+  -d "{\"last_backup_at\": $(date -u +%s)000}"
+```
 
-**The repository must stay private.** Once the backup workflow runs, it holds
-daily dumps of the family's complete financial history as build artifacts, and a
-`TELNYX_API_KEY` whose REST surface includes deleting the database.
+Reporting `last_backup_at` is what makes a missed backup visible: the app reads
+it and Settings warns when it is more than three days old. An invisible backup
+is not a backup.
+
+**Do not treat the phones as the backup.** `epoch` and the `households` row live
+on the server, so if the database is lost no phone can authenticate to re-upload
+its replica. The data survives locally, but recovery means seeding a fresh
+household and re-enrolling every device by hand.
 
 ## Restore runbook
 
@@ -178,4 +180,4 @@ cursors exist, and the 4 MiB ceiling only appears at real size.
 ## What is deliberately not here
 
 No multiple currencies, no debts or savings goals, no bank integration, no
-Excel export, no iOS, no web. See PRD §3 for why each one is out.
+Excel export, no iOS, no web.

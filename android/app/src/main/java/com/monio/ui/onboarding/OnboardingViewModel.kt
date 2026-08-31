@@ -29,7 +29,7 @@ data class OnboardingUiState(
  * Onboarding shows when app.session.isEnrolled() is false. Join calls
  * /auth/enroll on Dispatchers.IO; the server never composes user-facing text,
  * so every failure is mapped here from an error CODE to a Polish string,
- * never shown verbatim (PRD §9).
+ * never shown verbatim.
  */
 class OnboardingViewModel(private val app: MonioApp) : ViewModel() {
 

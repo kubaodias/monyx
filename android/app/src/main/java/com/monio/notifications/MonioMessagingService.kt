@@ -22,7 +22,7 @@ import kotlinx.coroutines.launch
 class MonioMessagingService : FirebaseMessagingService() {
 
     /**
-     * The FCM token rides along as an optional field on /sync/push (PRD §7). A
+     * The FCM token rides along as an optional field on /sync/push. A
      * dedicated endpoint would be a fire-and-forget call at app start that fails
      * whenever the phone happens to be offline at launch, with no retry and no
      * state to retry from. Attaching it to a request that already retries
@@ -37,7 +37,7 @@ class MonioMessagingService : FirebaseMessagingService() {
     }
 
     /**
-     * There are two render paths, not one (PRD §8).
+     * There are two render paths, not one.
      *
      * Backgrounded or killed, the system tray resolves the loc keys itself. In
      * the FOREGROUND this fires and the keys are NOT auto-resolved — so the
@@ -80,7 +80,7 @@ class MonioMessagingService : FirebaseMessagingService() {
             flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
             data.forEach { (key, value) -> putExtra(key, value) }
         }
-        // FLAG_IMMUTABLE is required on API 31+; omitting it throws (§8).
+        // FLAG_IMMUTABLE is required on API 31+; omitting it throws.
         val pending = PendingIntent.getActivity(
             this,
             0,

@@ -2,7 +2,7 @@
 // Restore a dump produced by `telnyx-edge storage sqldb export`.
 //
 // A SQL script over `execute --remote --file` is capped at roughly 4 MiB — past
-// it, 422 (PRD §10). A multi-year dump will exceed that, so this splits the file
+// it, 422. A multi-year dump will exceed that, so this splits the file
 // into chunks at statement boundaries. Ten lines, written now rather than
 // discovered during an outage.
 //

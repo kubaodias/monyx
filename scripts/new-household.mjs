@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Create a household, seed its default categories and accounts, and mint the
 // first invite code — all through the CLI, because a household has no endpoint
-// that creates it (PRD §7: enrolment consumes an invite, it does not bootstrap).
+// that creates it — enrolment consumes an invite, it does not bootstrap.
 //
 // Usage: node scripts/new-household.mjs "Dom" [--db monio] [--lang pl|en]
 //

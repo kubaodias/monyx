@@ -19,7 +19,7 @@ class MonioApp : Application() {
         createNotificationChannel()
         // NOTE: sync is deliberately NOT enqueued here. Application.onCreate and
         // everything before it is what actually threatens the five-second target
-        // (§9) — WorkManager initialises through an androidx.startup
+        // — WorkManager initialises through an androidx.startup
         // ContentProvider that runs first and opens its own Room database.
         // Enqueue from a LaunchedEffect after the first frame instead.
     }
@@ -27,7 +27,7 @@ class MonioApp : Application() {
     /**
      * A notification channel's importance is immutable after creation. It can
      * only be lowered, by the user, in system settings. Set it correctly on the
-     * first install or every family member fixes it by hand (§9).
+     * first install or every family member fixes it by hand.
      */
     private fun createNotificationChannel() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return

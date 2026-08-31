@@ -6,8 +6,8 @@ import org.junit.Test
 import java.util.Locale
 
 /**
- * The keypad is the whole add flow (PRD §9), and money is an integer in minor
- * units — the one rule whose violation is a critical bug (§6). Both are pure
+ * The keypad is the whole add flow, and money is an integer in minor
+ * units — the one rule whose violation is a critical bug. Both are pure
  * logic, so both are tested here rather than through the UI.
  */
 class AmountInputTest {
@@ -79,7 +79,7 @@ class AmountInputTest {
 
     @Test
     fun `a subtraction below zero clamps rather than producing a negative amount`() {
-        // Amounts are always positive; direction comes from kind (§6).
+        // Amounts are always positive; direction comes from kind.
         val result = type('5', '-', '9', '=')
         assertEquals(0L, result.toMinor())
     }

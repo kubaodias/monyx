@@ -48,7 +48,7 @@ private enum class Emphasis { Digit, Function, Confirm }
 
 /**
  * A hand-drawn grid, roughly forty lines of layout. No system keyboard is ever
- * shown in the add flow (PRD §9).
+ * shown in the add flow.
  *
  * Compose recomposition is not a risk here: a digit tap redrawing a number and a
  * twenty-cell grid is nothing. Do not spend an evening on derivedStateOf.

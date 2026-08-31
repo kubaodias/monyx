@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  Polish. The source language is English (PRD §9), which lives in
+  Polish. The source language is English, which lives in
   values/strings.xml; this file is the translation.
 
   Keep both files in step: a key added here and not there falls back to
@@ -86,7 +86,7 @@
 
     <!-- Notifications. The server sends a key and its arguments; this file
          supplies the wording. Every placeholder is %1$s, never %d: getString()
-         handed a String for a %d specifier throws (§8). -->
+         handed a String for a %d specifier throws. -->
     <string name="channel_budget_alerts">Alerty budżetowe</string>
     <string name="channel_budget_alerts_description">Powiadomienie, gdy wydatki zbliżają się do limitu</string>
     <string name="budget_alert_title">Monia</string>

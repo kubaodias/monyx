@@ -51,7 +51,7 @@ class AddViewModel(private val repository: MonioRepository) : ViewModel() {
     val accounts: StateFlow<List<AccountEntity>> = repository.accounts()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
-    /** Account and date come from defaults so the fast path stays two taps (§9). */
+    /** Account and date come from defaults so the fast path stays two taps. */
     fun ensureDefaultAccount(available: List<AccountEntity>) {
         if (_state.value.accountId == null && available.isNotEmpty()) {
             _state.value = _state.value.copy(accountId = available.first().id)
@@ -74,7 +74,7 @@ class AddViewModel(private val repository: MonioRepository) : ViewModel() {
     fun setKind(kind: EntryKind) {
         _state.value = _state.value.copy(
             kind = kind,
-            // A transfer has no category and never enters spending statistics (§6).
+            // A transfer has no category and never enters spending statistics.
             categoryId = if (kind == EntryKind.Transfer) null else _state.value.categoryId,
         )
     }
@@ -105,8 +105,7 @@ class AddViewModel(private val repository: MonioRepository) : ViewModel() {
 
     /**
      * Saves to Room and returns immediately. The user never waits on the
-     * network — the row is written with pending = 1 and SyncWorker picks it up
-     * (§9).
+     * network — the row is written with pending = 1 and SyncWorker picks it up.
      */
     fun save(createdBy: String, onSaved: () -> Unit) {
         val current = _state.value

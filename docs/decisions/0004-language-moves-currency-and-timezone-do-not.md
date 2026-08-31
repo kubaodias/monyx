@@ -34,8 +34,8 @@ Does not follow it:
 
 - **The currency.** `zł` is a symbol, not a word, and is identical in every
   translation. It is marked `translatable="false"`.
-- **The timezone.** `Dates.ZONE` stays `Europe/Warsaw`. §6 buckets months on a
-  local date precisely so an expense entered at 01:30 on 1 September in Warsaw
+- **The timezone.** `Dates.ZONE` stays `Europe/Warsaw`. Months are bucketed on
+  a local date precisely so an expense entered at 01:30 on 1 September in Warsaw
   does not fall into August; that reasoning is about geography and does not
   change because somebody switched the interface to English.
 - **Category and account names.** These are rows that sync to every device, not

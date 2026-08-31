@@ -103,7 +103,7 @@ private fun MainScaffold(
     val backStack by navController.currentBackStackEntryAsState()
     val currentRoute = backStack?.destination
 
-    // Deep-link state for the budget screen, set by a notification tap (§8).
+    // Deep-link state for the budget screen, set by a notification tap.
     var budgetCategoryId by remember { mutableStateOf<String?>(null) }
     var budgetPeriod by remember { mutableStateOf<String?>(null) }
     var txCategoryId by remember { mutableStateOf<String?>(null) }
@@ -146,7 +146,7 @@ private fun MainScaffold(
     ) { padding ->
         NavHost(
             navController = navController,
-            // Launching the app lands directly on the numeric keypad (§9). This
+            // Launching the app lands directly on the numeric keypad. This
             // is the single thing that determines whether the family is still
             // using this in a month.
             startDestination = startDestination ?: Destinations.ADD,

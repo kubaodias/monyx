@@ -9,8 +9,8 @@ plugins {
 }
 
 /**
- * versionCode is the one that matters, and it is not the one people display
- * (PRD §9). Android refuses any APK whose versionCode is lower than the
+ * versionCode is the one that matters, and it is not the one people display.
+ * Android refuses any APK whose versionCode is lower than the
  * installed one, so a bad release cannot be rolled back without an uninstall —
  * which destroys local data, including anything not yet synced.
  */
@@ -45,7 +45,7 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         // Schemas are still exported and committed. No hand-written Migration
-        // classes, ever — see the destructive-migration note in §9.
+        // classes, ever — see the destructive-migration note in Entities.kt.
         ksp { arg("room.schemaLocation", "$projectDir/schemas") }
     }
 
@@ -64,8 +64,7 @@ android {
         debug {
             // Debug and release builds must coexist. Without the suffix the
             // eventual release build fails with INSTALL_FAILED_UPDATE_INCOMPATIBLE
-            // and the only way through is an uninstall that destroys local data
-            // (PRD §13, M1).
+            // and the only way through is an uninstall that destroys local data.
             applicationIdSuffix = ".debug"
             versionNameSuffix = "-debug"
         }
@@ -74,7 +73,7 @@ android {
             // The loc keys the server sends are resolved through an explicit
             // when(key) map, never Resources.getIdentifier() — a string
             // referenced only by name from the server has no code reference and
-            // shrinkResources would strip it (PRD §8).
+            // shrinkResources would strip it.
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
             if (keystoreProps.isNotEmpty()) {
@@ -116,7 +115,7 @@ dependencies {
     implementation(libs.androidx.material.icons.extended)
     debugImplementation(libs.androidx.ui.tooling)
 
-    // The one place a navigation dependency earns its keep (§9).
+    // The one place a navigation dependency earns its keep.
     implementation(libs.androidx.navigation.compose)
 
     implementation(libs.androidx.room.runtime)
@@ -127,11 +126,11 @@ dependencies {
     implementation(libs.androidx.datastore.preferences)
 
     // A sideloaded APK gets no Play cloud profiles, so the baseline profiles
-    // shipped by profileinstaller are the only AOT there is (§9).
+    // shipped by profileinstaller are the only AOT there is.
     implementation(libs.androidx.profileinstaller)
 
     // OkHttp with kotlinx.serialization — about sixty lines of client. Not
-    // Retrofit: five endpoints do not justify an interface-proxy layer (§9).
+    // Retrofit: five endpoints do not justify an interface-proxy layer.
     implementation(libs.okhttp)
     implementation(libs.kotlinx.serialization.json)
 
