@@ -242,3 +242,99 @@ test("a rejected row is reported with its id so the client can flag it, not drop
   assert.equal(result.rejected[0]!.id, "keeps-id");
   assert.equal(result.rejected[0]!.table, "transactions");
 });
+
+// --------------------------------------------------------------- archiving
+
+test("an account row omitting archived is accepted and lands as 0", async () => {
+  const { fake, db } = setup();
+
+  // Exactly the shape a phone built before archiving existed still pushes. It
+  // must not be rejected, and the NOT NULL column must not take a NULL.
+  const result = await push(db, [
+    { table: "accounts", row: { id: "a1", name: "Karta", initial_balance_minor: 0, sort_order: 0, deleted: 0 } },
+  ]);
+
+  assert.deepEqual(result.rejected, []);
+  const row = fake.db.prepare("SELECT archived FROM accounts WHERE id='a1'").get() as { archived: number };
+  assert.equal(row.archived, 0);
+});
+
+test("archiving round-trips through push and pull", async () => {
+  const { db } = setup();
+  await push(db, [
+    { table: "accounts", row: { id: "a1", name: "Karta", initial_balance_minor: 0, sort_order: 0, archived: 0, deleted: 0 } },
+  ]);
+  await push(db, [
+    { table: "accounts", row: { id: "a1", name: "Karta", initial_balance_minor: 0, sort_order: 0, archived: 1, deleted: 0 } },
+  ]);
+
+  const page = await pull(db, 0, 100);
+  const account = page.changes.filter((c) => c.table === "accounts" && c.row["id"] === "a1").at(-1);
+  assert.ok(account, "the account must reach other devices");
+  assert.equal(account.row["archived"], 1);
+  // Archiving is not deleting: the row stays visible to every device.
+  assert.equal(account.row["deleted"], 0);
+});
+
+test("archived must be a flag, not free text", async () => {
+  const { db } = setup();
+  const result = await push(db, [
+    { table: "accounts", row: { id: "a1", name: "Karta", initial_balance_minor: 0, sort_order: 0, archived: "yes", deleted: 0 } },
+  ]);
+  assert.equal(result.applied, 0);
+  assert.equal(result.rejected[0]?.reason, "bad_archived");
+});
+
+// ------------------------------------------------------- the monthly plan
+
+test("a month plan pushes, pulls, and is revised in place", async () => {
+  const { db } = setup();
+  await push(db, [
+    { table: "month_plans", row: { id: "p1", period: "2026-08", planned_minor: 500000, deleted: 0 } },
+  ]);
+  await push(db, [
+    { table: "month_plans", row: { id: "p1", period: "2026-08", planned_minor: 620000, deleted: 0 } },
+  ]);
+
+  const page = await pull(db, 0, 100);
+  const plans = page.changes.filter((c) => c.table === "month_plans");
+  assert.equal(plans.at(-1)?.row["planned_minor"], 620000);
+});
+
+test("two phones planning the same month offline do not take the push down", async () => {
+  const { fake, db } = setup();
+  // Distinct ids, same (household, period): exactly what UNIQUE forbids. The
+  // ON CONFLICT clause has to resolve it, because batch() is all-or-nothing and
+  // a raw constraint failure would reject the unrelated rows alongside it.
+  const result = await push(db, [
+    { table: "month_plans", row: { id: "p1", period: "2026-08", planned_minor: 500000, deleted: 0 } },
+    { table: "month_plans", row: { id: "p2", period: "2026-08", planned_minor: 700000, deleted: 0 } },
+    { table: "categories", row: { id: "c1", name: "Dom", kind: "expense", sort_order: 0, deleted: 0 } },
+  ]);
+
+  assert.deepEqual(result.rejected, []);
+  assert.equal(result.applied, 3, "the unrelated category must survive the collision");
+  const rows = fake.db.prepare("SELECT planned_minor FROM month_plans WHERE period='2026-08'").all();
+  assert.equal(rows.length, 1, "one plan per month, last push wins");
+});
+
+test("a plan of zero is legal but a negative one is not", async () => {
+  const { db } = setup();
+  const zero = await push(db, [
+    { table: "month_plans", row: { id: "p1", period: "2026-08", planned_minor: 0, deleted: 0 } },
+  ]);
+  assert.deepEqual(zero.rejected, []);
+
+  const negative = await push(db, [
+    { table: "month_plans", row: { id: "p2", period: "2026-09", planned_minor: -1, deleted: 0 } },
+  ]);
+  assert.equal(negative.rejected[0]?.reason, "bad_planned_minor");
+});
+
+test("a plan needs a well-formed period", async () => {
+  const { db } = setup();
+  const result = await push(db, [
+    { table: "month_plans", row: { id: "p1", period: "2026-8", planned_minor: 100, deleted: 0 } },
+  ]);
+  assert.equal(result.rejected[0]?.reason, "bad_period");
+});

@@ -6,7 +6,7 @@
 // into chunks at statement boundaries. Ten lines, written now rather than
 // discovered during an outage.
 //
-// Usage: node scripts/restore.mjs <dump.sql|dump.sql.gz> [--db monio] [--dry-run]
+// Usage: node scripts/restore.mjs <dump.sql|dump.sql.gz> [--db monyx] [--dry-run]
 import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { gunzipSync } from "node:zlib";
@@ -14,11 +14,11 @@ import { gunzipSync } from "node:zlib";
 const args = process.argv.slice(2);
 const file = args.find((a) => !a.startsWith("--"));
 const dbIndex = args.indexOf("--db");
-const db = dbIndex >= 0 ? args[dbIndex + 1] : "monio";
+const db = dbIndex >= 0 ? args[dbIndex + 1] : "monyx";
 const dryRun = args.includes("--dry-run");
 
 if (!file) {
-  console.error("usage: node scripts/restore.mjs <dump.sql|dump.sql.gz> [--db monio] [--dry-run]");
+  console.error("usage: node scripts/restore.mjs <dump.sql|dump.sql.gz> [--db monyx] [--dry-run]");
   process.exit(2);
 }
 

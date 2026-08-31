@@ -137,6 +137,16 @@ function upsertStatement(
       budgetUpdatable.map((c) => `${c} = excluded.${c}`).join(", ");
   }
 
+  // month_plans carries UNIQUE (household_id, period) for the same reason and
+  // needs the same escape hatch: two phones planning August offline each mint
+  // their own id, and without this the second one takes the whole push down.
+  if (table === "month_plans") {
+    const planUpdatable = updatable.filter((c) => c !== "period");
+    sql +=
+      ` ON CONFLICT(household_id, period) DO UPDATE SET ` +
+      planUpdatable.map((c) => `${c} = excluded.${c}`).join(", ");
+  }
+
   return db.prepare(sql).bind(...values);
 }
 
@@ -146,6 +156,7 @@ function normalize(table: TableName, col: string, value: unknown): unknown {
     if (table === "transactions" && col === "source") return "manual";
     if (col === "sort_order") return 0;
     if (col === "initial_balance_minor") return 0;
+    if (col === "archived") return 0;
     return null;
   }
   return value;

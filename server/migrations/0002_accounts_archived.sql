@@ -1,0 +1,11 @@
+-- Archiving an account, as distinct from deleting one.
+--
+-- `deleted` means the row should disappear; but an account cannot really
+-- disappear while transactions still reference it, and its balance is part of
+-- every past month. `archived` is the honest version of what people actually
+-- want when they close a card: stop offering it when adding a transaction, keep
+-- every złoty it ever held.
+--
+-- Old clients neither send nor understand this column. The DEFAULT is what lets
+-- them keep pushing accounts rows through an INSERT that now names it.
+ALTER TABLE accounts ADD COLUMN archived INTEGER NOT NULL DEFAULT 0;

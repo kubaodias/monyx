@@ -33,11 +33,11 @@ val keystoreProps = Properties().apply {
 }
 
 android {
-    namespace = "com.monio"
+    namespace = "com.monyx"
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "com.monio"
+        applicationId = "com.monyx"
         minSdk = 26
         targetSdk = 35
         versionCode = gitCommitCount()

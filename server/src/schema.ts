@@ -10,6 +10,7 @@ export type TableName =
   | "members"
   | "accounts"
   | "categories"
+  | "month_plans"
   | "budgets"
   | "transactions";
 
@@ -23,6 +24,9 @@ export const DEPENDENCY_ORDER: readonly TableName[] = [
   "members",
   "accounts",
   "categories",
+  // Depends on nothing but the household; sits beside budgets because that is
+  // where it is read.
+  "month_plans",
   "budgets",
   "transactions",
 ] as const;
@@ -41,11 +45,14 @@ export const COLUMNS: Record<TableName, readonly string[]> = {
   members: ["id", "household_id", "name", "created_at", "seq", "deleted"],
   accounts: [
     "id", "household_id", "name", "icon", "color",
-    "initial_balance_minor", "sort_order", "seq", "deleted",
+    "initial_balance_minor", "sort_order", "archived", "seq", "deleted",
   ],
   categories: [
     "id", "household_id", "parent_id", "name", "icon", "color",
     "kind", "sort_order", "seq", "deleted",
+  ],
+  month_plans: [
+    "id", "household_id", "period", "planned_minor", "seq", "deleted",
   ],
   budgets: [
     "id", "household_id", "category_id", "period", "limit_minor",
@@ -66,6 +73,7 @@ export const FOREIGN_KEYS: Record<
   members: [],
   accounts: [],
   categories: [{ column: "parent_id", table: "categories" }],
+  month_plans: [],
   budgets: [{ column: "category_id", table: "categories" }],
   transactions: [
     { column: "account_id", table: "accounts" },
@@ -161,6 +169,9 @@ export function validateChange(raw: unknown): ValidationResult {
       if (!optionalText(row["icon"]) || !optionalText(row["color"])) return reject("bad_icon_or_color");
       if (!isInt(row["initial_balance_minor"])) return reject("bad_initial_balance_minor");
       if (!isInt(row["sort_order"])) return reject("bad_sort_order");
+      // Absent is legal, and means 0: a client built before archiving existed
+      // still pushes accounts, and rejecting those would strand it.
+      if (row["archived"] !== undefined && !flag(row["archived"])) return reject("bad_archived");
       break;
     }
     case "categories": {
@@ -170,6 +181,15 @@ export function validateChange(raw: unknown): ValidationResult {
       if (row["parent_id"] === id) return reject("self_parent");
       if (!optionalText(row["icon"]) || !optionalText(row["color"])) return reject("bad_icon_or_color");
       if (!isInt(row["sort_order"])) return reject("bad_sort_order");
+      break;
+    }
+    case "month_plans": {
+      if (typeof row["period"] !== "string" || !PERIOD_RE.test(row["period"])) return reject("bad_period");
+      // A plan of zero is meaningful — "I have nothing to spend this month" —
+      // so only a negative or non-integer is wrong.
+      if (!isInt(row["planned_minor"]) || (row["planned_minor"] as number) < 0) {
+        return reject("bad_planned_minor");
+      }
       break;
     }
     case "budgets": {

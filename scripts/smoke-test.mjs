@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// End-to-end check against a DEPLOYED monio-api.
+// End-to-end check against a DEPLOYED monyx-api.
 //
 // Covers the M0/M1 criteria that only a real deployment can answer: that the
 // seq scheme survives db.batch() on the live platform (not just node:sqlite),
@@ -46,7 +46,7 @@ async function call(path, { method = "GET", token, body } = {}) {
 const today = new Date().toISOString().slice(0, 10);
 const period = today.slice(0, 7);
 
-console.log(`\n=== monio-api smoke test against ${BASE} ===\n`);
+console.log(`\n=== monyx-api smoke test against ${BASE} ===\n`);
 
 // 1. health — must not touch the database and must be fast.
 const t0 = Date.now();

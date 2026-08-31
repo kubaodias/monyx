@@ -19,7 +19,7 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "Monio"
+rootProject.name = "Monyx"
 // One Gradle module until it hurts. Splitting into :core, :data,:
 // feature-* is configuration cost with no return on a five-screen app.
 include(":app")

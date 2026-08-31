@@ -1,6 +1,11 @@
 # 0005 — One name after all: Monio everywhere
 
-**Date:** 2026-08-31 · **Status:** accepted · **Supersedes:** 0003
+**Date:** 2026-08-31 · **Status:** superseded by 0007 on 2026-08-31 · **Supersedes:** 0003
+
+> **Superseded.** The single name chosen here turned out to be taken on Google
+> Play, along with the one it replaced. The app is now Monyx. See
+> `0007-the-name-is-monyx.md`. The argument below is kept because 0007 rests on
+> it: the reason one name beats two is unchanged, only the name is different.
 
 ## Context
 

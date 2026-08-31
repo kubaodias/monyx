@@ -3,7 +3,7 @@
 // first invite code — all through the CLI, because a household has no endpoint
 // that creates it — enrolment consumes an invite, it does not bootstrap.
 //
-// Usage: node scripts/new-household.mjs "Dom" [--db monio] [--lang pl|en]
+// Usage: node scripts/new-household.mjs "Dom" [--db monyx] [--lang pl|en]
 //
 // --lang picks the language of the SEED DATA only, and it is a one-time choice.
 // Category and account names are rows that sync to every device; the in-app
@@ -16,7 +16,7 @@ import { randomUUID, randomBytes } from "node:crypto";
 const args = process.argv.slice(2);
 const name = args.find((a) => !a.startsWith("--")) ?? "Dom";
 const dbIndex = args.indexOf("--db");
-const db = dbIndex >= 0 ? args[dbIndex + 1] : "monio";
+const db = dbIndex >= 0 ? args[dbIndex + 1] : "monyx";
 const langIndex = args.indexOf("--lang");
 const lang = langIndex >= 0 ? args[langIndex + 1] : "pl";
 

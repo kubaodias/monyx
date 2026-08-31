@@ -5,7 +5,7 @@
 // Node 22.5+ ships node:sqlite and a test runner, so this needs zero
 // devDependencies beyond TypeScript.
 import { DatabaseSync } from "node:sqlite";
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import type {
@@ -96,8 +96,13 @@ export class FakeDb implements SqlDatabase {
     this.db = new DatabaseSync(":memory:");
     // SQLDB has foreign keys on and stock SQLite does not.
     this.db.exec("PRAGMA foreign_keys = ON");
-    const schema = readFileSync(join(HERE, "..", "migrations", "0001_init.sql"), "utf8");
-    this.db.exec(schema);
+    // Every migration, in order — not just 0001. Pinning the first one meant the
+    // tests silently ran against the schema as it was on day one, so a column
+    // added later existed in production and not under test.
+    const dir = join(HERE, "..", "migrations");
+    for (const file of readdirSync(dir).filter((f) => f.endsWith(".sql")).sort()) {
+      this.db.exec(readFileSync(join(dir, file), "utf8"));
+    }
   }
 
   prepare(query: string): SqlPreparedStatement {

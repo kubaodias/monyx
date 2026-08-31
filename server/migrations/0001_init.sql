@@ -1,4 +1,4 @@
--- Monio initial schema.
+-- Monyx initial schema.
 -- Migrations are numbered and untouchable once applied: a schema fix is a new
 -- file, never an edit to this one.
 

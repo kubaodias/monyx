@@ -1,4 +1,4 @@
-# Monio
+# Monyx
 
 A shared household budget app for one family. Native Android, backend on Telnyx
 Edge Compute. English and Polish interface, switchable in Settings.
@@ -6,7 +6,7 @@ Edge Compute. English and Polish interface, switchable in Settings.
 ## Layout
 
 ```
-monio/
+monyx/
 ├── server/          Telnyx Edge Compute function (TypeScript)
 ├── android/         The app (Kotlin, Compose, Room)
 ├── scripts/         One-off operational scripts
@@ -24,7 +24,7 @@ monio/
 ```sh
 cd server
 npm install
-npm test          # 44 tests: the sync protocol and the budget alert path
+npm test          # 51 tests: the sync protocol and the budget alert path
 npm run typecheck
 telnyx-edge ship  # deploy
 ```
@@ -39,7 +39,7 @@ Migrations are numbered and untouchable once applied. A fix is a **new file**,
 never an edit to an old one.
 
 ```sh
-telnyx-edge storage sqldb migrations apply monio --remote --migrations-dir server/migrations
+telnyx-edge storage sqldb migrations apply monyx --remote --migrations-dir server/migrations
 ```
 
 ### Creating a household
@@ -84,7 +84,7 @@ so "which build do you have?" is answerable over the phone.
 
 ### The release keystore
 
-`android/keystore.properties` (git-ignored) points at `~/.monio/monio-release.jks`.
+`android/keystore.properties` (git-ignored) points at `~/.monyx/monyx-release.jks`.
 
 **Back up both the keystore and its password somewhere that survives a laptop
 dying.** Android refuses an update signed with a different key than the installed
@@ -102,7 +102,7 @@ in a different way:
 1. `res/values-<tag>/strings.xml` — miss it and the language cannot be shown.
 2. `res/xml/locales_config.xml` — miss it and Android's own per-app language
    list will not offer it.
-3. `Locales.SUPPORTED` in `android/app/src/main/java/com/monio/Locales.kt` —
+3. `Locales.SUPPORTED` in `android/app/src/main/java/com/monyx/Locales.kt` —
    miss it and the in-app picker will not list it.
 
 Selection goes through `AppCompatDelegate.setApplicationLocales`, not a
@@ -133,8 +133,8 @@ Backups are manual for a harder reason: `sqldb export` is CLI-only, with no REST
 equivalent, so the function cannot dump its own database.
 
 ```sh
-telnyx-edge storage sqldb export monio --remote --output monio-$(date -u +%Y%m%d).sql
-curl -X POST "$MONIO_API_URL/cron/daily" \
+telnyx-edge storage sqldb export monyx --remote --output monyx-$(date -u +%Y%m%d).sql
+curl -X POST "$MONYX_API_URL/cron/daily" \
   -H "x-cron-secret: $CRON_SECRET" -H 'content-type: application/json' \
   -d "{\"last_backup_at\": $(date -u +%s)000}"
 ```
@@ -158,12 +158,12 @@ single-user apps while every screen still looks perfectly normal.
 1. **Restore the export.** A SQL script over `execute --remote --file` is capped
    at roughly 4 MiB, so split a large dump into chunks:
    ```sh
-   node scripts/restore.mjs backups/monio-YYYYMMDD.sql
+   node scripts/restore.mjs backups/monyx-YYYYMMDD.sql
    ```
 2. **Bump the epoch.** Every device notices on its next pull, resets its cursor
    and re-pulls from scratch.
    ```sh
-   telnyx-edge storage sqldb execute monio --remote \
+   telnyx-edge storage sqldb execute monyx --remote \
      --command "UPDATE households SET epoch = epoch + 1 WHERE id = ?" --param <household_id>
    ```
 3. **Ask ONE recently-online phone** to tap *Re-upload everything* /

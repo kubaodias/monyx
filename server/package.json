@@ -1,7 +1,7 @@
 {
-  "name": "monio-api",
+  "name": "monyx-api",
   "version": "0.1.0",
-  "description": "Monio household budget \u2014 Telnyx Edge Compute backend",
+  "description": "Monyx household budget \u2014 Telnyx Edge Compute backend",
   "type": "module",
   "private": true,
   "scripts": {

@@ -204,7 +204,7 @@ export async function sendBudgetAlert(
             // A visible title is mandatory for a notification message, and this
             // one is only ever a fallback: the localised title comes from
             // title_loc_key and strings.xml on the device.
-            notification: { title: "Monio", body: "" },
+            notification: { title: "Monyx", body: "" },
             data,
             android: {
               priority: "high",
@@ -213,7 +213,7 @@ export async function sendBudgetAlert(
                 body_loc_key: "budget_alert",
                 body_loc_args: args,
                 channel_id: "budget_alerts",
-                click_action: "MONIO_BUDGET_ALERT",
+                click_action: "MONYX_BUDGET_ALERT",
               },
             },
           },

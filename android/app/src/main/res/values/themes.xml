@@ -8,7 +8,7 @@
          AppCompatActivity, which is what applies a chosen locale to the
          Activity's Configuration below API 33. Compose still owns every colour
          and type style the user actually sees. -->
-    <style name="Theme.Monio" parent="Theme.AppCompat.Light.NoActionBar">
+    <style name="Theme.Monyx" parent="Theme.AppCompat.Light.NoActionBar">
         <item name="android:windowBackground">@android:color/white</item>
     </style>
 </resources>

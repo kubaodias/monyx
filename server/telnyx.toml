@@ -1,4 +1,4 @@
-name = "monio-api"
+name = "monyx-api"
 main = "src/index.ts"
 compatibility_date = "2026-05-01"
 
@@ -31,4 +31,4 @@ period = 60
 
 [edge_compute]
 func_id = "db2fb8bb-e93f-4bb3-aa04-58217ac83ff8"
-func_name = "monio-api"
+func_name = "monyx-api"

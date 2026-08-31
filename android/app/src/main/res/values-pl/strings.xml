@@ -10,7 +10,7 @@
   the rule stops being checkable.
 -->
 <resources>
-    <string name="app_name">Monio</string>
+    <string name="app_name">Monyx</string>
 
     <!-- Navigation -->
     <string name="nav_overview">Przegląd</string>
@@ -43,7 +43,7 @@
     <string name="overview_breakdown">Na co idą pieniądze</string>
     <string name="overview_recent">Ostatnie transakcje</string>
     <string name="overview_no_data">Brak wydatków w tym miesiącu</string>
-    <string name="overview_accounts">Konta</string>
+    <string name="overview_all_accounts">Wszystkie konta</string>
     <string name="overview_see_all">Zobacz wszystkie</string>
     <string name="overview_previous_month">Poprzedni miesiąc</string>
     <string name="overview_next_month">Następny miesiąc</string>
@@ -68,6 +68,14 @@
     <string name="transactions_delete_confirm_message">Tej operacji nie można cofnąć.</string>
 
     <!-- Budget -->
+    <string name="budget_plan_to_assign">Do rozdysponowania</string>
+    <string name="budget_plan_edit">Plan na ten miesiąc</string>
+    <string name="budget_plan_none">Brak planu. Ustal, ile masz do wydania w tym miesiącu.</string>
+    <string name="budget_plan_total">Do wydania w tym miesiącu</string>
+    <string name="budget_plan_assigned">Przypisane do kategorii</string>
+    <string name="budget_plan_spent">Wydane</string>
+    <string name="budget_plan_left_to_spend">Pozostało do wydania</string>
+    <string name="budget_plan_assigned_hint">Już przypisane: %1$s · do rozdysponowania: %2$s</string>
     <string name="budget_title">Budżet</string>
     <string name="budget_empty">Nie ustawiono jeszcze żadnych limitów</string>
     <string name="budget_set_limit">Ustaw limit</string>
@@ -88,9 +96,9 @@
          handed a String for a %d specifier throws. -->
     <string name="channel_budget_alerts">Alerty budżetowe</string>
     <string name="channel_budget_alerts_description">Powiadomienie, gdy wydatki zbliżają się do limitu</string>
-    <string name="budget_alert_title">Monio</string>
+    <string name="budget_alert_title">Monyx</string>
     <string name="budget_alert">%1$s: %2$s z %3$s zł (%4$s%%)</string>
-    <string name="notifications_permission_rationale">Monio powiadomi Cię, zanim przekroczysz budżet</string>
+    <string name="notifications_permission_rationale">Monyx powiadomi Cię, zanim przekroczysz budżet</string>
     <string name="notifications_enable">Włącz powiadomienia</string>
 
     <!-- Settings -->
@@ -159,6 +167,10 @@
     <string name="settings_invite_loading">Generowanie…</string>
     <string name="settings_invite_error">Nie udało się utworzyć zaproszenia</string>
     <string name="settings_reupload_confirm_title">Wysłać wszystko ponownie?</string>
+    <string name="settings_archive">Archiwizuj</string>
+    <string name="settings_unarchive">Przywróć</string>
+    <string name="settings_archived_accounts">Archiwum</string>
+    <string name="settings_archive_account_confirm">Zarchiwizować „%1$s”? Konto przestanie być proponowane przy dodawaniu transakcji. Zapisane już operacje pozostają bez zmian.</string>
     <string name="settings_delete_account_confirm">Usunąć konto \"%1$s\"?</string>
     <string name="settings_delete_category_confirm">Usunąć kategorię \"%1$s\"?</string>
     <string name="settings_icon">Ikona</string>
