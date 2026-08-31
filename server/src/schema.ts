@@ -1,6 +1,6 @@
 // Types, table specs and input validation.
 //
-// Every change is validated here before any SQL runs (PRD §7). This is forced
+// Every change is validated here before any SQL runs. This is forced
 // by two platform facts working together: batch() is all-or-nothing, and SQLDB
 // failures reject with a plain Error — no typed class, no error codes. A single
 // malformed row reaching SQL would roll back the entire push, and classifying
@@ -14,7 +14,7 @@ export type TableName =
   | "transactions";
 
 /**
- * Dependency order, not timestamp order (PRD §7). A new category and a
+ * Dependency order, not timestamp order. A new category and a
  * transaction in it must not arrive the other way round: the foreign key check
  * would reject the transaction and a real expense would be lost while the user
  * watched it save.
@@ -58,7 +58,7 @@ export const COLUMNS: Record<TableName, readonly string[]> = {
   ],
 };
 
-/** Foreign keys checked before the batch, against this household only (§11). */
+/** Foreign keys checked before the batch, against this household only. */
 export const FOREIGN_KEYS: Record<
   TableName,
   readonly { column: string; table: TableName }[]
@@ -120,8 +120,8 @@ function flag(v: unknown): boolean {
 
 /**
  * Validate one incoming change. Money is an integer in minor units — never a
- * float, never a string. That is the one rule in the PRD whose violation is a
- * critical bug (§6), so it is checked on every amount here.
+ * float, never a string. That is the one rule whose violation is a critical
+ * bug, so it is checked on every amount here.
  */
 export function validateChange(raw: unknown): ValidationResult {
   if (!isPlainObject(raw)) {
@@ -181,7 +181,7 @@ export function validateChange(raw: unknown): ValidationResult {
     case "transactions": {
       const kind = String(row["kind"]);
       if (!TX_KINDS.has(kind)) return reject("bad_kind");
-      // Amounts are always positive; direction comes from kind (§6).
+      // Amounts are always positive; direction comes from kind.
       if (!isInt(row["amount_minor"]) || (row["amount_minor"] as number) <= 0) return reject("bad_amount_minor");
       if (typeof row["account_id"] !== "string" || !ID_RE.test(row["account_id"])) return reject("bad_account_id");
       if (!optionalId(row["transfer_account_id"])) return reject("bad_transfer_account_id");
@@ -194,7 +194,7 @@ export function validateChange(raw: unknown): ValidationResult {
       // because batch() is all-or-nothing, takes the whole push down with it.
       if (!isInt(row["created_at"])) return reject("bad_created_at");
       if (row["source"] !== undefined && !SOURCES.has(String(row["source"]))) return reject("bad_source");
-      // A transfer has no category and never enters spending statistics (§6).
+      // A transfer has no category and never enters spending statistics.
       if (kind === "transfer") {
         if (typeof row["transfer_account_id"] !== "string") return reject("transfer_needs_target");
         if (row["transfer_account_id"] === row["account_id"]) return reject("transfer_to_self");
@@ -203,7 +203,7 @@ export function validateChange(raw: unknown): ValidationResult {
         if (row["transfer_account_id"] !== undefined && row["transfer_account_id"] !== null) {
           return reject("non_transfer_has_target");
         }
-        // A non-transfer with no category is allowed: v2 splits set it NULL (§12).
+        // A non-transfer with no category is allowed: v2 splits set it NULL.
       }
       break;
     }
@@ -215,7 +215,7 @@ export function validateChange(raw: unknown): ValidationResult {
 /**
  * The local date in Europe/Warsaw, as 'YYYY-MM-DD'.
  *
- * Months are bucketed on a local date (§6): without it an expense entered at
+ * Months are bucketed on a local date: without it an expense entered at
  * 01:30 on 1 September in Warsaw falls into August for the server and September
  * for the phone. The client authors occurred_on today, but the daily sweep needs
  * the current period, so the helper is written once here rather than three times

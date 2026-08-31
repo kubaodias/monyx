@@ -12,7 +12,7 @@ import kotlinx.serialization.json.jsonPrimitive
 
 /**
  * A Kotlin data class and a TypeScript interface describe the same seven tables,
- * and the duplication is on purpose (§5). A code generator or an OpenAPI schema
+ * and the duplication is on purpose. A code generator or an OpenAPI schema
  * in between is a pipeline to maintain in order to save rewriting ~80 lines that
  * change a few times a year. These mappings are that duplication, written out.
  */

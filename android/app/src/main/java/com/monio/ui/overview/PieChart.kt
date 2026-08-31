@@ -39,7 +39,7 @@ data class PieSlice(
 )
 
 /**
- * The breakdown pie chart: Canvas plus drawArc, no charting library (PRD §9).
+ * The breakdown pie chart: Canvas plus drawArc, no charting library.
  * A donut — the ring leaves a hole — with the month's total in the middle,
  * and a legend below listing each slice's colour, name, amount and share.
  */

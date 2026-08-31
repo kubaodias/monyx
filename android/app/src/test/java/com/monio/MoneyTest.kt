@@ -66,7 +66,7 @@ class MoneyTest {
     fun `signs come from the kind, never from a negative amount`() = withLocale("pl-PL") {
         assertEquals("-45,99", flat(Money.formatSigned(4599, "expense")))
         assertEquals("+45,99", flat(Money.formatSigned(4599, "income")))
-        // A transfer moves money, it does not spend it (§6) — so it is unsigned.
+        // A transfer moves money, it does not spend it — so it is unsigned.
         assertEquals("45,99", flat(Money.formatSigned(4599, "transfer")))
     }
 
@@ -107,7 +107,7 @@ class DatesTest {
     }
 
     /**
-     * Months are bucketed on a LOCAL date (§6). An expense entered at 01:30 on
+     * Months are bucketed on a LOCAL date. An expense entered at 01:30 on
      * 1 September in Warsaw must fall in September, not August — this is the
      * whole reason occurred_on exists as a separate column.
      */

@@ -4,8 +4,8 @@
 
 ## Context
 
-PRD §6 says client-generated ids are UUIDv4 so rows can be created offline
-without collisions. That is right for every table but one.
+Client-generated ids are UUIDv4 so rows can be created offline without
+collisions. That is right for every table but one.
 
 `budgets` also carries `UNIQUE (household_id, category_id, period)`. Two phones
 that each set a limit for Groceries in September while offline would generate two
@@ -14,7 +14,7 @@ one violates the unique constraint — and because `batch()` is all-or-nothing, 
 single violating statement takes the entire push down with it, including every
 unrelated expense in the same batch.
 
-Nothing in the PRD covers this case.
+Nothing in the original design covers this case.
 
 ## Decision
 
@@ -33,7 +33,7 @@ platform runs 3.51 (verified).
 
 ## Consequences
 
-The property §6 actually wants from v4 — offline creation without collisions —
+The property actually wanted from v4 — offline creation without collisions —
 is preserved, and for budgets it is strengthened: the id is now a function of
 the thing it identifies, so independent devices agree by construction.
 

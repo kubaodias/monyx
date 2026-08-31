@@ -20,6 +20,6 @@ dependencyResolutionManagement {
 }
 
 rootProject.name = "Monio"
-// One Gradle module until it hurts (PRD §5). Splitting into :core, :data,
-// :feature-* is configuration cost with no return on a five-screen app.
+// One Gradle module until it hurts. Splitting into :core, :data,:
+// feature-* is configuration cost with no return on a five-screen app.
 include(":app")

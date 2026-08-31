@@ -74,10 +74,10 @@ private data class EditTarget(
 )
 
 /**
- * Categories with usage bars, editing limits for the month (PRD §9).
+ * Categories with usage bars, editing limits for the month.
  *
  * [initialCategoryId] and [initialPeriod] exist because a budget-alert
- * notification deep-links straight to a category's budget for a month (§8):
+ * notification deep-links straight to a category's budget for a month:
  * tapping it should land here with that category's edit dialog already open.
  */
 @Composable

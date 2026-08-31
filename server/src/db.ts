@@ -1,9 +1,9 @@
 // The only path to env.DB. Nothing else in the codebase imports the binding
-// (PRD §11) — isolation has to be a mechanism, not an intention.
+// — isolation has to be a mechanism, not an intention.
 //
 // Bindings come from the import, never from the fetch(req, env) argument:
 // reading env.DB off that second argument type-checks cleanly and is undefined
-// at runtime (PRD §5).
+// at runtime.
 import { env } from "@telnyx/edge-runtime";
 import type {
   SqlDatabase,
@@ -35,7 +35,7 @@ function binding(): SqlDatabase {
 
 /**
  * The normal path: a handle pinned to one household. `db` is injectable so
- * sync.ts can be exercised against the node:sqlite fake (PRD §5).
+ * sync.ts can be exercised against the node:sqlite fake.
  */
 export function forHousehold(
   householdId: string,
@@ -90,7 +90,7 @@ export interface SessionRow {
  * resolving it to a household necessarily precedes any household scoping.
  * Everything downstream goes through forHousehold() with the id this returns.
  *
- * The PRD names two exceptions; this is the third, and it is named here for the
+ * Two exceptions were planned; this is the third, and it is named here for the
  * same reason — making the exceptions countable is what makes the rule
  * checkable. See docs/decisions/0001-session-lookup-is-a-db-exception.md.
  */

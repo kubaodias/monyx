@@ -66,8 +66,8 @@ import com.monio.ui.theme.Palette
 import kotlinx.coroutines.launch
 
 /**
- * Chronological list, plain-LIKE search, filter by category / account / period
- * (PRD §9). `initialCategoryId` / `initialPeriod` let the Budget screen deep-
+ * Chronological list, plain-LIKE search, filter by category / account / period.
+ * `initialCategoryId` / `initialPeriod` let the Budget screen deep-
  * link into a filtered list, e.g. tapping "over budget" for a category.
  */
 @Composable
@@ -290,7 +290,7 @@ private fun DayGroup(
     items: List<TransactionListItem>,
     onRowClick: (TransactionListItem) -> Unit,
 ) {
-    // A transfer moves money, it does not spend it — it never enters the total (§6).
+    // A transfer moves money, it does not spend it — it never enters the total.
     val totalMinor = items.filter { it.kind != "transfer" }
         .sumOf { if (it.kind == "income") it.amountMinor else -it.amountMinor }
     val totalKind = if (totalMinor >= 0) "income" else "expense"

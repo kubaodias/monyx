@@ -1,8 +1,8 @@
--- A household starts with default categories (PRD §15).
+-- A household starts with default categories.
 --
 -- Starting empty would mean the first expense costs a detour through category
--- setup, which is exactly the friction §9 exists to prevent. The family renames
--- and extends them from Settings.
+-- setup, which is exactly the friction the add flow exists to prevent. The
+-- family renames and extends them from Settings.
 --
 -- Names are Polish. Seed language is a one-time choice made per household and
 -- is NOT what the in-app language picker changes: these are rows that sync to

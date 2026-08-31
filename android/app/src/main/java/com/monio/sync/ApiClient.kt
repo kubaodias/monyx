@@ -16,7 +16,7 @@ import java.util.concurrent.TimeUnit
 /**
  * About sixty lines of client. Not Retrofit: five endpoints do not justify an
  * interface-proxy layer. Not Ktor: it drags in its own engine and serialization
- * stack. Not java.net.http.HttpClient: it does not exist on Android (§9).
+ * stack. Not java.net.http.HttpClient: it does not exist on Android.
  */
 object Api {
     const val BASE_URL = "https://monio-api-db2fb8bb-e.telnyxcompute.com"
@@ -41,7 +41,7 @@ object Api {
             val body = response.body?.string().orEmpty()
             if (!response.isSuccessful) {
                 // The server returns codes, never user-facing text; the client
-                // maps them to Polish strings (§9).
+                // maps them to Polish strings.
                 val code = runCatching {
                     json.parseToJsonElement(body).let { (it as JsonObject)["error"]?.toString() }
                 }.getOrNull()?.trim('"') ?: "http_${response.code}"
@@ -106,7 +106,7 @@ data class InviteResponse(
     @SerialName("expires_at") val expiresAt: Long,
 )
 
-/** Every change is a full-row upsert; deletion is that row with deleted = 1 (§7). */
+/** Every change is a full-row upsert; deletion is that row with deleted = 1. */
 @Serializable
 data class Change(val table: String, val row: JsonObject)
 

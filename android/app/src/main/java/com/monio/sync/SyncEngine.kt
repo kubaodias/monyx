@@ -10,7 +10,7 @@ import kotlinx.serialization.json.JsonObject
  * flags for accepted rows and mark rejected ones, then pull in a loop until
  * has_more == false, persisting the cursor.
  *
- * Push always finishes before pull applies (§7). This is an invariant, not an
+ * Push always finishes before pull applies. This is an invariant, not an
  * implementation detail — reversing it reintroduces the lost-edit case the
  * `pending` rule exists to prevent.
  */
@@ -29,7 +29,7 @@ class SyncEngine(
     // ------------------------------------------------------------------ push
 
     private suspend fun pushPending(token: String) {
-        // Dependency order, not timestamp order (§7).
+        // Dependency order, not timestamp order.
         val members = dao.pendingMembers()
         val accounts = dao.pendingAccounts()
         val categories = dao.pendingCategories()
@@ -45,7 +45,7 @@ class SyncEngine(
         }
         if (changes.isEmpty()) return
 
-        // Push batches are capped at 200 changes client-side (§7). A realistic
+        // Push batches are capped at 200 changes client-side. A realistic
         // push is one to five; 200 only matters on a first sync or a re-upload,
         // both of which loop anyway.
         changes.chunked(200).forEach { chunk ->
@@ -84,13 +84,13 @@ class SyncEngine(
                         // A rejected change is never dropped and never retried:
                         // rejected = 1 AND pending cleared, in one transaction.
                         // Leaving pending set would re-push the same invalid row
-                        // every hour forever (§7).
+                        // every hour forever.
                         if (bad.isNotEmpty()) dao.rejectTransactions(bad.toList())
                     }
                 }
             }
         }
-        // The seq returned by push is NOT a pull cursor (§7). It stamps the
+        // The seq returned by push is NOT a pull cursor. It stamps the
         // accepted local rows and nothing more; advancing the cursor to it would
         // skip every row another device committed in between — permanently, and
         // with no error. So it is deliberately unused here.
@@ -107,7 +107,7 @@ class SyncEngine(
             val page = Api.pull(token, cursor)
 
             // If epoch differs from the stored value, the client resets its
-            // cursor to zero and starts over BEFORE applying anything (§6, §10).
+            // cursor to zero and starts over BEFORE applying anything.
             // The epoch write and the first page's apply share one transaction —
             // otherwise a crash in between leaves a reset cursor with a stale
             // epoch, and the design would be relying on idempotent upserts to
@@ -132,7 +132,7 @@ class SyncEngine(
     /**
      * A pulled page is applied inside one withTransaction { }, which also gives
      * Room's invalidation tracker a single emission instead of up to two hundred
-     * recompositions (§9). Never nest a withContext(Dispatchers.IO) inside it —
+     * recompositions. Never nest a withContext(Dispatchers.IO) inside it —
      * Room owns its own transaction dispatcher and the switch deadlocks.
      */
     private suspend fun applyPage(page: PullResponse, epochOverride: Long, resetCursor: Boolean) {
@@ -156,7 +156,7 @@ class SyncEngine(
 
             // The client applies every pulled row EXCEPT where a local edit is
             // still pending, so an offline edit is never destroyed by a pull
-            // before it has been sent (§7).
+            // before it has been sent.
             val pendingMembers = dao.pendingMembers().map { it.id }.toSet()
             val pendingAccounts = dao.pendingAccounts().map { it.id }.toSet()
             val pendingCategories = dao.pendingCategories().map { it.id }.toSet()
@@ -183,7 +183,7 @@ class SyncEngine(
             // The cursor is set to the highest seq actually applied, never to
             // anything else. A page applied halfway then interrupted is harmless:
             // the cursor never moved, upserts are idempotent by id, and the
-            // re-pull is a no-op (§7).
+            // re-pull is a no-op.
             val highest = page.changes
                 .mapNotNull { it.row["seq"]?.toString()?.trim('"')?.toLongOrNull() }
                 .maxOrNull()

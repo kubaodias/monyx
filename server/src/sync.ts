@@ -2,7 +2,7 @@
 //
 // Takes its database as a parameter rather than reaching for the imported env:
 // that is what lets the protocol be exercised against the node:sqlite fake, and
-// it is the same rule the isolation boundary in db.ts depends on (PRD §5, §11).
+// it is the same rule the isolation boundary in db.ts depends on.
 import type { HouseholdDb } from "./db.ts";
 import type { SqlPreparedStatement } from "@telnyx/edge-runtime";
 import {
@@ -30,17 +30,17 @@ export interface PullPage {
   has_more: boolean;
 }
 
-/** Push batches are capped at 200 changes client-side (§7); enforced here too. */
+/** Push batches are capped at 200 changes client-side; enforced here too. */
 export const MAX_PUSH_CHANGES = 200;
 
-/** Default pull page size. has_more drives the loop (§7). */
+/** Default pull page size. has_more drives the loop. */
 export const DEFAULT_PULL_LIMIT = 500;
 
 /**
  * Build the statements that allocate seq for a batch of accepted rows.
  *
- * seq is allocated per row, never per batch, and never read into TypeScript
- * (§6). One statement reserves the whole range and each row takes its own
+ * seq is allocated per row, never per batch, and never read into TypeScript.
+ * One statement reserves the whole range and each row takes its own
  * offset inside it — N + 1 statements, and exactly one ordering assumption
  * rather than N of them.
  *
@@ -49,7 +49,7 @@ export const DEFAULT_PULL_LIMIT = 500;
  * doing so can clobber each other, and BEGIN is rejected at runtime, so there
  * is no transaction to wrap it in. The arithmetic stays inside the batch.
  *
- * Lives in its own function taking (household_id, rows) because §12's voice
+ * Lives in its own function taking (household_id, rows) because the planned voice
  * tools will write transactions server-side, and allocation duplicated into a
  * second call site is how two writers end up disagreeing about the counter.
  */
@@ -71,7 +71,7 @@ export function buildSeqStatements(
 
   // Statement 1 + i, for i = 1..N. The offset runs across the WHOLE batch, not
   // per table — resetting it per table produces duplicate seqs across tables and
-  // is silent (PRD §13, M0 step 2).
+  // is silent.
   changes.forEach((change, index) => {
     statements.push(upsertStatement(db, change, index + 1, n));
   });
@@ -86,7 +86,7 @@ function seqExpr(): string {
 
 /**
  * A full-row upsert. There is no op field: every change is an upsert and a
- * deletion is that row with deleted = 1 (§7).
+ * deletion is that row with deleted = 1.
  */
 function upsertStatement(
   db: HouseholdDb,
@@ -106,7 +106,7 @@ function upsertStatement(
       placeholders.push(seqExpr());
       values.push(hh, n, offset);
     } else if (col === "household_id") {
-      // Stamped from the token, never taken from the request (§11).
+      // Stamped from the token, never taken from the request.
       placeholders.push("?");
       values.push(hh);
     } else {
@@ -128,7 +128,7 @@ function upsertStatement(
   // would otherwise collide on that constraint and, because batch() is
   // all-or-nothing, take the whole push down with them. The second clause
   // resolves it in place — last push to commit wins, which is the same rule the
-  // rest of sync follows (§7). SQLite has allowed multiple ON CONFLICT targets
+  // rest of sync follows. SQLite has allowed multiple ON CONFLICT targets
   // since 3.35; the platform runs 3.51.
   if (table === "budgets") {
     const budgetUpdatable = updatable.filter((c) => c !== "category_id" && c !== "period");
@@ -157,7 +157,7 @@ function normalize(table: TableName, col: string, value: unknown): unknown {
  * Validation runs first, in TypeScript: bad rows are separated out and
  * reported, and only rows known to be valid enter the batch. That is what makes
  * the applied / rejected split possible at all — batch() is all-or-nothing, so
- * a mixed outcome cannot come from the database (§7).
+ * a mixed outcome cannot come from the database.
  */
 export async function push(
   db: HouseholdDb,
@@ -180,7 +180,7 @@ export async function push(
     });
   }
 
-  // Foreign keys that exist and belong to the same household (§11), checked
+  // Foreign keys that exist and belong to the same household, checked
   // before any SQL write. Rows introduced earlier in this same batch count as
   // present — the client orders changes by dependency, so a category and a
   // transaction in it arrive together and legitimately.
@@ -192,7 +192,7 @@ export async function push(
   }
 
   // The whole batch runs inside a single batch() — atomically — and each row
-  // draws its own seq inside it (§6). The server applies changes in array
+  // draws its own seq inside it. The server applies changes in array
   // order, so a row touched twice in one batch ends in its final state.
   const statements = buildSeqStatements(db, accepted);
   const results = await db.batch<{ next_seq: number }>(statements);
@@ -295,7 +295,7 @@ async function existingIds(
  *
  * Because no two rows share a seq, a page boundary can never fall in the middle
  * of a group of rows sharing one value, which would drop the remainder of that
- * group forever (§6).
+ * group forever.
  *
  * Each table is asked for limit + 1 rows and the merge is truncated to limit,
  * which makes has_more exact: any row left out of a table's query has a seq
@@ -334,7 +334,7 @@ export async function pull(
     changes: page.map(({ table, row }) => ({ table, row })),
     epoch: head?.epoch ?? 1,
     // The high-water mark of this page, never the household counter: the client
-    // persists the highest seq actually applied and nothing else (§7).
+    // persists the highest seq actually applied and nothing else.
     seq: page.length > 0 ? page[page.length - 1]!.seq : since,
     has_more,
   };

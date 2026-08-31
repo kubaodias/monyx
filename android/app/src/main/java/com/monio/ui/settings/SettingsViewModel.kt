@@ -27,7 +27,7 @@ import kotlinx.coroutines.withContext
 data class AccountRow(val entity: AccountEntity, val balanceMinor: Long)
 
 /**
- * Nesting is exactly one level deep (PRD §6): a root category plus its direct
+ * Nesting is exactly one level deep: a root category plus its direct
  * children, never grandchildren.
  */
 data class CategoryNode(val entity: CategoryEntity, val children: List<CategoryEntity>)
@@ -44,7 +44,7 @@ sealed interface InviteUiState {
 /**
  * Settings is where the sync design becomes operable: the rejected-row count,
  * last_backup_at from the server, and re-upload everything are not cosmetic —
- * they are the other half of the restore runbook (PRD §9, §10).
+ * they are the other half of the restore runbook.
  */
 class SettingsViewModel(private val app: MonioApp) : ViewModel() {
 
@@ -131,7 +131,7 @@ class SettingsViewModel(private val app: MonioApp) : ViewModel() {
     /**
      * A network call: run off the main thread, surface a loading state, and
      * never show anything the server says verbatim — the server returns codes,
-     * the client owns every user-facing string (§9).
+     * the client owns every user-facing string.
      */
     fun createInvite() {
         if (_inviteState.value == InviteUiState.Loading) return
@@ -155,7 +155,7 @@ class SettingsViewModel(private val app: MonioApp) : ViewModel() {
     }
 
     /**
-     * Step 3 of the restore runbook (§10) — without it, the copies of the data
+     * Step 3 of the restore runbook — without it, the copies of the data
      * sitting on four phones cannot be used to repair the server.
      */
     fun reuploadEverything() {

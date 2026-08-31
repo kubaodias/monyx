@@ -86,7 +86,7 @@ interface MonioDao {
     // --------------------------------------------------------- pending rows
     // Sent in dependency order: members, accounts, categories, budgets,
     // transactions. Otherwise a new category and a transaction in it can arrive
-    // in the wrong order and a real expense is lost (§7).
+    // in the wrong order and a real expense is lost.
 
     @Query("SELECT * FROM members WHERE pending = 1")
     suspend fun pendingMembers(): List<MemberEntity>
@@ -105,7 +105,7 @@ interface MonioDao {
 
     /**
      * Clearing pending is not optional on a rejected row — leaving it set would
-     * re-push the same invalid row every hour forever (§7).
+     * re-push the same invalid row every hour forever.
      */
     @Query("UPDATE accounts SET pending = 0 WHERE id IN (:ids)")
     suspend fun clearPendingAccounts(ids: List<String>)
@@ -137,7 +137,7 @@ interface MonioDao {
     @Query("UPDATE members SET pending = 0, rejected = 1 WHERE id IN (:ids)")
     suspend fun rejectMembers(ids: List<String>)
 
-    /** The other half of the restore procedure in §10. */
+    /** The other half of the restore runbook in the README. */
     @Query("UPDATE accounts SET pending = 1")
     suspend fun markAllAccountsPending()
 
@@ -180,7 +180,7 @@ interface MonioDao {
 
     /**
      * An account balance is its opening balance plus income, minus expenses,
-     * plus or minus transfers (§6).
+     * plus or minus transfers.
      */
     @Query(
         """SELECT a.id AS id, a.name AS name, a.icon AS icon, a.color AS color,
@@ -210,7 +210,7 @@ interface MonioDao {
     /**
      * The spending breakdown. A transfer moves money, it does not spend it, so
      * it never enters spending statistics — excluded here at the query level
-     * rather than left to the caller (§6).
+     * rather than left to the caller.
      *
      * Rolled up to the top-level category so the chart has one slice per parent.
      */
@@ -231,7 +231,7 @@ interface MonioDao {
     fun spendByCategory(period: String): Flow<List<CategorySpend>>
 
     /**
-     * Budgets carry forward, resolved lazily at query time (§6). This is the
+     * Budgets carry forward, resolved lazily at query time. This is the
      * client's own implementation of the limit-in-effect rule; the server's copy
      * lives only in the alert path, and both read the same synced rows.
      *
@@ -269,8 +269,8 @@ interface MonioDao {
 
     /**
      * Search is a plain LIKE, never FTS5: a database containing virtual tables
-     * cannot be exported at all, which would silently cost us the backup path
-     * (§10). At 36k rows a LIKE scan is a few milliseconds.
+     * cannot be exported at all, which would silently cost us the backup path.
+     * At 36k rows a LIKE scan is a few milliseconds.
      */
     @Query(
         """SELECT t.id, t.kind, t.amountMinor, t.note, t.occurredAt, t.occurredOn,

@@ -40,7 +40,7 @@ import com.monio.data.Money
 import com.monio.ui.theme.Palette
 
 /**
- * Accounts: list, add, edit, delete via the repository (PRD §9). Editing
+ * Accounts: list, add, edit, delete via the repository. Editing
  * offers name, opening balance, icon and colour.
  */
 @Composable

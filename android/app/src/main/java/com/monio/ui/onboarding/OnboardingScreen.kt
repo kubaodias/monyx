@@ -39,7 +39,7 @@ import com.monio.MonioApp
 import com.monio.R
 
 /**
- * The family's first impression (PRD §9): warm and welcoming, not a login
+ * The family's first impression: warm and welcoming, not a login
  * form. Shown when app.session.isEnrolled() is false.
  */
 @Composable

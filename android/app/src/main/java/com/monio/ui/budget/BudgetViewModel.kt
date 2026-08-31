@@ -18,10 +18,10 @@ import kotlinx.coroutines.flow.stateIn
 
 /**
  * Backs the Budget screen. Reads are always local — the phone's number is the
- * one displayed (PRD §7, "No /budgets/status"). Writes set `pending` locally
- * and return immediately; the caller enqueues sync separately, since kicking
- * off a WorkManager job is the composable's job, not the ViewModel's (no
- * Context is held here on purpose).
+ * one displayed, and there is no /budgets/status endpoint. Writes set
+ * `pending` locally and return immediately; the caller enqueues sync
+ * separately, since kicking off a WorkManager job is the composable's job,
+ * not the ViewModel's (no Context is held here on purpose).
  */
 class BudgetViewModel(private val repository: MonioRepository) : ViewModel() {
 
@@ -59,7 +59,7 @@ class BudgetViewModel(private val repository: MonioRepository) : ViewModel() {
     }
 
     /** Tombstones the limit for the currently selected period; carry-forward
-     *  stops there (PRD §6) — earlier periods are unaffected. */
+     *  stops there — earlier periods are unaffected. */
     suspend fun clearBudget(categoryId: String) {
         repository.clearBudget(categoryId, _period.value)
     }

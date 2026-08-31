@@ -6,17 +6,17 @@ import androidx.room.PrimaryKey
 
 /**
  * One schema shared by the SQL DB and Room — identical structure on both sides
- * reduces sync to copying rows (PRD §6).
+ * reduces sync to copying rows.
  *
  * Room carries two extra columns on every synced table: `pending` and
  * `rejected`. A local write sets pending = 1 and returns to the UI immediately —
  * the user never waits on the network. A row the server refuses has pending
- * cleared and rejected set, so it stops being retried but never disappears (§9).
+ * cleared and rejected set, so it stops being retried but never disappears.
  *
  * Room does NOT declare foreign keys. The server enforces them, which is where
  * they belong; on the client they would only produce constraint violations when
  * a page boundary delivers a transaction before its category. The client is a
- * cache. Keep the indices, drop the constraints (§9).
+ * cache. Keep the indices, drop the constraints.
  */
 
 @Entity(tableName = "members")
@@ -36,7 +36,7 @@ data class AccountEntity(
     val name: String,
     val icon: String? = null,
     val color: String? = null,
-    /** Money is an integer in minor units, always grosze. Never a float (§6). */
+    /** Money is an integer in minor units, always grosze. Never a float. */
     val initialBalanceMinor: Long = 0,
     val sortOrder: Int = 0,
     val seq: Long = 0,
@@ -68,7 +68,7 @@ data class CategoryEntity(
 data class TransactionEntity(
     @PrimaryKey val id: String,
     /** 'expense', 'income' or 'transfer'. Amounts are always positive; the
-     *  direction comes from kind (§6). */
+     *  direction comes from kind. */
     val kind: String,
     val amountMinor: Long,
     val accountId: String,
@@ -78,7 +78,7 @@ data class TransactionEntity(
     /** Epoch ms, for ordering. */
     val occurredAt: Long,
     /** 'YYYY-MM-DD' local date, for bucketing. One column removes the entire
-     *  timezone class of bugs (§6). */
+     *  timezone class of bugs. */
     val occurredOn: String,
     val createdBy: String,
     val source: String = "manual",
@@ -94,7 +94,7 @@ data class BudgetEntity(
     @PrimaryKey val id: String,
     val categoryId: String,
     /** 'YYYY-MM'. A budgets row is a limit that holds from its period onward
-     *  until a newer row supersedes it (§6). */
+     *  until a newer row supersedes it. */
     val period: String,
     val limitMinor: Long,
     val seq: Long = 0,
@@ -105,13 +105,14 @@ data class BudgetEntity(
 
 /**
  * The cursor and epoch live in a one-row Room table, not DataStore, and this is
- * a deliberate trick (§9).
+ * a deliberate trick.
  *
  * Room verifies a schema hash on open and throws the first time an entity
  * changes without a version bump. The obvious fix, fallbackToDestructiveMigration(),
- * silently wipes the device database — which is exactly the second copy §10
- * depends on. But because the cursor lives INSIDE that database, a destructive
- * wipe also resets it to zero, the next sync re-pulls everything, and
+ * silently wipes the device database — which is exactly the second copy the
+ * restore runbook depends on. But because the cursor lives INSIDE that
+ * database, a destructive wipe also resets it to zero, the next sync re-pulls
+ * everything, and
  * destructive migration becomes a legitimate strategy rather than a data-loss
  * bug.
  *

@@ -4,7 +4,7 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <!-- Android 13+ requires this at runtime, and without it every push is
          dropped SILENTLY — the server sees a successful delivery and the phone
-         shows nothing (PRD §9). Asked on first visit to the Budget screen. -->
+         shows nothing. Asked on first visit to the Budget screen. -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <application
@@ -22,7 +22,7 @@
         <!-- allowBackup defaults to true, and Google Auto Backup would copy Room
              and DataStore to the cloud and restore them onto a NEW phone,
              session token included. Two devices would then share one `devices`
-             row, so revoking one revokes both (PRD §11). -->
+             row, so revoking one revokes both. -->
 
         <activity
             android:name=".MainActivity"
@@ -37,7 +37,7 @@
 
             <!-- A home screen shortcut saves taps, not milliseconds — it is the
                  same cold start. Point it at MainActivity with an extra and
-                 branch the start destination. Do not add a second Activity (§9). -->
+                 branch the start destination. Do not add a second Activity. -->
             <meta-data
                 android:name="android.app.shortcuts"
                 android:resource="@xml/shortcuts" />

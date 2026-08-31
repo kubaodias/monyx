@@ -45,7 +45,7 @@ import com.monio.ui.theme.Palette
 
 /**
  * Categories grouped by kind (expense/income), subcategories nested exactly
- * one level under their parent (PRD §6). Add/edit/delete via the repository.
+ * one level under their parent. Add/edit/delete via the repository.
  */
 @Composable
 fun CategoriesSection(
@@ -307,7 +307,7 @@ private fun CategoryEditDialog(
 /**
  * Parent choice as a chip row rather than a dropdown, to stay clear of
  * ExposedDropdownMenuBox's experimental API surface. Only root categories are
- * offered — nesting is exactly one level deep (PRD §6), so a category that
+ * offered — nesting is exactly one level deep, so a category that
  * itself has a parent is never a valid choice here.
  */
 @Composable

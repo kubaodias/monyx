@@ -23,7 +23,7 @@ import kotlinx.coroutines.launch
 data class PeriodOption(val period: String, val label: String)
 
 /**
- * Backs the Transactions screen (PRD §9): chronological list, plain-LIKE
+ * Backs the Transactions screen: chronological list, plain-LIKE
  * search, and filter by category / account / period. Filters live here so the
  * search field and the filter chips share one source of truth and the query
  * to Room stays a single flatMapLatest — never four separate collections
@@ -109,7 +109,7 @@ class TransactionsViewModel(
     }
 
     /**
-     * A local write returns immediately (§9) — the row is tombstoned on device
+     * A local write returns immediately — the row is tombstoned on device
      * and the sheet can close right away. SyncWorker carries the tombstone to
      * the server on its own schedule.
      */

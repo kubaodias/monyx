@@ -4,9 +4,9 @@
 
 ## Context
 
-PRD §11 makes `db.ts` the single isolation boundary and states it "exports
+`db.ts` is the single isolation boundary, and it was specified to export
 exactly three things — `forHousehold(id)`, `resolveInvite(code)` and
-`allHouseholds()`", naming two honest exceptions: enrolment has no household
+`allHouseholds()` — with two honest exceptions: enrolment has no household
 yet, and the daily sweep spans all of them.
 
 Implementing `/sync/push` revealed a third, unavoidable pre-household lookup.
@@ -30,4 +30,4 @@ household id from a request.
 
 The alternative — resolving the token inside `auth.ts` against a raw binding —
 would have put a second `env.DB` importer in the codebase, which is exactly what
-§11 is written to prevent.
+the isolation boundary is written to prevent.

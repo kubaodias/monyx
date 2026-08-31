@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  English — the source language (PRD §9) and the default resources, so an
+  English — the source language and the default resources, so an
   unsupported system language lands here rather than on a missing key.
 
   Polish lives in values-pl/. Keep the two in step: a key added there and not
@@ -89,7 +89,7 @@
 
     <!-- Notifications. The server sends a key and its arguments; this file
          supplies the wording. Every placeholder is %1$s, never %d: getString()
-         handed a String for a %d specifier throws (§8). -->
+         handed a String for a %d specifier throws. -->
     <string name="channel_budget_alerts">Budget alerts</string>
     <string name="channel_budget_alerts_description">A heads-up when spending approaches a limit</string>
     <string name="budget_alert_title">Monia</string>

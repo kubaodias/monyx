@@ -53,7 +53,7 @@ import com.monio.ui.theme.Palette
 
 /**
  * The Overview screen (Przegląd): month totals, the spending breakdown, account
- * balances and the recent ledger (PRD §9). Navigation is passed in as plain
+ * balances and the recent ledger. Navigation is passed in as plain
  * callbacks, never a NavController.
  */
 @Composable

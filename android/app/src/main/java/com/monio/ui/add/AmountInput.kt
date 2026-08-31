@@ -4,7 +4,7 @@ import java.text.DecimalFormatSymbols
 import java.util.Locale
 
 /**
- * The amount field is NOT a TextField (PRD §9).
+ * The amount field is NOT a TextField.
  *
  * This is the highest-leverage decision in the Android half of the project: it
  * removes the entire class of "focus the field at first composition" flakiness —
@@ -44,7 +44,7 @@ class AmountInput private constructor(
 
     val operatorLabel: String? get() = pendingOperator?.toString()
 
-    /** The entered value in minor units (grosze). Money is an integer, always (§6). */
+    /** The entered value in minor units (grosze). Money is an integer, always. */
     fun toMinor(): Long {
         val parts = text.split(',')
         val whole = parts[0].filter { it.isDigit() }.ifEmpty { "0" }

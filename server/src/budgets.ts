@@ -1,17 +1,17 @@
 // Budget aggregates, thresholds and the daily sweep.
 //
-// This is the ONLY implementation of the budget query. /budgets/status was cut
-// (§7): the phone computes its own number from the same synced rows, and the
+// This is the ONLY implementation of the budget query. /budgets/status was cut:
+// the phone computes its own number from the same synced rows, and the
 // server's SQL survives only here, inside the alert path, where nothing
 // competes with it.
 import type { HouseholdDb } from "./db.ts";
 import { currentPeriod } from "./schema.ts";
 
-/** 80% and 100% of a category budget (§8). */
+/** 80% and 100% of a category budget. */
 export const THRESHOLDS = [80, 100] as const;
 
 /**
- * Thresholds clear with hysteresis: 80% clears below 75%, 100% below 95% (§8).
+ * Thresholds clear with hysteresis: 80% clears below 75%, 100% below 95%.
  *
  * The naive rule — never clear — has a failure worse than the oscillation it
  * prevents: someone types 1500,00 instead of 15,00, both alerts fire, they
@@ -43,7 +43,7 @@ export interface PendingAlert {
 /**
  * The limits in effect for a period, with the spend against each.
  *
- * Carry-forward is resolved lazily at query time (§6): a budgets row is not a
+ * Carry-forward is resolved lazily at query time: a budgets row is not a
  * limit for one month, it is a limit that holds from its period onward until a
  * newer row supersedes it.
  *
@@ -120,7 +120,7 @@ export async function budgetStatuses(
  *
  * Claiming is the mutex. budget_alerts has PRIMARY KEY (household_id,
  * category_id, period, threshold) on a single-primary SQLite where writes
- * serialise, so INSERT OR IGNORE followed by changes() is a real mutex (§8).
+ * serialise, so INSERT OR IGNORE followed by changes() is a real mutex.
  * Whoever inserts the row owns the notification; everyone else sees zero rows
  * changed and does nothing. No actor is needed to re-derive a property the
  * primary key already gives.
@@ -157,7 +157,7 @@ export async function claimAlerts(
       if (status.pct < threshold) continue;
 
       // Claim, then send, then stamp. notified_at starts at 0, meaning claimed
-      // but not delivered; the daily sweep retries anything still at 0 (§8).
+      // but not delivered; the daily sweep retries anything still at 0.
       const res = await db
         .prepare(
           `INSERT OR IGNORE INTO budget_alerts
@@ -175,7 +175,7 @@ export async function claimAlerts(
     // higher one. The lower threshold is marked notified without being
     // delivered — and it is marked with a REAL timestamp, never 0. Writing 0
     // would leave it looking undelivered, and the sweep would send it hours
-    // later as a second notification for a single crossing (§8).
+    // later as a second notification for a single crossing.
     const highest = Math.max(...claimed);
     for (const threshold of claimed) {
       if (threshold === highest) continue;

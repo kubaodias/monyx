@@ -2,7 +2,7 @@
 //
 // M2 is done when crossing a budget produces exactly one notification, on every
 // phone, and correcting the mistake that caused it does not silence the
-// category for the rest of the month (§13). These tests are that criterion.
+// category for the rest of the month. These tests are that criterion.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { FakeDb, expense, seedHousehold } from "./fake-db.ts";
@@ -112,7 +112,7 @@ test("crossing 80% claims the alert exactly once, however many times it is check
   assert.equal(first[0]!.pct, 85);
 
   // Whoever inserts the row owns the notification; everyone else sees zero rows
-  // changed and does nothing (§8). This is the mutex.
+  // changed and does nothing. This is the mutex.
   assert.deepEqual(await claimAlerts(db, "2026-08", NOW), []);
   assert.deepEqual(await claimAlerts(db, "2026-08", NOW), []);
 });
@@ -128,7 +128,7 @@ test("one expense crossing BOTH thresholds sends one notification, for the highe
 
   // The lower threshold is marked notified with a REAL timestamp, never 0.
   // Writing 0 would leave it looking undelivered and the sweep would send it
-  // hours later as a second notification for a single crossing (§8).
+  // hours later as a second notification for a single crossing.
   const row = fake.db
     .prepare("SELECT notified_at FROM budget_alerts WHERE threshold = 80")
     .get() as { notified_at: number };

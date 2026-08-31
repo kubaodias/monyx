@@ -11,13 +11,13 @@ import kotlinx.coroutines.flow.map
 private val Context.sessionStore by preferencesDataStore(name = "monio_session")
 
 /**
- * The session token stays in DataStore (§9) — everything the sync protocol
+ * The session token stays in DataStore — everything the sync protocol
  * needs to be atomic lives in Room instead.
  *
  * android:allowBackup="false" matters here: Google Auto Backup would copy
  * DataStore to the cloud and restore it onto a NEW phone, session token
  * included. Two devices would then share one `devices` row, so revoking one
- * would revoke both (§11).
+ * would revoke both.
  */
 class Session(private val context: Context) {
 

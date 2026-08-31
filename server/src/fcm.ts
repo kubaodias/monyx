@@ -2,7 +2,7 @@
 //
 // The legacy server key was shut down in June 2024, so this goes through v1,
 // which requires an OAuth2 token: assemble a JWT, sign it RS256 with
-// node:crypto, exchange it, cache it (§8). No external library.
+// node:crypto, exchange it, cache it. No external library.
 import { env } from "@telnyx/edge-runtime";
 import { createSign } from "node:crypto";
 import type { PendingAlert } from "./budgets.ts";
@@ -20,14 +20,14 @@ interface CachedToken {
   expires_at: number;
 }
 
-/** KV keys may not contain a colon (§8). */
+/** KV keys may not contain a colon. */
 const TOKEN_KEY = "fcm/token";
 const TOKEN_TTL_SECONDS = 55 * 60; // the token lives 60 minutes
 const SKEW_MS = 60_000;
 
 /**
  * Module state persists per container, so the token is cached in memory as well
- * and the KV hop only happens on a cold start (§8). Containers are reclaimed
+ * and the KV hop only happens on a cold start. Containers are reclaimed
  * without notice — usable as a cache, never as storage.
  */
 let memoryToken: CachedToken | null = null;
@@ -36,7 +36,7 @@ let serviceAccountCache: ServiceAccount | null = null;
 
 /**
  * The entire service-account JSON sits as one secret and is parsed here — a
- * bare PEM in an environment variable loses its newlines (§8).
+ * bare PEM in an environment variable loses its newlines.
  */
 async function serviceAccount(): Promise<ServiceAccount> {
   if (serviceAccountCache) return serviceAccountCache;
@@ -129,8 +129,8 @@ async function accessToken(sa: ServiceAccount): Promise<string> {
  *
  * body_loc_args is an array of STRINGS — JSON numbers are rejected as
  * INVALID_ARGUMENT. Arguments are substituted literally, so NumberFormat never
- * runs on them on the device. §9's rule still stands, because the wording comes
- * from strings.xml and a numeral is not wording (§8).
+ * runs on them on the device. The no-hardcoded-strings rule still stands,
+ * because the wording comes from strings.xml and a numeral is not wording.
  */
 const PLN = new Intl.NumberFormat("pl-PL", {
   minimumFractionDigits: 2,
@@ -156,7 +156,7 @@ export interface DeliveryOutcome {
  * Send one alert to every phone in the household.
  *
  * The budget is shared, so the information is shared; routing it to whoever
- * happened to enter the expense would tell the wrong person (§8).
+ * happened to enter the expense would tell the wrong person.
  */
 export async function sendBudgetAlert(
   alert: PendingAlert,
@@ -169,7 +169,7 @@ export async function sendBudgetAlert(
   const url = `https://fcm.googleapis.com/v1/projects/${sa.project_id}/messages:send`;
 
   // Every placeholder is %1$s, %2$s, … never %d: getString() handed a String
-  // for a %d specifier throws — a crash, not a rendering glitch (§8).
+  // for a %d specifier throws — a crash, not a rendering glitch.
   const args = [
     alert.category_name,
     formatMinor(alert.spent_minor),
@@ -179,7 +179,7 @@ export async function sendBudgetAlert(
 
   // The data block drives the deep link. With a notification block present,
   // onMessageReceived is not called while the app is backgrounded — the data
-  // arrives as extras on the launching Activity's intent (§8).
+  // arrives as extras on the launching Activity's intent.
   const data = {
     type: "budget_alert",
     category_id: alert.category_id,
@@ -200,7 +200,7 @@ export async function sendBudgetAlert(
             token: device.fcm_token,
             // The notification block is what makes the system tray display it
             // reliably: data-only messages are throttled in Doze, and a
-            // force-stopped app receives nothing at all (§8).
+            // force-stopped app receives nothing at all.
             // "Monia", not "Monio": this title is what Android shows when the
             // app is backgrounded and FCM renders the notification itself.
             // User-facing copy is Monia; only identifiers are monio (ADR 0003).
@@ -241,12 +241,12 @@ export async function sendBudgetAlert(
     }
     // A 404 UNREGISTERED means the app was uninstalled or its data cleared.
     // Null that row's token — without it, every future alert retries a phone
-    // that no longer exists, forever (§8).
+    // that no longer exists, forever.
     if (value.status === 404) {
       unregistered.push(value.device.device_id);
       continue;
     }
-    // 400, 403, 429 and 503 are logged and left alone (§8).
+    // 400, 403, 429 and 503 are logged and left alone.
     console.error(`fcm ${value.status}`, value.text);
   }
 
