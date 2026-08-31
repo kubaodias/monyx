@@ -10,7 +10,7 @@
   the rule stops being checkable.
 -->
 <resources>
-    <string name="app_name">Monia</string>
+    <string name="app_name">Monio</string>
 
     <!-- Navigation -->
     <string name="nav_overview">Przegląd</string>
@@ -22,17 +22,14 @@
     <!-- Add screen -->
     <string name="add_expense">Wydatek</string>
     <string name="add_income">Przychód</string>
-    <string name="add_transfer">Przelew</string>
     <string name="add_save">Zapisz</string>
     <string name="add_note_hint">Notatka</string>
     <string name="add_pick_category">Wybierz kategorię</string>
     <string name="add_pick_account">Konto</string>
-    <string name="add_transfer_to">Na konto</string>
     <string name="add_saved">Zapisano</string>
     <string name="add_needs_amount">Podaj kwotę</string>
     <string name="add_needs_category">Wybierz kategorię</string>
     <string name="add_needs_account">Dodaj najpierw konto</string>
-    <string name="add_needs_transfer_account">Wybierz drugie konto</string>
     <string name="add_clear">Wyczyść</string>
     <string name="add_backspace">Usuń znak</string>
     <string name="add_today">Dziś</string>
@@ -60,6 +57,8 @@
     <string name="transactions_filter_account">Konto</string>
     <string name="transactions_clear_filters">Wyczyść filtry</string>
     <string name="transactions_delete">Usuń</string>
+    <string name="transactions_edit">Edytuj</string>
+    <string name="transactions_edit_amount">Kwota</string>
     <string name="transactions_deleted">Usunięto</string>
     <string name="transactions_undo">Cofnij</string>
     <string name="transactions_pending">Czeka na wysłanie</string>
@@ -89,9 +88,9 @@
          handed a String for a %d specifier throws. -->
     <string name="channel_budget_alerts">Alerty budżetowe</string>
     <string name="channel_budget_alerts_description">Powiadomienie, gdy wydatki zbliżają się do limitu</string>
-    <string name="budget_alert_title">Monia</string>
+    <string name="budget_alert_title">Monio</string>
     <string name="budget_alert">%1$s: %2$s z %3$s zł (%4$s%%)</string>
-    <string name="notifications_permission_rationale">Monia powiadomi Cię, zanim przekroczysz budżet</string>
+    <string name="notifications_permission_rationale">Monio powiadomi Cię, zanim przekroczysz budżet</string>
     <string name="notifications_enable">Włącz powiadomienia</string>
 
     <!-- Settings -->
@@ -136,7 +135,7 @@
     <string name="settings_language_system">Domyślny systemowy</string>
 
     <!-- Onboarding -->
-    <string name="onboarding_title">Witaj w Monii</string>
+    <string name="onboarding_title">Zaczynajmy</string>
     <string name="onboarding_subtitle">Wspólny budżet domowy</string>
     <string name="onboarding_invite_code">Kod zaproszenia</string>
     <string name="onboarding_your_name">Twoje imię</string>

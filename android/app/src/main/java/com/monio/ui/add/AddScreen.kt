@@ -24,11 +24,15 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.Wallet
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.DatePicker
+import androidx.compose.material3.DatePickerDialog
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -50,7 +54,9 @@ import com.monio.data.AccountEntity
 import com.monio.data.CategoryEntity
 import com.monio.data.Dates
 import com.monio.ui.theme.Palette
+import java.time.Instant
 import java.time.LocalDate
+import java.time.ZoneOffset
 
 /**
  * Launching the app must land directly on the numeric keypad. Type the amount,
@@ -91,8 +97,17 @@ fun AddScreen(
             }
     }
 
+    // A subcategory is drawn in its parent's colour, so a family of categories
+    // reads as one group in the grid instead of a scatter of unrelated hues.
+    val colorOf: (CategoryEntity) -> Color = remember(categories) {
+        val byId = categories.associateBy { it.id }
+        val resolve: (CategoryEntity) -> Color = { c ->
+            Palette.colorForChild(c.color, byId[c.parentId]?.color, c.parentId, c.id)
+        }
+        resolve
+    }
+
     var showAccountPicker by remember { mutableStateOf(false) }
-    var showTransferPicker by remember { mutableStateOf(false) }
     var showDatePicker by remember { mutableStateOf(false) }
 
     Column(modifier = Modifier.fillMaxSize()) {
@@ -104,20 +119,16 @@ fun AddScreen(
             state = state,
             accounts = accounts,
             onPickAccount = { showAccountPicker = true },
-            onPickTransferAccount = { showTransferPicker = true },
             onPickDate = { showDatePicker = true },
         )
 
-        if (state.kind != EntryKind.Transfer) {
-            CategoryGrid(
-                categories = selectable,
-                selectedId = state.categoryId,
-                onSelect = viewModel::selectCategory,
-                modifier = Modifier.weight(1f),
-            )
-        } else {
-            Spacer(Modifier.weight(1f))
-        }
+        CategoryGrid(
+            categories = selectable,
+            selectedId = state.categoryId,
+            colorOf = colorOf,
+            onSelect = viewModel::selectCategory,
+            modifier = Modifier.weight(1f),
+        )
 
         OutlinedTextField(
             value = state.note,
@@ -151,13 +162,6 @@ fun AddScreen(
             onDismiss = { showAccountPicker = false },
         )
     }
-    if (showTransferPicker) {
-        AccountPickerDialog(
-            accounts = accounts.filter { it.id != state.accountId },
-            onPick = { viewModel.selectTransferAccount(it); showTransferPicker = false },
-            onDismiss = { showTransferPicker = false },
-        )
-    }
     if (showDatePicker) {
         DayPickerDialog(
             selected = state.date,
@@ -172,7 +176,6 @@ private fun KindSelector(selected: EntryKind, onSelect: (EntryKind) -> Unit) {
     val options = listOf(
         EntryKind.Expense to R.string.add_expense,
         EntryKind.Income to R.string.add_income,
-        EntryKind.Transfer to R.string.add_transfer,
     )
     Row(
         modifier = Modifier
@@ -253,12 +256,10 @@ private fun ContextRow(
     state: AddUiState,
     accounts: List<AccountEntity>,
     onPickAccount: () -> Unit,
-    onPickTransferAccount: () -> Unit,
     onPickDate: () -> Unit,
 ) {
     val accountName = accounts.firstOrNull { it.id == state.accountId }?.name
         ?: stringResource(R.string.add_needs_account)
-    val transferName = accounts.firstOrNull { it.id == state.transferAccountId }?.name
 
     Row(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp),
@@ -270,13 +271,6 @@ private fun ContextRow(
             label = accountName,
             onClick = onPickAccount,
         )
-        if (state.kind == EntryKind.Transfer) {
-            ContextChip(
-                icon = null,
-                label = transferName ?: stringResource(R.string.add_transfer_to),
-                onClick = onPickTransferAccount,
-            )
-        }
         ContextChip(
             icon = { Icon(Icons.Filled.CalendarToday, contentDescription = null, modifier = Modifier.size(16.dp)) },
             label = when (state.date) {
@@ -313,6 +307,7 @@ private fun ContextChip(
 private fun CategoryGrid(
     categories: List<CategoryEntity>,
     selectedId: String?,
+    colorOf: (CategoryEntity) -> Color,
     onSelect: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -324,7 +319,7 @@ private fun CategoryGrid(
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         items(categories, key = { it.id }) { category ->
-            val color = Palette.colorFor(category.color, category.id)
+            val color = colorOf(category)
             val selected = category.id == selectedId
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
@@ -393,40 +388,48 @@ private fun AccountPickerDialog(
     )
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun DayPickerDialog(
     selected: LocalDate,
     onPick: (LocalDate) -> Unit,
     onDismiss: () -> Unit,
 ) {
-    // Deliberately not a full calendar: almost every entry is today or
-    // yesterday, and a date picker in this path costs taps the five-second
-    // target cannot spare.
-    val choices = (0L..13L).map { Dates.today().minusDays(it) }
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.add_pick_date)) },
-        text = {
-            Column {
-                choices.forEach { day ->
-                    val label = when (day) {
-                        Dates.today() -> stringResource(R.string.add_today)
-                        Dates.today().minusDays(1) -> stringResource(R.string.add_yesterday)
-                        else -> Dates.dayLabel(day.toString())
-                    }
-                    Text(
-                        text = label,
-                        fontWeight = if (day == selected) FontWeight.SemiBold else FontWeight.Normal,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { onPick(day) }
-                            .padding(vertical = 10.dp),
-                    )
-                }
-            }
-        },
-        confirmButton = {
-            TextButton(onClick = onDismiss) { Text(stringResource(R.string.common_close)) }
+    // A month grid. The previous fourteen-day list could not reach a date at the
+    // end of last month, which is exactly when someone is catching up on
+    // receipts. Future days stay unselectable — an expense has already happened.
+    val today = Dates.today()
+    val state = rememberDatePickerState(
+        initialSelectedDateMillis = selected.atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli(),
+        selectableDates = object : androidx.compose.material3.SelectableDates {
+            override fun isSelectableDate(utcTimeMillis: Long): Boolean =
+                !utcMillisToLocalDate(utcTimeMillis).isAfter(today)
+
+            override fun isSelectableYear(year: Int): Boolean = year <= today.year
         },
     )
+
+    DatePickerDialog(
+        onDismissRequest = onDismiss,
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    state.selectedDateMillis?.let { onPick(utcMillisToLocalDate(it)) } ?: onDismiss()
+                },
+            ) { Text(stringResource(R.string.settings_save)) }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.settings_cancel)) }
+        },
+    ) {
+        DatePicker(state = state, title = null)
+    }
 }
+
+/**
+ * DatePicker hands back a UTC midnight, always. Reading it back in the household
+ * timezone would land on the previous day for anywhere east of Greenwich —
+ * Warsaw included — so it is read as UTC and only then treated as a plain date.
+ */
+private fun utcMillisToLocalDate(utcMillis: Long): LocalDate =
+    Instant.ofEpochMilli(utcMillis).atZone(ZoneOffset.UTC).toLocalDate()

@@ -7,6 +7,7 @@ import com.monio.data.AccountEntity
 import com.monio.data.CategoryEntity
 import com.monio.data.Dates
 import com.monio.data.MonioRepository
+import com.monio.data.TransactionEntity
 import com.monio.data.TransactionListItem
 import com.monio.sync.SyncWorker
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -101,6 +102,19 @@ class TransactionsViewModel(
         _period.value = period.orEmpty()
     }
 
+    /**
+     * The filter the navigator wants shown, applied to the live ViewModel.
+     *
+     * The transactions tab keeps its ViewModel across a tab switch, so a jump
+     * in from a budget row or a pie slice cannot pass its filter through the
+     * constructor — by then the ViewModel already exists. Tapping the tab
+     * itself sends (null, null) and lands here as a clear.
+     */
+    fun applyFilter(categoryId: String?, period: String?) {
+        _categoryId.value = categoryId
+        _period.value = period.orEmpty()
+    }
+
     fun clearFilters() {
         _query.value = ""
         _categoryId.value = null
@@ -116,6 +130,38 @@ class TransactionsViewModel(
     fun deleteTransaction(id: String) {
         viewModelScope.launch {
             repository.deleteTransaction(id)
+            SyncWorker.enqueue(appContext)
+        }
+    }
+
+    /** Loads the full row behind a list item, which the list projection does not carry. */
+    suspend fun load(id: String): TransactionEntity? = repository.transaction(id)
+
+    /**
+     * An edit is an upsert of the whole row, exactly like a create: the sync
+     * protocol carries full rows, so there is no partial-update path to get
+     * wrong. occurredOn is recomputed because changing the date must move the
+     * row between months, and that column is what every month query buckets on.
+     */
+    fun saveEdit(
+        original: TransactionEntity,
+        amountMinor: Long,
+        categoryId: String?,
+        accountId: String,
+        note: String,
+        occurredAtMs: Long,
+    ) {
+        viewModelScope.launch {
+            repository.updateTransaction(
+                original.copy(
+                    amountMinor = amountMinor,
+                    categoryId = categoryId,
+                    accountId = accountId,
+                    note = note.ifBlank { null },
+                    occurredAt = occurredAtMs,
+                    occurredOn = Dates.localDate(occurredAtMs),
+                ),
+            )
             SyncWorker.enqueue(appContext)
         }
     }

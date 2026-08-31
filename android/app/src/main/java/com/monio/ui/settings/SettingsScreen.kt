@@ -12,11 +12,15 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -474,16 +478,36 @@ internal fun ConfirmDialog(
     )
 }
 
+/**
+ * A scrollable grid, not a side-scrolling strip.
+ *
+ * With fifty-odd icons a single row is unusable: the ones past the fourth are
+ * invisible, and nothing about the strip suggests there are forty more. A grid
+ * shows most of them at once and scrolls vertically like the rest of the dialog.
+ */
 @Composable
 internal fun IconSwatchRow(selected: String?, onSelect: (String) -> Unit) {
-    LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-        items(Palette.icons) { (key, vector) ->
+    LazyVerticalGrid(
+        columns = GridCells.Adaptive(minSize = 48.dp),
+        // Bounded because this lives inside an AlertDialog, which offers a
+        // child infinite height and would crash a lazy grid asked to fill it.
+        modifier = Modifier.fillMaxWidth().heightIn(max = 200.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        items(Palette.icons, key = { it.first }) { (key, vector) ->
             val isSelected = key == selected
             Box(
                 modifier = Modifier
                     .size(40.dp)
                     .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.surfaceVariant)
+                    .background(
+                        if (isSelected) {
+                            MaterialTheme.colorScheme.primaryContainer
+                        } else {
+                            MaterialTheme.colorScheme.surfaceVariant
+                        },
+                    )
                     .border(
                         width = if (isSelected) 2.dp else 0.dp,
                         color = MaterialTheme.colorScheme.primary,
@@ -492,7 +516,15 @@ internal fun IconSwatchRow(selected: String?, onSelect: (String) -> Unit) {
                     .clickable { onSelect(key) },
                 contentAlignment = Alignment.Center,
             ) {
-                Icon(vector, contentDescription = key, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                Icon(
+                    vector,
+                    contentDescription = key,
+                    tint = if (isSelected) {
+                        MaterialTheme.colorScheme.onPrimaryContainer
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    },
+                )
             }
         }
     }
@@ -500,8 +532,13 @@ internal fun IconSwatchRow(selected: String?, onSelect: (String) -> Unit) {
 
 @Composable
 internal fun ColorSwatchRow(selected: String?, onSelect: (String) -> Unit) {
-    LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-        items(Palette.colors) { (key, color) ->
+    LazyVerticalGrid(
+        columns = GridCells.Adaptive(minSize = 44.dp),
+        modifier = Modifier.fillMaxWidth().heightIn(max = 104.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        items(Palette.colors, key = { it.first }) { (key, color) ->
             val isSelected = key == selected
             Box(
                 modifier = Modifier

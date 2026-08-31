@@ -27,6 +27,7 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
@@ -35,9 +36,11 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -61,28 +64,39 @@ import com.monio.data.AccountEntity
 import com.monio.data.CategoryEntity
 import com.monio.data.Dates
 import com.monio.data.Money
+import com.monio.data.TransactionEntity
 import com.monio.data.TransactionListItem
 import com.monio.ui.theme.Palette
 import kotlinx.coroutines.launch
 
 /**
  * Chronological list, plain-LIKE search, filter by category / account / period.
- * `initialCategoryId` / `initialPeriod` let the Budget screen deep-
- * link into a filtered list, e.g. tapping "over budget" for a category.
+ *
+ * [filterCategoryId] and [filterPeriod] are the filter the NAVIGATOR wants
+ * shown — a budget row, a pie slice, or the tab itself asking for everything.
+ * They are applied reactively rather than through the constructor: this screen
+ * keeps its ViewModel across a tab switch, so by the time a jump arrives the
+ * ViewModel already exists and a constructor argument would be ignored.
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TransactionsScreen(
-    initialCategoryId: String? = null,
-    initialPeriod: String? = null,
+    filterCategoryId: String? = null,
+    filterPeriod: String? = null,
+    onSyncRequested: () -> Unit = {},
 ) {
     val app = LocalContext.current.applicationContext as MonioApp
     val viewModel: TransactionsViewModel = viewModel(
         factory = viewModelFactory {
             initializer {
-                TransactionsViewModel(app.repository, app.applicationContext, initialCategoryId, initialPeriod)
+                TransactionsViewModel(app.repository, app.applicationContext, filterCategoryId, filterPeriod)
             }
         },
     )
+
+    LaunchedEffect(filterCategoryId, filterPeriod) {
+        viewModel.applyFilter(filterCategoryId, filterPeriod)
+    }
 
     val query by viewModel.query.collectAsStateWithLifecycle()
     val categoryId by viewModel.categoryId.collectAsStateWithLifecycle()
@@ -93,9 +107,12 @@ fun TransactionsScreen(
     val transactions by viewModel.transactions.collectAsStateWithLifecycle()
 
     var selectedItem by remember { mutableStateOf<TransactionListItem?>(null) }
+    var editing by remember { mutableStateOf<TransactionEntity?>(null) }
+    var refreshing by remember { mutableStateOf(false) }
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     val deletedMessage = stringResource(R.string.transactions_deleted)
+    val savedMessage = stringResource(R.string.add_saved)
 
     val hasActiveFilters = query.isNotBlank() || categoryId != null || accountId != null || period.isNotBlank()
 
@@ -133,7 +150,7 @@ fun TransactionsScreen(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 CategoryFilterChip(
-                    categories = categories,
+                    categories = remember(categories) { categories.filter { it.parentId == null } },
                     selectedId = categoryId,
                     onSelect = viewModel::setCategoryFilter,
                 )
@@ -169,9 +186,29 @@ fun TransactionsScreen(
                 }
             } else {
                 val grouped = remember(transactions) { transactions.groupBy { it.occurredOn }.toList() }
-                LazyColumn(contentPadding = PaddingValues(vertical = 8.dp, horizontal = 0.dp)) {
-                    items(grouped, key = { it.first }) { (day, dayItems) ->
-                        DayGroup(day = day, items = dayItems, onRowClick = { selectedItem = it })
+                PullToRefreshBox(
+                    isRefreshing = refreshing,
+                    onRefresh = {
+                        refreshing = true
+                        onSyncRequested()
+                        scope.launch {
+                            // The worker is fire-and-forget, so the spinner is
+                            // time-boxed rather than tied to its result. It is
+                            // an acknowledgement of the gesture, not a progress
+                            // bar: rows arrive on their own when the pull lands.
+                            kotlinx.coroutines.delay(1200)
+                            refreshing = false
+                        }
+                    },
+                    modifier = Modifier.fillMaxSize(),
+                ) {
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(vertical = 8.dp, horizontal = 0.dp),
+                    ) {
+                        items(grouped, key = { it.first }) { (day, dayItems) ->
+                            DayGroup(day = day, items = dayItems, onRowClick = { selectedItem = it })
+                        }
                     }
                 }
             }
@@ -182,10 +219,39 @@ fun TransactionsScreen(
         TransactionDetailSheet(
             item = item,
             onDismiss = { selectedItem = null },
+            onEdit = {
+                scope.launch {
+                    // The list projection is a join, not the row — load the real
+                    // entity before handing it to an editor that will write it back.
+                    editing = viewModel.load(item.id)
+                    selectedItem = null
+                }
+            },
             onDelete = { id ->
                 viewModel.deleteTransaction(id)
                 selectedItem = null
                 scope.launch { snackbarHostState.showSnackbar(deletedMessage) }
+            },
+        )
+    }
+
+    editing?.let { original ->
+        EditTransactionDialog(
+            original = original,
+            categories = categories,
+            accounts = accounts,
+            onDismiss = { editing = null },
+            onSave = { edit ->
+                viewModel.saveEdit(
+                    original = original,
+                    amountMinor = edit.amountMinor,
+                    categoryId = edit.categoryId,
+                    accountId = edit.accountId,
+                    note = edit.note,
+                    occurredAtMs = edit.occurredAtMs,
+                )
+                editing = null
+                scope.launch { snackbarHostState.showSnackbar(savedMessage) }
             },
         )
     }

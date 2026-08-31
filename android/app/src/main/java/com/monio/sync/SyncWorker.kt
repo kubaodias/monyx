@@ -64,6 +64,35 @@ class SyncWorker(
         }
 
         /**
+         * What "Sync now" and a pull-to-refresh mean: no debounce, and REPLACE
+         * rather than KEEP.
+         *
+         * KEEP is right for enqueue(), where the point is to coalesce. It is
+         * wrong here: a debounced push already sitting in the queue would make
+         * an explicit tap do nothing at all for fifteen seconds, which reads as
+         * a broken button.
+         */
+        fun syncNow(context: Context) {
+            val request = OneTimeWorkRequestBuilder<SyncWorker>()
+                .setConstraints(constraints)
+                .build()
+            WorkManager.getInstance(context)
+                .enqueueUniqueWork(UNIQUE_ONE_SHOT, ExistingWorkPolicy.REPLACE, request)
+        }
+
+        /**
+         * Called the moment enrolment succeeds, not only on the next cold start.
+         *
+         * Without this a newly joined phone schedules no work at all until the
+         * app is killed and reopened: the first thing a new family member sees
+         * is an empty app, and nothing on screen suggests restarting.
+         */
+        fun onEnrolled(context: Context) {
+            syncNow(context)
+            schedulePeriodic(context)
+        }
+
+        /**
          * Hourly, as a bonus on top of sync-on-open.
          *
          * UPDATE, not KEEP: KEEP on periodic work means a later change to the

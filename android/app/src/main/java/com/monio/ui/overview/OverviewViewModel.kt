@@ -27,6 +27,8 @@ data class OverviewUiState(
     val expenseMinor: Long = 0,
     val breakdown: List<CategorySpend> = emptyList(),
     val accounts: List<AccountBalance> = emptyList(),
+    /** The selected month's transactions, newest first — NOT the newest rows in
+     *  the database. Stepping back a month must not keep showing today's. */
     val recent: List<TransactionListItem> = emptyList(),
 ) {
     /** Balance = income - expenses for the selected month. */
@@ -50,7 +52,7 @@ class OverviewViewModel(private val repository: MonioRepository) : ViewModel() {
                 repository.monthTotals(selectedPeriod),
                 repository.spendByCategory(selectedPeriod),
                 repository.accountBalances(),
-                repository.recentTransactions(8),
+                repository.recentTransactions(selectedPeriod, 12),
             ) { totals, breakdown, accounts, recent ->
                 OverviewUiState(
                     period = selectedPeriod,

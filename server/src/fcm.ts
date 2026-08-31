@@ -201,10 +201,10 @@ export async function sendBudgetAlert(
             // The notification block is what makes the system tray display it
             // reliably: data-only messages are throttled in Doze, and a
             // force-stopped app receives nothing at all.
-            // "Monia", not "Monio": this title is what Android shows when the
-            // app is backgrounded and FCM renders the notification itself.
-            // User-facing copy is Monia; only identifiers are monio (ADR 0003).
-            notification: { title: "Monia", body: "" },
+            // A visible title is mandatory for a notification message, and this
+            // one is only ever a fallback: the localised title comes from
+            // title_loc_key and strings.xml on the device.
+            notification: { title: "Monio", body: "" },
             data,
             android: {
               priority: "high",

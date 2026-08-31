@@ -14,10 +14,14 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 
+/**
+ * What can be CREATED. "transfer" is deliberately absent: rows with that kind
+ * may still exist from before it was removed, and every read path still renders
+ * them, but nothing offers to make a new one.
+ */
 enum class EntryKind(val wire: String) {
     Expense("expense"),
     Income("income"),
-    Transfer("transfer"),
 }
 
 data class AddUiState(
@@ -25,16 +29,12 @@ data class AddUiState(
     val kind: EntryKind = EntryKind.Expense,
     val categoryId: String? = null,
     val accountId: String? = null,
-    val transferAccountId: String? = null,
     val note: String = "",
     val date: LocalDate = Dates.today(),
 ) {
     val amountMinor: Long get() = amount.evaluate().toMinor()
     val canSave: Boolean
-        get() = amountMinor > 0 && accountId != null && when (kind) {
-            EntryKind.Transfer -> transferAccountId != null && transferAccountId != accountId
-            else -> categoryId != null
-        }
+        get() = amountMinor > 0 && accountId != null && categoryId != null
 }
 
 class AddViewModel(private val repository: MonioRepository) : ViewModel() {
@@ -62,7 +62,6 @@ class AddViewModel(private val repository: MonioRepository) : ViewModel() {
         val current = _state.value
         val next = when (action) {
             is KeyAction.Digit -> current.amount.digit(action.value)
-            KeyAction.DoubleZero -> current.amount.digit('0').digit('0')
             KeyAction.Separator -> current.amount.separator()
             KeyAction.Backspace -> current.amount.backspace()
             is KeyAction.Operator -> current.amount.operator(action.op)
@@ -72,11 +71,9 @@ class AddViewModel(private val repository: MonioRepository) : ViewModel() {
     }
 
     fun setKind(kind: EntryKind) {
-        _state.value = _state.value.copy(
-            kind = kind,
-            // A transfer has no category and never enters spending statistics.
-            categoryId = if (kind == EntryKind.Transfer) null else _state.value.categoryId,
-        )
+        // Expense and income categories are different lists, so a category
+        // chosen under one kind is meaningless under the other.
+        _state.value = _state.value.copy(kind = kind, categoryId = null)
     }
 
     fun selectCategory(id: String) {
@@ -85,10 +82,6 @@ class AddViewModel(private val repository: MonioRepository) : ViewModel() {
 
     fun selectAccount(id: String) {
         _state.value = _state.value.copy(accountId = id)
-    }
-
-    fun selectTransferAccount(id: String) {
-        _state.value = _state.value.copy(transferAccountId = id)
     }
 
     fun setNote(note: String) {
@@ -118,11 +111,6 @@ class AddViewModel(private val repository: MonioRepository) : ViewModel() {
                 amountMinor = current.amountMinor,
                 accountId = accountId,
                 categoryId = current.categoryId,
-                transferAccountId = if (current.kind == EntryKind.Transfer) {
-                    current.transferAccountId
-                } else {
-                    null
-                },
                 note = current.note,
                 occurredAtMs = occurredAt(current.date),
                 createdBy = createdBy,
@@ -132,7 +120,6 @@ class AddViewModel(private val repository: MonioRepository) : ViewModel() {
             _state.value = AddUiState(
                 kind = current.kind,
                 accountId = current.accountId,
-                transferAccountId = current.transferAccountId,
             )
             onSaved()
         }

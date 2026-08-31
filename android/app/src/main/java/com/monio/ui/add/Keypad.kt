@@ -30,8 +30,6 @@ import com.monio.R
 /** What a key press means. The screen owns the interpretation. */
 sealed interface KeyAction {
     data class Digit(val value: Char) : KeyAction
-    /** The "00" key — two grosze zeros in one tap, which is most of the time. */
-    data object DoubleZero : KeyAction
     data object Separator : KeyAction
     data object Backspace : KeyAction
     data class Operator(val op: Char) : KeyAction
@@ -42,6 +40,8 @@ private data class Key(
     val label: String,
     val action: KeyAction,
     val emphasis: Emphasis = Emphasis.Digit,
+    /** How many of the row's four columns this key occupies. */
+    val span: Float = 1f,
 )
 
 private enum class Emphasis { Digit, Function, Confirm }
@@ -82,10 +82,11 @@ fun Keypad(
             Key("3", KeyAction.Digit('3')),
             Key("⌫", KeyAction.Backspace, Emphasis.Function),
         ),
+        // Zero takes the width the "00" key used to have. Two zeros in one tap
+        // saved a tap on round amounts and cost a mis-tap on every other one.
         listOf(
             Key(separator.toString(), KeyAction.Separator),
-            Key("0", KeyAction.Digit('0')),
-            Key("00", KeyAction.DoubleZero),
+            Key("0", KeyAction.Digit('0'), span = 2f),
             Key("✓", KeyAction.Confirm, Emphasis.Confirm),
         ),
     )
@@ -104,7 +105,7 @@ fun Keypad(
                         key = key,
                         enabled = key.action != KeyAction.Confirm || confirmEnabled,
                         onClick = { onKey(key.action) },
-                        modifier = Modifier.weight(1f).fillMaxSize(),
+                        modifier = Modifier.weight(key.span).fillMaxSize(),
                     )
                 }
             }

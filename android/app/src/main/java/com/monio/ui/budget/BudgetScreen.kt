@@ -22,7 +22,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material3.AlertDialog
@@ -258,12 +258,16 @@ private fun BudgetRow(
         else -> MaterialTheme.colorScheme.primary
     }
     val over = usage.spentMinor > usage.limitMinor
-    val tint = Palette.colorFor(usage.color, usage.categoryId)
+    val tint = Palette.colorForChild(usage.color, usage.parentColor, usage.parentId, usage.categoryId)
 
+    // Tapping the row asks the question the row provokes — "what did I spend it
+    // on?" — and the pencil changes the limit. It was the other way round, which
+    // put the rarer action on the whole card and the commoner one behind a
+    // chevron that looked like decoration.
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onEdit),
+            .clickable(onClick = onOpenTransactions),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
     ) {
         Row(
@@ -312,10 +316,10 @@ private fun BudgetRow(
                 )
             }
 
-            IconButton(onClick = onOpenTransactions) {
+            IconButton(onClick = onEdit) {
                 Icon(
-                    imageVector = Icons.Filled.ChevronRight,
-                    contentDescription = stringResource(R.string.budget_view_transactions),
+                    imageVector = Icons.Filled.Edit,
+                    contentDescription = stringResource(R.string.budget_edit_limit),
                 )
             }
         }

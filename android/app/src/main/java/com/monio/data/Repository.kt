@@ -20,7 +20,7 @@ class MonioRepository(private val dao: MonioDao) {
     fun monthTotals(period: String) = dao.monthTotals(period)
     fun spendByCategory(period: String) = dao.spendByCategory(period)
     fun budgetUsage(period: String) = dao.budgetUsage(period)
-    fun recentTransactions(limit: Int = 8) = dao.recentTransactions(limit)
+    fun recentTransactions(period: String = "", limit: Int = 8) = dao.recentTransactions(period, limit)
     fun rejectedCount() = dao.rejectedCount()
     fun syncStateFlow() = dao.syncStateFlow()
 

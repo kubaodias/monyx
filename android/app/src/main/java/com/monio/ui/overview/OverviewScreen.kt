@@ -58,8 +58,7 @@ import com.monio.ui.theme.Palette
  */
 @Composable
 fun OverviewScreen(
-    onOpenTransaction: (String) -> Unit,
-    onSeeAllTransactions: () -> Unit,
+    onOpenTransactions: (categoryId: String?, period: String?) -> Unit,
 ) {
     val app = LocalContext.current.applicationContext as MonioApp
     val viewModel: OverviewViewModel = viewModel(factory = OverviewViewModel.factory(app.repository))
@@ -85,7 +84,13 @@ fun OverviewScreen(
             )
         }
         item {
-            BreakdownCard(breakdown = state.breakdown)
+            BreakdownCard(
+                breakdown = state.breakdown,
+                // A slice is a question — "what made up that 340 zł?" — so it
+                // opens that category's transactions for the month on screen,
+                // not for today.
+                onCategoryClick = { categoryId -> onOpenTransactions(categoryId, state.period) },
+            )
         }
         if (state.accounts.isNotEmpty()) {
             item {
@@ -95,8 +100,8 @@ fun OverviewScreen(
         item {
             RecentSection(
                 recent = state.recent,
-                onOpenTransaction = onOpenTransaction,
-                onSeeAll = onSeeAllTransactions,
+                onOpenTransaction = { onOpenTransactions(null, state.period) },
+                onSeeAll = { onOpenTransactions(null, state.period) },
             )
         }
     }
@@ -186,7 +191,10 @@ private fun SummaryStat(label: String, amountMinor: Long, tint: Color) {
 }
 
 @Composable
-private fun BreakdownCard(breakdown: List<CategorySpend>) {
+private fun BreakdownCard(
+    breakdown: List<CategorySpend>,
+    onCategoryClick: (String) -> Unit,
+) {
     Card(
         shape = RoundedCornerShape(24.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
@@ -207,7 +215,7 @@ private fun BreakdownCard(breakdown: List<CategorySpend>) {
                     color = Palette.colorFor(spend.color, spend.categoryId),
                 )
             }
-            PieChart(slices = slices)
+            PieChart(slices = slices, onSliceClick = onCategoryClick)
         }
     }
 }

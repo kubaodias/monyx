@@ -13,7 +13,7 @@
   "zł" is a currency symbol, not a word: it is identical in every translation.
 -->
 <resources>
-    <string name="app_name">Monia</string>
+    <string name="app_name">Monio</string>
 
     <!-- Navigation -->
     <string name="nav_overview">Overview</string>
@@ -25,17 +25,14 @@
     <!-- Add screen -->
     <string name="add_expense">Expense</string>
     <string name="add_income">Income</string>
-    <string name="add_transfer">Transfer</string>
     <string name="add_save">Save</string>
     <string name="add_note_hint">Note</string>
     <string name="add_pick_category">Pick a category</string>
     <string name="add_pick_account">Account</string>
-    <string name="add_transfer_to">To account</string>
     <string name="add_saved">Saved</string>
     <string name="add_needs_amount">Enter an amount</string>
     <string name="add_needs_category">Pick a category</string>
     <string name="add_needs_account">Add an account first</string>
-    <string name="add_needs_transfer_account">Pick the other account</string>
     <string name="add_clear">Clear</string>
     <string name="add_backspace">Delete character</string>
     <string name="add_today">Today</string>
@@ -63,6 +60,8 @@
     <string name="transactions_filter_account">Account</string>
     <string name="transactions_clear_filters">Clear filters</string>
     <string name="transactions_delete">Delete</string>
+    <string name="transactions_edit">Edit</string>
+    <string name="transactions_edit_amount">Amount</string>
     <string name="transactions_deleted">Deleted</string>
     <string name="transactions_undo">Undo</string>
     <string name="transactions_pending">Waiting to sync</string>
@@ -92,9 +91,9 @@
          handed a String for a %d specifier throws. -->
     <string name="channel_budget_alerts">Budget alerts</string>
     <string name="channel_budget_alerts_description">A heads-up when spending approaches a limit</string>
-    <string name="budget_alert_title">Monia</string>
+    <string name="budget_alert_title">Monio</string>
     <string name="budget_alert">%1$s: %2$s of %3$s zł (%4$s%%)</string>
-    <string name="notifications_permission_rationale">Monia will warn you before you go over budget</string>
+    <string name="notifications_permission_rationale">Monio will warn you before you go over budget</string>
     <string name="notifications_enable">Turn on notifications</string>
 
     <!-- Settings -->
@@ -142,7 +141,7 @@
     <string name="language_pl" translatable="false">Polski</string>
 
     <!-- Onboarding -->
-    <string name="onboarding_title">Welcome to Monia</string>
+    <string name="onboarding_title">Let’s get started</string>
     <string name="onboarding_subtitle">A shared household budget</string>
     <string name="onboarding_invite_code">Invite code</string>
     <string name="onboarding_your_name">Your name</string>

@@ -1,6 +1,11 @@
 # 0003 — Monio is the service, Monia is what the family sees
 
-**Date:** 2026-08-29 · **Status:** accepted
+**Date:** 2026-08-29 · **Status:** superseded by 0005 on 2026-08-31
+
+> **Superseded.** The split described here was reversed: Monio is now the only
+> name, user-visible copy included. See
+> `0005-one-name-after-all.md`. The reasoning below is kept because the
+> identifier half of it still holds and the reversal is only legible against it.
 
 ## Context
 

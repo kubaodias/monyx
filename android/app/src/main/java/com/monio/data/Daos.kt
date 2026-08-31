@@ -21,6 +21,10 @@ data class BudgetUsage(
     val name: String,
     val color: String?,
     val icon: String?,
+    /** Set when the budgeted category is itself a subcategory, so the row can be
+     *  drawn in its parent's colour like everywhere else. */
+    val parentId: String?,
+    val parentColor: String?,
     val limitMinor: Long,
     val spentMinor: Long,
 )
@@ -43,8 +47,12 @@ data class TransactionListItem(
     val note: String?,
     val occurredAt: Long,
     val occurredOn: String,
+    val categoryId: String?,
+    val accountId: String?,
     val categoryName: String?,
     val categoryIcon: String?,
+    /** Already resolved: a subcategory reports its PARENT's colour, so a family
+     *  of categories reads as one colour group wherever it is drawn. */
     val categoryColor: String?,
     val accountName: String?,
     val transferAccountName: String?,
@@ -239,6 +247,7 @@ interface MonioDao {
      */
     @Query(
         """SELECT b.categoryId AS categoryId, c.name AS name, c.color AS color, c.icon AS icon,
+                  c.parentId AS parentId, pc.color AS parentColor,
                   b.limitMinor AS limitMinor,
                   COALESCE((SELECT SUM(t.amountMinor) FROM transactions t
                             WHERE t.deleted = 0 AND t.kind = 'expense'
@@ -249,6 +258,7 @@ interface MonioDao {
                                                          AND sc.deleted = 0))), 0) AS spentMinor
            FROM budgets b
            JOIN categories c ON c.id = b.categoryId AND c.deleted = 0
+           LEFT JOIN categories pc ON pc.id = c.parentId
            WHERE b.deleted = 0
              AND b.period = (SELECT MAX(b2.period) FROM budgets b2
                              WHERE b2.categoryId = b.categoryId AND b2.period <= :period)
@@ -274,16 +284,19 @@ interface MonioDao {
      */
     @Query(
         """SELECT t.id, t.kind, t.amountMinor, t.note, t.occurredAt, t.occurredOn,
-                  c.name AS categoryName, c.icon AS categoryIcon, c.color AS categoryColor,
+                  t.categoryId, t.accountId,
+                  c.name AS categoryName, c.icon AS categoryIcon,
+                  COALESCE(pc.color, c.color) AS categoryColor,
                   a.name AS accountName, ta.name AS transferAccountName,
                   t.pending, t.rejected
            FROM transactions t
            LEFT JOIN categories c ON c.id = t.categoryId
+           LEFT JOIN categories pc ON pc.id = c.parentId
            LEFT JOIN accounts   a ON a.id = t.accountId
            LEFT JOIN accounts  ta ON ta.id = t.transferAccountId
            WHERE t.deleted = 0
              AND (:query = '' OR t.note LIKE '%' || :query || '%' OR c.name LIKE '%' || :query || '%')
-             AND (:categoryId IS NULL OR t.categoryId = :categoryId)
+             AND (:categoryId IS NULL OR t.categoryId = :categoryId OR c.parentId = :categoryId)
              AND (:accountId  IS NULL OR t.accountId  = :accountId)
              AND (:period = '' OR substr(t.occurredOn, 1, 7) = :period)
            ORDER BY t.occurredAt DESC, t.id DESC"""
@@ -297,15 +310,19 @@ interface MonioDao {
 
     @Query(
         """SELECT t.id, t.kind, t.amountMinor, t.note, t.occurredAt, t.occurredOn,
-                  c.name AS categoryName, c.icon AS categoryIcon, c.color AS categoryColor,
+                  t.categoryId, t.accountId,
+                  c.name AS categoryName, c.icon AS categoryIcon,
+                  COALESCE(pc.color, c.color) AS categoryColor,
                   a.name AS accountName, ta.name AS transferAccountName,
                   t.pending, t.rejected
            FROM transactions t
            LEFT JOIN categories c ON c.id = t.categoryId
+           LEFT JOIN categories pc ON pc.id = c.parentId
            LEFT JOIN accounts   a ON a.id = t.accountId
            LEFT JOIN accounts  ta ON ta.id = t.transferAccountId
            WHERE t.deleted = 0
+             AND (:period = '' OR substr(t.occurredOn, 1, 7) = :period)
            ORDER BY t.occurredAt DESC, t.id DESC LIMIT :limit"""
     )
-    fun recentTransactions(limit: Int): Flow<List<TransactionListItem>>
+    fun recentTransactions(period: String, limit: Int): Flow<List<TransactionListItem>>
 }
