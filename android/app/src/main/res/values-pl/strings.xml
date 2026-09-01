@@ -48,6 +48,11 @@
     <string name="overview_previous_month">Poprzedni miesiąc</string>
     <string name="overview_next_month">Następny miesiąc</string>
     <string name="overview_percent">%1$d%%</string>
+    <string name="overview_trend">Ostatnie 30 dni</string>
+    <string name="overview_trend_through">Do %1$s</string>
+    <string name="overview_trend_empty">W tych 30 dniach nic się nie działo</string>
+    <string name="overview_show_trend">Pokaż ostatnie 30 dni</string>
+    <string name="overview_show_totals">Wróć do podsumowania miesiąca</string>
 
     <!-- Transactions -->
     <string name="transactions_search">Szukaj</string>

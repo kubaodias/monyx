@@ -30,6 +30,11 @@ class MonyxRepository(private val dao: MonyxDao) {
     fun spendByCategory(period: String, accountIds: Set<String> = emptySet()) =
         dao.spendByCategory(period, allAccounts(accountIds), accountIds.toList())
 
+    /** Day-by-day income and expense, under the same account filter as the rest
+     *  of the overview. Both ends inclusive. */
+    fun dailyTotals(fromDay: String, toDay: String, accountIds: Set<String> = emptySet()) =
+        dao.dailyTotals(fromDay, toDay, allAccounts(accountIds), accountIds.toList())
+
     fun budgetUsage(period: String) = dao.budgetUsage(period)
 
     fun recentTransactions(period: String = "", limit: Int = 8, accountIds: Set<String> = emptySet()) =

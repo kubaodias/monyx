@@ -31,6 +31,19 @@ data class BudgetUsage(
 
 data class MonthTotals(val incomeMinor: Long, val expenseMinor: Long)
 
+/**
+ * One day's income and expense, for the trend on the back of the balance card.
+ *
+ * Quiet days are simply missing from the result rather than returned as zeros —
+ * gap-filling them is the chart's job, because a window of thirty days has
+ * thirty columns whether or not money moved on each one.
+ */
+data class DailyTotals(
+    val day: String,
+    val incomeMinor: Long,
+    val expenseMinor: Long,
+)
+
 data class AccountBalance(
     val id: String,
     val name: String,
@@ -313,6 +326,32 @@ interface MonyxDao {
            ORDER BY spentMinor DESC"""
     )
     fun spendByCategory(period: String, allAccounts: Int, accountIds: List<String>): Flow<List<CategorySpend>>
+
+    /**
+     * Income and expense per day over a date range, both ends inclusive.
+     *
+     * Bounded on occurredOn — the local date the client authored — and not on
+     * occurredAt, so a day here is the same day the monthly aggregates bucket
+     * into. A transfer is neither earned nor spent, so it is excluded by the
+     * two CASEs rather than by a WHERE: it still moved on that day, it just
+     * contributes nothing to either side.
+     */
+    @Query(
+        """SELECT occurredOn AS day,
+             COALESCE(SUM(CASE WHEN kind = 'income'  THEN amountMinor ELSE 0 END), 0) AS incomeMinor,
+             COALESCE(SUM(CASE WHEN kind = 'expense' THEN amountMinor ELSE 0 END), 0) AS expenseMinor
+           FROM transactions
+           WHERE deleted = 0 AND occurredOn >= :fromDay AND occurredOn <= :toDay
+             AND (:allAccounts = 1 OR accountId IN (:accountIds))
+           GROUP BY occurredOn
+           ORDER BY occurredOn"""
+    )
+    fun dailyTotals(
+        fromDay: String,
+        toDay: String,
+        allAccounts: Int,
+        accountIds: List<String>,
+    ): Flow<List<DailyTotals>>
 
     /**
      * Budgets carry forward, resolved lazily at query time. This is the

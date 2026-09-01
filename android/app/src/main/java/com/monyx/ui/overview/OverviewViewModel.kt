@@ -33,9 +33,26 @@ data class OverviewUiState(
     /** The selected month's transactions, newest first — NOT the newest rows in
      *  the database. Stepping back a month must not keep showing today's. */
     val recent: List<TransactionListItem> = emptyList(),
+    /** The back of the balance card: thirty days ending inside the selected
+     *  month. Its window is NOT the month, which is why it carries its own
+     *  dates and its own totals rather than reusing the ones above. */
+    val trend: TrendSeries,
 ) {
     /** Balance = income - expenses for the selected month. */
     val balanceMinor: Long get() = incomeMinor - expenseMinor
+}
+
+/**
+ * A state for a period nothing has loaded for yet. The trend still gets a
+ * properly shaped thirty-day window rather than an empty one, so the chart has
+ * ends to label from its very first frame.
+ */
+private fun emptyState(period: String): OverviewUiState {
+    val window = trendWindow(period)
+    return OverviewUiState(
+        period = period,
+        trend = trendSeries(emptyList(), window.start, window.endInclusive),
+    )
 }
 
 /**
@@ -52,12 +69,18 @@ class OverviewViewModel(private val repository: MonyxRepository) : ViewModel() {
     @OptIn(ExperimentalCoroutinesApi::class)
     val uiState: StateFlow<OverviewUiState> = combine(period, selectedAccounts, ::Pair)
         .flatMapLatest { (selectedPeriod, accountIds) ->
+            val window = trendWindow(selectedPeriod)
             combine(
                 repository.monthTotals(selectedPeriod, accountIds),
                 repository.spendByCategory(selectedPeriod, accountIds),
                 repository.accountBalances(),
                 repository.recentTransactions(selectedPeriod, 12, accountIds),
-            ) { totals, breakdown, accounts, recent ->
+                repository.dailyTotals(
+                    Dates.iso(window.start),
+                    Dates.iso(window.endInclusive),
+                    accountIds,
+                ),
+            ) { totals, breakdown, accounts, recent, daily ->
                 OverviewUiState(
                     period = selectedPeriod,
                     incomeMinor = totals.incomeMinor,
@@ -68,13 +91,14 @@ class OverviewViewModel(private val repository: MonyxRepository) : ViewModel() {
                     accounts = accounts.filter { it.archived == 0 },
                     selectedAccountIds = accountIds,
                     recent = recent,
+                    trend = trendSeries(daily, window.start, window.endInclusive),
                 )
             }
         }
         .stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5_000),
-            initialValue = OverviewUiState(period = period.value),
+            initialValue = emptyState(period.value),
         )
 
     fun previousMonth() {

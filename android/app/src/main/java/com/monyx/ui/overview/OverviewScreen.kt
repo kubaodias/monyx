@@ -1,5 +1,8 @@
 package com.monyx.ui.overview
 
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -28,15 +31,21 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.ShowChart
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.SpanStyle
@@ -96,6 +105,7 @@ fun OverviewScreen(
                 income = state.incomeMinor,
                 expense = state.expenseMinor,
                 balance = state.balanceMinor,
+                trend = state.trend,
             )
         }
         item {
@@ -144,44 +154,191 @@ private fun MonthSwitcher(period: String, onPrevious: () -> Unit, onNext: () -> 
     }
 }
 
+/**
+ * The month's balance on the front, the thirty days behind it on the back.
+ *
+ * A flip rather than a second card or a screen of its own, because it is one
+ * fact seen two ways: the running total on the back is the number on the front,
+ * arriving. Two cards side by side would have claimed two separate facts.
+ */
 @Composable
-private fun SummaryCard(income: Long, expense: Long, balance: Long) {
-    val balanceColor =
-        if (balance < 0) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
+private fun SummaryCard(income: Long, expense: Long, balance: Long, trend: TrendSeries) {
+    var showTrend by rememberSaveable { mutableStateOf(false) }
+    // Dropped whenever the window itself changes — a day index means nothing
+    // once the month switcher has moved the thirty days underneath it.
+    var focused by remember(trend.from, trend.points.size) { mutableStateOf<Int?>(null) }
+
+    val rotation by animateFloatAsState(
+        targetValue = if (showTrend) 180f else 0f,
+        animationSpec = tween(durationMillis = 450),
+        label = "balanceCardFlip",
+    )
+    val showingBack = rotation > 90f
 
     Card(
         shape = RoundedCornerShape(24.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+        modifier = Modifier
+            // The two faces are not the same height. Halfway through the turn
+            // the card is edge-on and effectively invisible, which is the one
+            // moment the size can change without anyone seeing it happen — and
+            // that is exactly when the faces swap.
+            .animateContentSize()
+            .graphicsLayer {
+                rotationY = rotation
+                cameraDistance = 14f * density
+            },
     ) {
-        Column(modifier = Modifier.fillMaxWidth().padding(24.dp)) {
-            Text(
-                text = stringResource(R.string.overview_balance),
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Text(
-                text = Money.formatWithCurrency(balance),
-                style = MaterialTheme.typography.displaySmall,
-                fontWeight = FontWeight.Bold,
-                color = balanceColor,
-            )
-            Spacer(modifier = Modifier.height(24.dp))
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                SummaryStat(
-                    label = stringResource(R.string.overview_income),
-                    amountMinor = income,
-                    tint = MaterialTheme.colorScheme.primary,
+        Box(
+            // The back is painted on a surface already turned 180 degrees, so
+            // without turning it back again every word on it reads mirrored.
+            modifier = Modifier.graphicsLayer { rotationY = if (showingBack) 180f else 0f },
+        ) {
+            if (showingBack) {
+                TrendFace(
+                    trend = trend,
+                    focused = focused,
+                    onFocus = { focused = it },
+                    onBack = {
+                        focused = null
+                        showTrend = false
+                    },
                 )
-                SummaryStat(
-                    label = stringResource(R.string.overview_expenses),
-                    amountMinor = expense,
-                    tint = MaterialTheme.colorScheme.error,
+            } else {
+                TotalsFace(
+                    income = income,
+                    expense = expense,
+                    balance = balance,
+                    onOpenTrend = { showTrend = true },
                 )
             }
         }
     }
 }
+
+@Composable
+private fun TotalsFace(income: Long, expense: Long, balance: Long, onOpenTrend: () -> Unit) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onOpenTrend)
+            .padding(24.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                text = stringResource(R.string.overview_balance),
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(modifier = Modifier.width(6.dp))
+            // The only sign that the card has a back. Without it the flip is a
+            // feature nobody finds, because nothing else about a number
+            // suggests it can be turned over.
+            Icon(
+                imageVector = Icons.Filled.ShowChart,
+                contentDescription = stringResource(R.string.overview_show_trend),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(16.dp),
+            )
+        }
+        Text(
+            text = Money.formatWithCurrency(balance),
+            style = MaterialTheme.typography.displaySmall,
+            fontWeight = FontWeight.Bold,
+            color = amountColor(balance),
+        )
+        Spacer(modifier = Modifier.height(24.dp))
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            SummaryStat(
+                label = stringResource(R.string.overview_income),
+                amountMinor = income,
+                tint = MaterialTheme.colorScheme.primary,
+            )
+            SummaryStat(
+                label = stringResource(R.string.overview_expenses),
+                amountMinor = expense,
+                tint = MaterialTheme.colorScheme.error,
+            )
+        }
+    }
+}
+
+/**
+ * The back: where the balance stood, and what moved to put it there.
+ *
+ * Header and footer always describe the SAME scope — the whole window, or the
+ * one day being pointed at. Letting the big number mean the window while the
+ * two figures under the chart meant a single day would have been two answers
+ * to one question.
+ */
+@Composable
+private fun TrendFace(
+    trend: TrendSeries,
+    focused: Int?,
+    onFocus: (Int?) -> Unit,
+    onBack: () -> Unit,
+) {
+    val point = focused?.let { trend.points.getOrNull(it) }
+    // "Through 25 August", not "25 August". The number under it is the balance
+    // as it stood at the END of that day, while the two figures below are what
+    // moved on the day itself — a bare date would have read as both.
+    val label = point
+        ?.let { stringResource(R.string.overview_trend_through, Dates.dayLabel(it.date.toString())) }
+        ?: stringResource(R.string.overview_trend)
+    val headline = if (point == null) trend.netMinor else trend.runningAt(focused)
+    val income = point?.incomeMinor ?: trend.incomeMinor
+    val expense = point?.expenseMinor ?: trend.expenseMinor
+
+    Column(modifier = Modifier.fillMaxWidth().padding(24.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth().clickable(onClick = onBack),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = label,
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    text = Money.formatWithCurrency(headline),
+                    style = MaterialTheme.typography.displaySmall,
+                    fontWeight = FontWeight.Bold,
+                    color = amountColor(headline),
+                )
+            }
+            Icon(
+                imageVector = Icons.Filled.Close,
+                contentDescription = stringResource(R.string.overview_show_totals),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(20.dp),
+            )
+        }
+        Spacer(modifier = Modifier.height(16.dp))
+        TrendChart(series = trend, focused = focused, onFocus = onFocus)
+        Spacer(modifier = Modifier.height(16.dp))
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            SummaryStat(
+                label = stringResource(R.string.overview_income),
+                amountMinor = income,
+                tint = MaterialTheme.colorScheme.primary,
+            )
+            SummaryStat(
+                label = stringResource(R.string.overview_expenses),
+                amountMinor = expense,
+                tint = MaterialTheme.colorScheme.error,
+            )
+        }
+    }
+}
+
+/** Negative money is the one thing on this card that must never read as neutral. */
+@Composable
+private fun amountColor(minor: Long): Color =
+    if (minor < 0) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
 
 @Composable
 private fun SummaryStat(label: String, amountMinor: Long, tint: Color) {

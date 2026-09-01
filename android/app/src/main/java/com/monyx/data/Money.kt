@@ -172,6 +172,23 @@ object Dates {
     fun shiftPeriod(period: String, months: Long): String =
         LocalDate.parse("$period-01").plusMonths(months).format(PERIOD)
 
+    fun iso(date: LocalDate): String = date.format(ISO)
+
+    fun lastDayOf(period: String): LocalDate =
+        LocalDate.parse("$period-01").plusMonths(1).minusDays(1)
+
+    /**
+     * The last day a chart may honestly plot for [period]: today while the month
+     * is still running, its final day once it is over.
+     *
+     * Deliberately NOT min(today, month end). A month in the future gets its own
+     * end, so a window anchored to it stays inside the month the switcher is
+     * pointing at — an empty chart labelled with next month's dates is honest,
+     * where silently showing the last thirty days of the present is not.
+     */
+    fun windowEnd(period: String, today: LocalDate = today()): LocalDate =
+        if (periodOf(today) == period) today else lastDayOf(period)
+
     fun startOfDayMillis(date: LocalDate): Long =
         date.atStartOfDay(ZONE).toInstant().toEpochMilli()
 }
