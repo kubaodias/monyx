@@ -17,18 +17,21 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.monyx.R
 import com.monyx.data.DailyTotals
 import com.monyx.data.Dates
-import java.time.DayOfWeek
 import java.time.LocalDate
+import kotlin.math.roundToInt
 
 /** How many days the balance card's trend covers. */
 const val TREND_DAYS = 30
@@ -40,16 +43,15 @@ data class TrendPoint(
     val expenseMinor: Long,
 ) {
     val netMinor: Long get() = incomeMinor - expenseMinor
-    val isQuiet: Boolean get() = incomeMinor == 0L && expenseMinor == 0L
 }
 
 /**
- * A gap-filled window of days, plus the balance as it stood at the end of each
+ * A gap-filled window of days, and the balance as it stood at the end of each
  * one.
  *
- * [runningMinor] shares indices with [points] and is what makes this a picture
- * of a budget rather than a pile of bars: the bars say what happened on a day,
- * the running total says where it left you.
+ * [runningMinor] is the series the card actually draws. The daily figures in
+ * [points] are what a single day is worth once you point at it — they are the
+ * readout, not the shape.
  */
 data class TrendSeries(
     val points: List<TrendPoint>,
@@ -59,48 +61,35 @@ data class TrendSeries(
     val expenseMinor: Long = points.sumOf { it.expenseMinor }
     val netMinor: Long get() = incomeMinor - expenseMinor
 
-    /** The largest single day on either side. */
-    val peakMinor: Long = points.maxOfOrNull { maxOf(it.incomeMinor, it.expenseMinor) } ?: 0L
+    /** Whether anything happened in the window at all. */
+    val isEmpty: Boolean = points.all { it.incomeMinor == 0L && it.expenseMinor == 0L }
 
-    /**
-     * What half the chart's height is worth — deliberately NOT the peak.
-     *
-     * One 8 500 salary against thirty days of 40 zł groceries scales every
-     * expense to less than a pixel, and a chart in which the ordinary month is
-     * invisible answers no question worth asking. So the scale is six times a
-     * typical day, capped at the peak: everyday amounts get most of the height,
-     * and the two or three days that really are off the scale run into the edge
-     * and say so by touching it.
-     *
-     * Both halves still share this one number. Scaling income and expense
-     * separately would draw a 8 500 payday and a 200 zł shop as the same bar,
-     * which is worse than a flat chart — it is a wrong one.
-     */
-    val scaleMinor: Long = run {
-        val pool = points
-            .flatMap { listOf(it.incomeMinor, it.expenseMinor) }
-            .filter { it > 0 }
-            .sorted()
-        if (pool.isEmpty()) 0L else minOf(peakMinor, maxOf(pool[pool.size / 2] * 6, 1L))
-    }
-
-    val isEmpty: Boolean get() = peakMinor == 0L
     val from: LocalDate get() = points.first().date
     val to: LocalDate get() = points.last().date
+
+    /**
+     * The vertical extent of the line. Zero is forced inside it on both sides,
+     * so break-even is always on the chart: it is the line that separates a
+     * month that is ahead from one that is behind, and a chart that cropped it
+     * out would hide the only threshold that means anything.
+     */
+    val lowRunningMinor: Long = minOf(0L, runningMinor.minOrNull() ?: 0L)
+    val highRunningMinor: Long = maxOf(0L, runningMinor.maxOrNull() ?: 0L)
 
     fun runningAt(index: Int): Long = runningMinor.getOrElse(index) { netMinor }
 }
 
 /**
- * Turn the rows the database returned into one point per day.
+ * Turn the rows the database returned into one point per day, then into the
+ * running balance across them.
  *
  * Every day in the window gets a point whether or not anything happened on it.
- * A chart plotted only from the days that had transactions would space Tuesday
- * and Friday the same distance apart as Tuesday and Wednesday, which destroys
- * the one thing an over-time chart is for.
+ * A line drawn only through the days that had transactions would space Tuesday
+ * and Friday the same distance apart as Tuesday and Wednesday, and the slope —
+ * which is the whole message — would be a lie about how fast money went.
  *
- * Always returns at least one point, so the callers that ask for [from] and
- * [to] cannot be handed a series with no ends.
+ * Always returns at least one point, so callers cannot be handed a series with
+ * no ends for the axis to label.
  */
 fun trendSeries(rows: List<DailyTotals>, from: LocalDate, to: LocalDate): TrendSeries {
     val byDay = rows.associateBy { it.day }
@@ -130,27 +119,46 @@ fun trendWindow(period: String, today: LocalDate = Dates.today()): ClosedRange<L
 }
 
 /**
- * Which day a touch at [x] across a chart [width] wide belongs to.
+ * How far up the chart a balance of [value] sits, 0 at the bottom and 1 at the
+ * top of the range [low]..[high].
  *
- * Columns are equal width, so the body is a division — the ends are what needs
- * deciding. A drag that runs off either edge stays on the first or last day
- * rather than returning a 31st that does not exist, because a finger sliding
- * past the end of the chart means "the end", not "nothing".
+ * A flat month — every day the same balance — has no range to divide by, and is
+ * drawn down the middle rather than pinned to an edge, where it would read as
+ * the best or worst the month ever got.
  */
-internal fun dayIndexAt(x: Float, width: Float, count: Int): Int? {
-    if (count <= 0 || width <= 0f) return null
-    val index = (x / (width / count)).toInt()
-    return index.coerceIn(0, count - 1)
+internal fun yFraction(value: Long, low: Long, high: Long): Float {
+    if (high <= low) return 0.5f
+    return ((value - low).toFloat() / (high - low).toFloat()).coerceIn(0f, 1f)
 }
 
 /**
- * Income above the line, expenses below it, one column per day.
+ * Which day a touch at [x] across a chart [width] wide belongs to.
  *
- * A diverging pair rather than a single net bar: a day that took 4 000 in and
- * paid 4 000 out is not a quiet day, and netting it to zero would draw it as
- * one. Both sides share a scale set by the largest single amount in the window,
- * so the two halves are comparable by eye — which is the whole point of putting
- * them on one axis.
+ * Nearest point, not nearest column: the days are vertices on a line, the first
+ * sitting on the left edge and the last on the right, so a touch belongs to
+ * whichever vertex it is closest to. A drag that runs off either end stays on
+ * the first or last day rather than returning a 31st that does not exist,
+ * because a finger sliding past the end of the chart means "the end".
+ */
+internal fun dayIndexAt(x: Float, width: Float, count: Int): Int? {
+    if (count <= 0 || width <= 0f) return null
+    if (count == 1) return 0
+    val step = width / (count - 1)
+    return (x / step).roundToInt().coerceIn(0, count - 1)
+}
+
+/**
+ * The balance over the window, drawn as one connected line.
+ *
+ * This is a picture of a budget rather than a ledger: payday is the step up,
+ * and the long grind down between one and the next is the month being lived.
+ * Both are read from the SLOPE, which is why every day gets a vertex even when
+ * nothing happened on it, and why the line is never smoothed — a curve fitted
+ * between two points invents balances the household never had.
+ *
+ * Above break-even the line and its fill are green, below it they are red, cut
+ * at the zero line rather than coloured by where the month happens to end. A
+ * month that dipped under and recovered says so.
  */
 @Composable
 fun TrendChart(
@@ -175,25 +183,26 @@ fun TrendChart(
 
     // pointerInput keeps whichever lambda it was given when its keys last
     // changed, so a plain read of `focused` inside the gesture would still be
-    // the value from the first composition — and tapping a bar a second time
+    // the value from the first composition — and tapping a day a second time
     // would compare against a stale null and never let go of it.
     val focusedNow by rememberUpdatedState(focused)
 
-    val incomeColor = MaterialTheme.colorScheme.primary
-    val expenseColor = MaterialTheme.colorScheme.error
+    val aboveColor = MaterialTheme.colorScheme.primary
+    val belowColor = MaterialTheme.colorScheme.error
     val axisColor = MaterialTheme.colorScheme.onSurfaceVariant
+    val surfaceColor = MaterialTheme.colorScheme.surface
     val count = series.points.size
 
     Column(modifier = modifier.fillMaxWidth()) {
         Canvas(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(112.dp)
+                .height(132.dp)
                 .pointerInput(count) {
                     detectTapGestures { offset ->
                         val hit = dayIndexAt(offset.x, size.width.toFloat(), count)
-                        // Tapping the focused day again lets go of it, so the
-                        // card can get back to the window totals without
+                        // Touching the same day again lets go of it, so the card
+                        // can get back to the window's own figures without
                         // needing a second control for it.
                         onFocus(if (hit == focusedNow) null else hit)
                     }
@@ -204,84 +213,84 @@ fun TrendChart(
                             onFocus(dayIndexAt(offset.x, size.width.toFloat(), count))
                         },
                     ) { change, _ ->
-                        // Consumed so the pager-less LazyColumn around it does
-                        // not steal the gesture halfway through a scrub.
+                        // Consumed so the LazyColumn around it cannot steal the
+                        // gesture halfway through a scrub.
                         change.consume()
                         onFocus(dayIndexAt(change.position.x, size.width.toFloat(), count))
                     }
                 },
         ) {
-            val column = size.width / count
-            val barWidth = (column * 0.40f).coerceAtLeast(1.5.dp.toPx())
-            val gap = column * 0.10f
-            val centreY = size.height / 2f
-            val half = centreY - 3.dp.toPx()
-            // Everything within the scale is drawn inside this, so reaching the
-            // full half-height means one thing only: the day is off the scale.
-            val usable = half * 0.9f
-            // A 3 zł coffee beside a 4 000 zł rent still rounds to nothing.
-            // A day money moved on must look like one.
-            val minBar = 2.dp.toPx()
-            val scale = series.scaleMinor
-            fun barHeight(amount: Long): Float = when {
-                scale <= 0L -> 0f
-                amount >= scale -> half
-                else -> (amount.toFloat() / scale * usable).coerceAtLeast(minBar)
+            // Room for the stroke and for the focus dot at either extreme, so
+            // the best and worst days of the window are not sliced in half by
+            // the edge of the canvas.
+            val padV = 8.dp.toPx()
+            val usableH = size.height - padV * 2
+            val low = series.lowRunningMinor
+            val high = series.highRunningMinor
+            val step = if (count > 1) size.width / (count - 1) else 0f
+
+            fun px(index: Int): Float = if (count > 1) index * step else size.width / 2f
+            fun py(value: Long): Float = padV + (1f - yFraction(value, low, high)) * usableH
+
+            val zeroY = py(0L)
+
+            val line = Path()
+            series.runningMinor.forEachIndexed { index, value ->
+                val x = px(index)
+                val y = py(value)
+                if (index == 0) line.moveTo(x, y) else line.lineTo(x, y)
             }
-            val radius = CornerRadius(barWidth / 2f, barWidth / 2f)
 
-            series.points.forEachIndexed { index, point ->
-                val left = index * column
-                val isFocused = focused == index
-                val dimmed = focused != null && !isFocused
+            // The same line closed down onto break-even, so the fill measures
+            // the distance from zero rather than from the bottom of the canvas.
+            val area = Path().apply {
+                addPath(line)
+                lineTo(px(count - 1), zeroY)
+                lineTo(px(0), zeroY)
+                close()
+            }
 
-                // Weekends as a faint band. Spending has a weekly rhythm and
-                // without them thirty columns are an undated smear.
-                if (point.date.dayOfWeek == DayOfWeek.SATURDAY ||
-                    point.date.dayOfWeek == DayOfWeek.SUNDAY
-                ) {
-                    drawRect(
-                        color = axisColor.copy(alpha = 0.04f),
-                        topLeft = Offset(left, 0f),
-                        size = Size(column, size.height),
-                    )
-                }
-                if (isFocused) {
-                    drawRect(
-                        color = axisColor.copy(alpha = 0.14f),
-                        topLeft = Offset(left, 0f),
-                        size = Size(column, size.height),
-                    )
-                }
-
-                val alpha = if (dimmed) 0.35f else 1f
-                val centreX = left + column / 2f
-                if (point.incomeMinor > 0) {
-                    val h = barHeight(point.incomeMinor)
-                    drawRoundRect(
-                        color = incomeColor.copy(alpha = alpha),
-                        topLeft = Offset(centreX - gap / 2f - barWidth, centreY - h),
-                        size = Size(barWidth, h),
-                        cornerRadius = radius,
-                    )
-                }
-                if (point.expenseMinor > 0) {
-                    val h = barHeight(point.expenseMinor)
-                    drawRoundRect(
-                        color = expenseColor.copy(alpha = alpha),
-                        topLeft = Offset(centreX + gap / 2f, centreY),
-                        size = Size(barWidth, h),
-                        cornerRadius = radius,
-                    )
-                }
+            clipRect(top = 0f, bottom = zeroY) {
+                drawPath(area, aboveColor.copy(alpha = 0.16f))
+            }
+            clipRect(top = zeroY, bottom = size.height) {
+                drawPath(area, belowColor.copy(alpha = 0.16f))
             }
 
             drawLine(
                 color = axisColor.copy(alpha = 0.35f),
-                start = Offset(0f, centreY),
-                end = Offset(size.width, centreY),
+                start = Offset(0f, zeroY),
+                end = Offset(size.width, zeroY),
                 strokeWidth = 1.dp.toPx(),
             )
+
+            val stroke = Stroke(
+                width = 2.5.dp.toPx(),
+                cap = StrokeCap.Round,
+                join = StrokeJoin.Round,
+            )
+            clipRect(top = 0f, bottom = zeroY) { drawPath(line, aboveColor, style = stroke) }
+            clipRect(top = zeroY, bottom = size.height) { drawPath(line, belowColor, style = stroke) }
+
+            focused?.let { index ->
+                val value = series.runningMinor.getOrNull(index) ?: return@let
+                val x = px(index)
+                val y = py(value)
+                drawLine(
+                    color = axisColor.copy(alpha = 0.30f),
+                    start = Offset(x, 0f),
+                    end = Offset(x, size.height),
+                    strokeWidth = 1.dp.toPx(),
+                )
+                // Ringed in the card's own colour so the dot stays legible
+                // wherever on the line it lands, fill included.
+                drawCircle(surfaceColor, radius = 5.5.dp.toPx(), center = Offset(x, y))
+                drawCircle(
+                    color = if (value < 0) belowColor else aboveColor,
+                    radius = 3.5.dp.toPx(),
+                    center = Offset(x, y),
+                )
+            }
         }
 
         Row(

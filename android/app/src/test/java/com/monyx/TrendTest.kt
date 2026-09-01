@@ -6,6 +6,7 @@ import com.monyx.ui.overview.TREND_DAYS
 import com.monyx.ui.overview.dayIndexAt
 import com.monyx.ui.overview.trendSeries
 import com.monyx.ui.overview.trendWindow
+import com.monyx.ui.overview.yFraction
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -149,69 +150,68 @@ class TrendTest {
         assertEquals(series.netMinor, series.runningAt(7))
     }
 
-    // ---------------------------------------------------------------- scaling
+    // ----------------------------------------------------- the line's range
 
     /**
-     * Both halves of the chart share one scale. If income and expense were
-     * scaled separately, a 20 zł day would draw the same bar as a 4 000 zł one
-     * and the two sides could not be compared by eye at all.
+     * Break-even is the only threshold on this chart that means anything, so it
+     * is forced inside the range from both directions — a month that never went
+     * negative still shows the line it stayed above.
      */
     @Test
-    fun `the tallest single amount on either side sets the scale`() {
-        val series = trendSeries(
-            listOf(day("2026-08-03", income = 400_000), day("2026-08-04", expense = 12_000)),
+    fun `zero is always inside the range, above water and below it`() {
+        val up = trendSeries(
+            listOf(day("2026-08-03", income = 10_000), day("2026-08-04", income = 5_000)),
             LocalDate.of(2026, 8, 3),
             LocalDate.of(2026, 8, 4),
         )
-        assertEquals(400_000L, series.peakMinor)
-    }
+        assertEquals(0L, up.lowRunningMinor)
+        assertEquals(15_000L, up.highRunningMinor)
 
-    /**
-     * The scale exists so that one payday cannot flatten a month of shopping.
-     * Six times a typical day, and the salary runs off the top rather than
-     * squashing everything under it.
-     */
-    @Test
-    fun `one payday does not flatten thirty days of groceries`() {
-        val rows = (3..12).map { day("2026-08-%02d".format(it), expense = 5_000) } +
-            day("2026-08-10", income = 850_000)
-        val series = trendSeries(rows, LocalDate.of(2026, 8, 3), LocalDate.of(2026, 8, 12))
-        assertEquals(850_000L, series.peakMinor)
-        assertEquals(30_000L, series.scaleMinor)
-        assertTrue(series.scaleMinor < series.peakMinor)
-    }
-
-    /** Nothing to protect against: an even month scales to its own tallest bar
-     *  and no day is pushed off the chart. */
-    @Test
-    fun `an evenly spent month is not clipped at all`() {
-        val rows = listOf(
-            day("2026-08-03", expense = 10_000),
-            day("2026-08-04", expense = 12_000),
-            day("2026-08-05", expense = 14_000),
+        val down = trendSeries(
+            listOf(day("2026-08-03", expense = 10_000), day("2026-08-04", expense = 5_000)),
+            LocalDate.of(2026, 8, 3),
+            LocalDate.of(2026, 8, 4),
         )
-        val series = trendSeries(rows, LocalDate.of(2026, 8, 3), LocalDate.of(2026, 8, 5))
-        assertEquals(series.peakMinor, series.scaleMinor)
+        assertEquals(-15_000L, down.lowRunningMinor)
+        assertEquals(0L, down.highRunningMinor)
     }
 
+    /** A month that dipped under and climbed back out keeps both extremes. */
     @Test
-    fun `a window with nothing in it has no scale to divide by`() {
-        val series = trendSeries(emptyList(), LocalDate.of(2026, 8, 3), LocalDate.of(2026, 8, 10))
-        assertEquals(0L, series.scaleMinor)
-    }
-
-    /** The two halves share one number, so a payday and a weekly shop can never
-     *  be drawn the same height. */
-    @Test
-    fun `income and expense are measured against the same scale`() {
-        val rows = listOf(
-            day("2026-08-03", income = 100_000),
-            day("2026-08-04", expense = 100_000),
-            day("2026-08-05", income = 4_000, expense = 6_000),
+    fun `a month that goes under and recovers keeps both ends of its swing`() {
+        val series = trendSeries(
+            listOf(
+                day("2026-08-03", expense = 40_000),
+                day("2026-08-05", income = 100_000),
+            ),
+            LocalDate.of(2026, 8, 3),
+            LocalDate.of(2026, 8, 5),
         )
-        val series = trendSeries(rows, LocalDate.of(2026, 8, 3), LocalDate.of(2026, 8, 5))
-        // Pooled and sorted: 4 000, 6 000, 100 000, 100 000 -> median 100 000.
-        assertEquals(100_000L, series.scaleMinor)
+        assertEquals(listOf(-40_000L, -40_000L, 60_000L), series.runningMinor)
+        assertEquals(-40_000L, series.lowRunningMinor)
+        assertEquals(60_000L, series.highRunningMinor)
+    }
+
+    @Test
+    fun `the bottom of the range is the bottom of the chart and the top is the top`() {
+        assertEquals(0f, yFraction(-40_000, -40_000, 60_000), 0.0001f)
+        assertEquals(1f, yFraction(60_000, -40_000, 60_000), 0.0001f)
+        assertEquals(0.4f, yFraction(0, -40_000, 60_000), 0.0001f)
+    }
+
+    /** A flat month has no range to divide by. Drawing it along an edge would
+     *  read as the best or the worst the month ever got; the middle claims
+     *  neither. */
+    @Test
+    fun `a flat month is drawn down the middle rather than pinned to an edge`() {
+        assertEquals(0.5f, yFraction(0, 0, 0), 0.0001f)
+        assertEquals(0.5f, yFraction(5_000, 5_000, 5_000), 0.0001f)
+    }
+
+    @Test
+    fun `a value outside the range cannot be drawn off the chart`() {
+        assertEquals(0f, yFraction(-99_000, -40_000, 60_000), 0.0001f)
+        assertEquals(1f, yFraction(99_000, -40_000, 60_000), 0.0001f)
     }
 
     @Test
@@ -223,48 +223,60 @@ class TrendTest {
     }
 
     /**
-     * A day that took 4 000 in and paid 4 000 out nets to nothing. It is not a
-     * quiet day, and the chart must not draw it as one — which is the whole
-     * reason the bars diverge instead of being a single net column.
+     * A day that took 4 000 in and paid 4 000 out leaves the line exactly where
+     * it was — correctly, because the balance did not move. It is still not a
+     * day nothing happened, and the readout under the chart has to say so.
      */
     @Test
-    fun `a day that balances out is still a day something happened`() {
+    fun `a day that balances out moves the line nowhere but is not a quiet window`() {
         val series = trendSeries(
             listOf(day("2026-08-03", income = 400_000, expense = 400_000)),
             LocalDate.of(2026, 8, 3),
             LocalDate.of(2026, 8, 3),
         )
         assertEquals(0L, series.netMinor)
+        assertEquals(listOf(0L), series.runningMinor)
         assertFalse(series.isEmpty)
-        assertFalse(series.points.first().isQuiet)
+        assertEquals(400_000L, series.points.first().incomeMinor)
+        assertEquals(400_000L, series.points.first().expenseMinor)
     }
 
     // ------------------------------------------------------------ hit testing
 
+    /** Thirty vertices, the first on the left edge and the last on the right,
+     *  so the spacing is width / 29 and not width / 30. */
     @Test
-    fun `each column owns its own slice of the width`() {
-        assertEquals(0, dayIndexAt(1f, 300f, 30))
-        assertEquals(1, dayIndexAt(11f, 300f, 30))
-        assertEquals(29, dayIndexAt(299f, 300f, 30))
+    fun `a touch lands on the nearest day, not the one it is standing in`() {
+        assertEquals(0, dayIndexAt(0f, 290f, 30))
+        assertEquals(0, dayIndexAt(4f, 290f, 30))
+        assertEquals(1, dayIndexAt(6f, 290f, 30))
+        assertEquals(29, dayIndexAt(290f, 290f, 30))
     }
 
     @Test
-    fun `a boundary belongs to the column that starts there`() {
-        assertEquals(1, dayIndexAt(10f, 300f, 30))
-        assertEquals(2, dayIndexAt(20f, 300f, 30))
+    fun `halfway between two days rounds to the later one`() {
+        assertEquals(1, dayIndexAt(5f, 290f, 30))
+        assertEquals(2, dayIndexAt(15f, 290f, 30))
+    }
+
+    /** A single-day window has no gap to divide by. */
+    @Test
+    fun `a one day window answers with its one day`() {
+        assertEquals(0, dayIndexAt(0f, 290f, 1))
+        assertEquals(0, dayIndexAt(280f, 290f, 1))
     }
 
     /** A finger dragged off the edge means "the end", not "no day at all". */
     @Test
     fun `a scrub past either edge stays on the first and last day`() {
-        assertEquals(0, dayIndexAt(-40f, 300f, 30))
-        assertEquals(29, dayIndexAt(340f, 300f, 30))
+        assertEquals(0, dayIndexAt(-40f, 290f, 30))
+        assertEquals(29, dayIndexAt(340f, 290f, 30))
     }
 
     @Test
     fun `a chart with no width and no days is not touchable`() {
         assertNull(dayIndexAt(10f, 0f, 30))
-        assertNull(dayIndexAt(10f, 300f, 0))
+        assertNull(dayIndexAt(10f, 290f, 0))
     }
 
     // ------------------------------------------------------------------ dates

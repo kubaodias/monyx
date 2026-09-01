@@ -9,7 +9,7 @@ Edge Compute. English and Polish interface, switchable in Settings.
   <tr>
     <td align="center" width="16%"><img src="docs/screenshots/add.png" alt="Adding an expense on the built-in keypad" width="100%"></td>
     <td align="center" width="16%"><img src="docs/screenshots/overview.png" alt="Monthly overview with a category breakdown" width="100%"></td>
-    <td align="center" width="16%"><img src="docs/screenshots/trend.png" alt="The balance card flipped over, showing income and expenses day by day across thirty days" width="100%"></td>
+    <td align="center" width="16%"><img src="docs/screenshots/trend.png" alt="The balance card flipped over, showing the running balance as a line across thirty days" width="100%"></td>
     <td align="center" width="16%"><img src="docs/screenshots/history.png" alt="Transaction history with search and filters" width="100%"></td>
     <td align="center" width="16%"><img src="docs/screenshots/budget.png" alt="Monthly plan and per-category budgets" width="100%"></td>
     <td align="center" width="16%"><img src="docs/screenshots/settings.png" alt="Accounts and categories in settings" width="100%"></td>
@@ -17,7 +17,7 @@ Edge Compute. English and Polish interface, switchable in Settings.
   <tr>
     <td align="center"><b>Add</b><br>the launch screen</td>
     <td align="center"><b>Overview</b><br>where the money goes</td>
-    <td align="center"><b>Trend</b><br>the balance, flipped</td>
+    <td align="center"><b>Trend</b><br>thirty days of balance</td>
     <td align="center"><b>History</b><br>search and filter</td>
     <td align="center"><b>Budget</b><br>plan and limits</td>
     <td align="center"><b>Settings</b><br>accounts, categories</td>
@@ -31,13 +31,15 @@ what makes the calculator possible — `60 +` stays on screen while the second
 operand is typed, instead of the running total vanishing the moment you press
 an operator.
 
-Tapping the balance turns the card over. The back plots the last thirty days,
-income above the line and expenses below it, and touching a bar answers what the
-balance was on that day. Both halves share one scale — otherwise a payday and a
-weekly shop would draw the same bar — but the scale is six times a typical day
-rather than the largest, so a single 8 500 salary cannot flatten a month of
-groceries into nothing. The two or three days that genuinely are off the scale
-run into the edge of the chart and say so by touching it.
+Tapping the balance turns the card over. The back draws the last thirty days as
+one connected line: payday is the step up, and the long grind down to the next
+one is the month being lived. Green above break-even, red below, cut at the zero
+line rather than coloured by wherever the month happens to end — a month that
+dipped under and recovered says so. Touching the line answers what the balance
+was on that evening and what moved on the day; dragging along it walks the
+month. Every day is a vertex even when nothing happened on it, and the line is
+never smoothed, because a curve fitted between two points invents balances the
+household never had.
 
 Interface English, category names Polish: the names are rows that sync to every
 device, so they are data the family owns, not translated copy. Switching the
