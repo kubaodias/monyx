@@ -9,19 +9,17 @@ Edge Compute. English and Polish interface, switchable in Settings.
 
 <table>
   <tr>
-    <td align="center" width="14%"><img src="docs/screenshots/add.png" alt="Adding an expense on the built-in keypad" width="100%"></td>
-    <td align="center" width="14%"><img src="docs/screenshots/overview.png" alt="Monthly overview with a category breakdown" width="100%"></td>
-    <td align="center" width="14%"><img src="docs/screenshots/trend.png" alt="The balance card flipped over, showing the month's balance arriving as a line" width="100%"></td>
-    <td align="center" width="14%"><img src="docs/screenshots/months.png" alt="The month picker open over the overview, with the chosen month filled and the present one ringed" width="100%"></td>
-    <td align="center" width="14%"><img src="docs/screenshots/history.png" alt="Transaction history with search and filters" width="100%"></td>
-    <td align="center" width="14%"><img src="docs/screenshots/budget.png" alt="Monthly plan and per-category budgets" width="100%"></td>
-    <td align="center" width="14%"><img src="docs/screenshots/settings.png" alt="Accounts and categories in settings" width="100%"></td>
+    <td align="center" width="16%"><img src="docs/screenshots/add.png" alt="Adding an expense on the built-in keypad" width="100%"></td>
+    <td align="center" width="16%"><img src="docs/screenshots/overview.png" alt="Monthly overview with a category breakdown" width="100%"></td>
+    <td align="center" width="16%"><img src="docs/screenshots/trend.png" alt="The balance card flipped over, showing the month's balance arriving as a line" width="100%"></td>
+    <td align="center" width="16%"><img src="docs/screenshots/history.png" alt="Transaction history with search and filters" width="100%"></td>
+    <td align="center" width="16%"><img src="docs/screenshots/budget.png" alt="Monthly plan and per-category budgets" width="100%"></td>
+    <td align="center" width="16%"><img src="docs/screenshots/settings.png" alt="Accounts and categories in settings" width="100%"></td>
   </tr>
   <tr>
     <td align="center"><b>Add</b><br>the launch screen</td>
     <td align="center"><b>Overview</b><br>where the money goes</td>
     <td align="center"><b>Trend</b><br>how the balance arrived</td>
-    <td align="center"><b>Months</b><br>one, shared by three</td>
     <td align="center"><b>History</b><br>search and filter</td>
     <td align="center"><b>Budget</b><br>plan and limits</td>
     <td align="center"><b>Settings</b><br>accounts, categories</td>
