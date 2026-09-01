@@ -1,25 +1,28 @@
-<img src="docs/logo.png" alt="" width="88" align="left" hspace="12" vspace="4">
+<p align="center">
+  <img src="docs/logo.png" alt="" width="96">
+</p>
 
-# Monyx
+<h1 align="center">Monyx</h1>
 
-A shared household budget app for one family. Native Android, backend on Telnyx
-Edge Compute. English and Polish interface, switchable in Settings.
+<p align="center">
+  A shared household budget app for one family. Native Android, backend on
+  Telnyx Edge Compute.<br>
+  English and Polish interface, switchable in Settings.
+</p>
 
 ## Screenshots
 
 <table>
   <tr>
-    <td align="center" width="16%"><img src="docs/screenshots/add.png" alt="Adding an expense on the built-in keypad" width="100%"></td>
-    <td align="center" width="16%"><img src="docs/screenshots/overview.png" alt="Monthly overview with a category breakdown" width="100%"></td>
-    <td align="center" width="16%"><img src="docs/screenshots/trend.png" alt="The balance card flipped over, showing the month's balance arriving as a line" width="100%"></td>
-    <td align="center" width="16%"><img src="docs/screenshots/history.png" alt="Transaction history with search and filters" width="100%"></td>
-    <td align="center" width="16%"><img src="docs/screenshots/budget.png" alt="Monthly plan and per-category budgets" width="100%"></td>
-    <td align="center" width="16%"><img src="docs/screenshots/settings.png" alt="Accounts and categories in settings" width="100%"></td>
+    <td align="center" width="20%"><img src="docs/screenshots/add.png" alt="Adding an expense on the built-in keypad" width="100%"></td>
+    <td align="center" width="20%"><img src="docs/screenshots/overview.png" alt="Monthly overview with a category breakdown" width="100%"></td>
+    <td align="center" width="20%"><img src="docs/screenshots/history.png" alt="Transaction history with search and filters" width="100%"></td>
+    <td align="center" width="20%"><img src="docs/screenshots/budget.png" alt="Monthly plan and per-category budgets" width="100%"></td>
+    <td align="center" width="20%"><img src="docs/screenshots/settings.png" alt="Accounts and categories in settings" width="100%"></td>
   </tr>
   <tr>
     <td align="center"><b>Add</b><br>the launch screen</td>
     <td align="center"><b>Overview</b><br>where the money goes</td>
-    <td align="center"><b>Trend</b><br>how the balance arrived</td>
     <td align="center"><b>History</b><br>search and filter</td>
     <td align="center"><b>Budget</b><br>plan and limits</td>
     <td align="center"><b>Settings</b><br>accounts, categories</td>
