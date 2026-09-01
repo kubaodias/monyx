@@ -1,17 +1,45 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+  The Monyx mark: a disc cut by a cross into a top half and two bottom
+  quarters — a pie chart with the slices pulled apart.
+
+  Sized against the middle 72 of the 108 canvas, not against the 108. An
+  adaptive icon only ever shows that middle square, so scaling the mark to the
+  full canvas would push it right up against the mask instead of leaving it the
+  same breathing room it has in the source square (where it is 60.5% across).
+
+  The corners are rounded by geometry INSET by k and stroked back out by 2k
+  with a round join: r-k stroked by 2k is r again, with every corner turned.
+  Writing the rounding into the path data instead is four arc tangencies per
+  piece, solved by hand.
+
+  Kept in step with com.monyx.ui.theme.MonyxMark, which is this shape at a
+  24dp viewport. Change one, change the other.
+-->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <!-- A coin with a zloty stroke: the app is about money in one currency. -->
     <path
-        android:fillColor="#FFFFFF"
-        android:pathData="M54,30a24,24 0 1,0 0.001,0zM54,38a16,16 0 1,1 -0.001,0z" />
+        android:fillColor="#F0F1EB"
+        android:strokeColor="#F0F1EB"
+        android:strokeWidth="2.11"
+        android:strokeLineJoin="round"
+        android:strokeLineCap="round"
+        android:pathData="M74.41,50.42 A20.73,20.73 0 0 0 33.59,50.42 Z" />
     <path
-        android:fillColor="#FFFFFF"
-        android:pathData="M48,46h5.5c4.2,0 7,2.4 7,6.2c0,3.9 -2.9,6.3 -7.3,6.3h-2.4V64h-2.8zM50.8,48.4v7.7h2.3c2.7,0 4.4,-1.4 4.4,-3.9c0,-2.4 -1.6,-3.8 -4.3,-3.8z" />
+        android:fillColor="#F0F1EB"
+        android:strokeColor="#F0F1EB"
+        android:strokeWidth="2.11"
+        android:strokeLineJoin="round"
+        android:strokeLineCap="round"
+        android:pathData="M33.59,57.58 L50.42,57.58 L50.42,74.41 A20.73,20.73 0 0 1 33.59,57.58 Z" />
     <path
-        android:fillColor="#FFFFFF"
-        android:pathData="M45,55.5h9v2.2h-9z" />
+        android:fillColor="#F0F1EB"
+        android:strokeColor="#F0F1EB"
+        android:strokeWidth="2.11"
+        android:strokeLineJoin="round"
+        android:strokeLineCap="round"
+        android:pathData="M57.58,57.58 L74.41,57.58 A20.73,20.73 0 0 1 57.58,74.41 Z" />
 </vector>

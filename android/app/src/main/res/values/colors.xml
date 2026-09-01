@@ -1,4 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="ic_launcher_background">#00875A</color>
+    <!-- The logo's own green, not the interface accent (#00875A). -->
+    <color name="ic_launcher_background">#16D2A0</color>
 </resources>

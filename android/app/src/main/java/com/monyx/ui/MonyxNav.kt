@@ -8,9 +8,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.DonutLarge
-import androidx.compose.material.icons.filled.PieChart
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationBarItemDefaults
@@ -47,6 +47,7 @@ import com.monyx.ui.budget.BudgetScreen
 import com.monyx.ui.onboarding.OnboardingScreen
 import com.monyx.ui.overview.OverviewScreen
 import com.monyx.ui.settings.SettingsScreen
+import com.monyx.ui.theme.MonyxMark
 import com.monyx.ui.theme.Palette
 import com.monyx.ui.transactions.TransactionsScreen
 
@@ -57,7 +58,7 @@ private data class Tab(
 )
 
 private val TABS = listOf(
-    Tab(Destinations.OVERVIEW, R.string.nav_overview, Icons.Filled.PieChart),
+    Tab(Destinations.OVERVIEW, R.string.nav_overview, MonyxMark),
     Tab(Destinations.TRANSACTIONS, R.string.nav_transactions, Icons.AutoMirrored.Filled.List),
     Tab(Destinations.ADD, R.string.nav_add, Icons.Filled.Add),
     Tab(Destinations.BUDGET, R.string.nav_budget, Icons.Filled.DonutLarge),
@@ -202,6 +203,12 @@ private fun MainScaffold(
                 TABS.forEach { tab ->
                     val selected = currentRoute?.hierarchy?.any { it.route == tab.route } == true
                     val isAdd = tab.route == Destinations.ADD
+                    // The logo, and it stays the logo's own weight of black
+                    // whether or not the tab is selected — the mark is an
+                    // identity, not a state. onSurface rather than a literal
+                    // black so it is still there in the dark theme, where a
+                    // hard-coded #000 would be a hole in the bar.
+                    val isMark = tab.route == Destinations.OVERVIEW
                     NavigationBarItem(
                         selected = selected,
                         onClick = {
@@ -218,16 +225,19 @@ private fun MainScaffold(
                         label = { Text(stringResource(tab.labelRes)) },
                         // Add is the one thing the app exists to do, so it is the
                         // one item that is coloured rather than monochrome.
-                        colors = if (isAdd) {
-                            NavigationBarItemDefaults.colors(
+                        colors = when {
+                            isAdd -> NavigationBarItemDefaults.colors(
                                 selectedIconColor = ADD_ON_ACCENT,
                                 selectedTextColor = ADD_ACCENT,
                                 unselectedIconColor = ADD_ACCENT,
                                 unselectedTextColor = ADD_ACCENT,
                                 indicatorColor = ADD_ACCENT,
                             )
-                        } else {
-                            NavigationBarItemDefaults.colors()
+                            isMark -> NavigationBarItemDefaults.colors(
+                                selectedIconColor = MaterialTheme.colorScheme.onSurface,
+                                unselectedIconColor = MaterialTheme.colorScheme.onSurface,
+                            )
+                            else -> NavigationBarItemDefaults.colors()
                         },
                     )
                 }

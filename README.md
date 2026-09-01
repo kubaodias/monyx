@@ -1,3 +1,5 @@
+<img src="docs/logo.png" alt="" width="88" align="left" hspace="12" vspace="4">
+
 # Monyx
 
 A shared household budget app for one family. Native Android, backend on Telnyx
