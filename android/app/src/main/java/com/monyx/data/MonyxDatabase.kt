@@ -13,9 +13,10 @@ import androidx.room.RoomDatabase
         TransactionEntity::class,
         BudgetEntity::class,
         MonthPlanEntity::class,
+        RecurringRuleEntity::class,
         SyncStateEntity::class,
     ],
-    version = 3,
+    version = 4,
     exportSchema = true,
 )
 abstract class MonyxDatabase : RoomDatabase() {

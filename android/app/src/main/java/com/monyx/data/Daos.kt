@@ -57,6 +57,33 @@ data class TransactionListItem(
     val categoryColor: String?,
     val accountName: String?,
     val transferAccountName: String?,
+    /** Non-null when a repeating rule wrote this row rather than a person. */
+    val recurringRuleId: String?,
+    val pending: Int,
+    val rejected: Int,
+)
+
+/**
+ * A rule joined to the names the settings list needs, plus how many
+ * transactions it has actually produced — the one figure that tells a person the
+ * rule is running rather than merely saved.
+ */
+data class RecurringRuleListItem(
+    val id: String,
+    val kind: String,
+    val amountMinor: Long,
+    val note: String?,
+    val freq: String,
+    val startsOn: String,
+    val endsOn: String?,
+    val categoryId: String?,
+    val accountId: String,
+    val categoryName: String?,
+    val categoryIcon: String?,
+    /** Already resolved to the parent's colour, as everywhere else. */
+    val categoryColor: String?,
+    val accountName: String?,
+    val generatedCount: Int,
     val pending: Int,
     val rejected: Int,
 )
@@ -83,6 +110,9 @@ interface MonyxDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertMembers(rows: List<MemberEntity>)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertRecurringRules(rows: List<RecurringRuleEntity>)
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertSyncState(state: SyncStateEntity)
@@ -115,6 +145,9 @@ interface MonyxDao {
     @Query("SELECT * FROM month_plans WHERE pending = 1")
     suspend fun pendingMonthPlans(): List<MonthPlanEntity>
 
+    @Query("SELECT * FROM recurring_rules WHERE pending = 1")
+    suspend fun pendingRecurringRules(): List<RecurringRuleEntity>
+
     @Query("SELECT * FROM transactions WHERE pending = 1")
     suspend fun pendingTransactions(): List<TransactionEntity>
 
@@ -140,6 +173,9 @@ interface MonyxDao {
     @Query("UPDATE members SET pending = 0 WHERE id IN (:ids)")
     suspend fun clearPendingMembers(ids: List<String>)
 
+    @Query("UPDATE recurring_rules SET pending = 0 WHERE id IN (:ids)")
+    suspend fun clearPendingRecurringRules(ids: List<String>)
+
     @Query("UPDATE accounts SET pending = 0, rejected = 1 WHERE id IN (:ids)")
     suspend fun rejectAccounts(ids: List<String>)
 
@@ -158,6 +194,9 @@ interface MonyxDao {
     @Query("UPDATE members SET pending = 0, rejected = 1 WHERE id IN (:ids)")
     suspend fun rejectMembers(ids: List<String>)
 
+    @Query("UPDATE recurring_rules SET pending = 0, rejected = 1 WHERE id IN (:ids)")
+    suspend fun rejectRecurringRules(ids: List<String>)
+
     /** The other half of the restore runbook in the README. */
     @Query("UPDATE accounts SET pending = 1")
     suspend fun markAllAccountsPending()
@@ -174,12 +213,16 @@ interface MonyxDao {
     @Query("UPDATE month_plans SET pending = 1")
     suspend fun markAllMonthPlansPending()
 
+    @Query("UPDATE recurring_rules SET pending = 1")
+    suspend fun markAllRecurringRulesPending()
+
     @Query(
         """SELECT (SELECT COUNT(*) FROM transactions WHERE rejected = 1)
                 + (SELECT COUNT(*) FROM accounts     WHERE rejected = 1)
                 + (SELECT COUNT(*) FROM categories   WHERE rejected = 1)
                 + (SELECT COUNT(*) FROM budgets      WHERE rejected = 1)
-                + (SELECT COUNT(*) FROM month_plans  WHERE rejected = 1)"""
+                + (SELECT COUNT(*) FROM month_plans  WHERE rejected = 1)
+                + (SELECT COUNT(*) FROM recurring_rules WHERE rejected = 1)"""
     )
     fun rejectedCount(): Flow<Int>
 
@@ -366,7 +409,7 @@ interface MonyxDao {
                   c.name AS categoryName, c.icon AS categoryIcon,
                   COALESCE(pc.color, c.color) AS categoryColor,
                   a.name AS accountName, ta.name AS transferAccountName,
-                  t.pending, t.rejected
+                  t.recurringRuleId, t.pending, t.rejected
            FROM transactions t
            LEFT JOIN categories c ON c.id = t.categoryId
            LEFT JOIN categories pc ON pc.id = c.parentId
@@ -392,7 +435,7 @@ interface MonyxDao {
                   c.name AS categoryName, c.icon AS categoryIcon,
                   COALESCE(pc.color, c.color) AS categoryColor,
                   a.name AS accountName, ta.name AS transferAccountName,
-                  t.pending, t.rejected
+                  t.recurringRuleId, t.pending, t.rejected
            FROM transactions t
            LEFT JOIN categories c ON c.id = t.categoryId
            LEFT JOIN categories pc ON pc.id = c.parentId
@@ -409,4 +452,41 @@ interface MonyxDao {
         allAccounts: Int,
         accountIds: List<String>,
     ): Flow<List<TransactionListItem>>
+
+    // ------------------------------------------------------- recurring rules
+
+    @Query(
+        """SELECT r.id, r.kind, r.amountMinor, r.note, r.freq, r.startsOn, r.endsOn,
+                  r.categoryId, r.accountId,
+                  c.name AS categoryName, c.icon AS categoryIcon,
+                  COALESCE(pc.color, c.color) AS categoryColor,
+                  a.name AS accountName,
+                  (SELECT COUNT(*) FROM transactions t
+                    WHERE t.recurringRuleId = r.id AND t.deleted = 0) AS generatedCount,
+                  r.pending, r.rejected
+           FROM recurring_rules r
+           LEFT JOIN categories c ON c.id = r.categoryId
+           LEFT JOIN categories pc ON pc.id = c.parentId
+           LEFT JOIN accounts   a ON a.id = r.accountId
+           WHERE r.deleted = 0
+           ORDER BY r.startsOn, r.id"""
+    )
+    fun recurringRules(): Flow<List<RecurringRuleListItem>>
+
+    @Query("SELECT * FROM recurring_rules WHERE deleted = 0")
+    suspend fun activeRecurringRules(): List<RecurringRuleEntity>
+
+    @Query("SELECT * FROM recurring_rules WHERE id = :id")
+    suspend fun recurringRule(id: String): RecurringRuleEntity?
+
+    /**
+     * Which of these transaction ids the phone already holds — in ANY state,
+     * tombstones included.
+     *
+     * Deliberately no `deleted = 0`. A generated expense the user deleted is
+     * still an occurrence that happened, and filtering tombstones out here would
+     * have the next materialisation pass write it straight back.
+     */
+    @Query("SELECT id FROM transactions WHERE id IN (:ids)")
+    suspend fun existingTransactionIds(ids: List<String>): List<String>
 }

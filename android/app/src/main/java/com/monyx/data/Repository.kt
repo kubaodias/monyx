@@ -1,6 +1,7 @@
 package com.monyx.data
 
 import java.nio.charset.StandardCharsets
+import java.time.LocalDate
 import java.util.UUID
 
 /**
@@ -35,6 +36,7 @@ class MonyxRepository(private val dao: MonyxDao) {
         dao.recentTransactions(period, limit, allAccounts(accountIds), accountIds.toList())
 
     fun rejectedCount() = dao.rejectedCount()
+    fun recurringRules() = dao.recurringRules()
     fun syncStateFlow() = dao.syncStateFlow()
 
     fun transactions(
@@ -251,6 +253,126 @@ class MonyxRepository(private val dao: MonyxDao) {
     suspend fun effectiveBudget(categoryId: String, period: String) =
         dao.effectiveBudget(categoryId, period)
 
+    // ------------------------------------------------------- recurring rules
+
+    suspend fun addRecurringRule(
+        kind: String,
+        amountMinor: Long,
+        accountId: String,
+        categoryId: String?,
+        note: String?,
+        freq: String,
+        startsOn: LocalDate,
+        endsOn: LocalDate?,
+        createdBy: String,
+    ): String {
+        val id = newId()
+        dao.upsertRecurringRules(
+            listOf(
+                RecurringRuleEntity(
+                    id = id,
+                    kind = kind,
+                    amountMinor = amountMinor,
+                    accountId = accountId,
+                    categoryId = categoryId,
+                    note = note?.takeIf { it.isNotBlank() },
+                    freq = freq,
+                    startsOn = startsOn.toString(),
+                    endsOn = endsOn?.toString(),
+                    createdBy = createdBy,
+                    createdAt = System.currentTimeMillis(),
+                    pending = 1,
+                ),
+            ),
+        )
+        return id
+    }
+
+    suspend fun updateRecurringRule(entity: RecurringRuleEntity) {
+        dao.upsertRecurringRules(listOf(entity.copy(pending = 1, rejected = 0)))
+    }
+
+    suspend fun recurringRule(id: String) = dao.recurringRule(id)
+
+    /**
+     * Stopping a rule is a tombstone, and it stops the rule ONLY. Every
+     * transaction it already produced stays exactly where it is: money that has
+     * been spent does not un-spend because the household cancelled the
+     * subscription.
+     */
+    suspend fun deleteRecurringRule(entity: RecurringRuleEntity) {
+        dao.upsertRecurringRules(listOf(entity.copy(deleted = 1, pending = 1)))
+    }
+
+    /**
+     * Write the transactions every rule owes up to [today], and return how many
+     * were created.
+     *
+     * Idempotent by construction rather than by bookkeeping. Each occurrence has
+     * an id derived from (rule, date), so this asks the database which of those
+     * ids it already holds and writes only the rest — no cursor column to keep
+     * in step, and nothing to go wrong when two phones run it at once.
+     *
+     * Called from two places, and the difference matters. SyncWorker runs it
+     * AFTER the pull — both orders converge, but pulling first means a tombstone
+     * for an occurrence someone else deleted has already arrived, so it is never
+     * briefly rewritten and re-pushed. App open runs it with no sync at all,
+     * which is the only path that works offline.
+     */
+    suspend fun materializeRecurring(today: LocalDate = Dates.today()): Int {
+        var written = 0
+        for (rule in dao.activeRecurringRules()) {
+            val anchor = parseDate(rule.startsOn) ?: continue
+            val dates = Recurrence.occurrences(
+                freq = rule.freq,
+                anchor = anchor,
+                endsOn = rule.endsOn?.let(::parseDate),
+                through = today,
+            )
+            if (dates.isEmpty()) continue
+
+            val ids = dates.map { Recurrence.occurrenceId(rule.id, it) }
+            // Chunked because Room expands `IN (:ids)` to one bind variable per
+            // id, and SQLite's limit is 999 on older Android builds.
+            val known = ids.chunked(500).flatMap { dao.existingTransactionIds(it) }.toSet()
+
+            val fresh = dates.asSequence()
+                .map { it to Recurrence.occurrenceId(rule.id, it) }
+                .filterNot { it.second in known }
+                .take(MAX_NEW_PER_PASS)
+                .toList()
+            if (fresh.isEmpty()) continue
+
+            dao.upsertTransactions(
+                fresh.map { (date, id) ->
+                    val at = Recurrence.occurredAt(date)
+                    TransactionEntity(
+                        id = id,
+                        kind = rule.kind,
+                        amountMinor = rule.amountMinor,
+                        accountId = rule.accountId,
+                        categoryId = rule.categoryId,
+                        note = rule.note,
+                        occurredAt = at,
+                        occurredOn = date.toString(),
+                        // The rule's author, not whoever's phone happened to run
+                        // this: every field has to be a pure function of
+                        // (rule, date) or two phones overwrite each other.
+                        createdBy = rule.createdBy,
+                        recurringRuleId = rule.id,
+                        createdAt = at,
+                        pending = 1,
+                    )
+                },
+            )
+            written += fresh.size
+        }
+        return written
+    }
+
+    private fun parseDate(value: String): LocalDate? =
+        runCatching { LocalDate.parse(value) }.getOrNull()
+
     /**
      * Step 3 of the restore runbook. Without this, the copies of the data
      * sitting on four phones cannot be used to repair the server.
@@ -260,10 +382,22 @@ class MonyxRepository(private val dao: MonyxDao) {
         dao.markAllCategoriesPending()
         dao.markAllBudgetsPending()
         dao.markAllMonthPlansPending()
+        dao.markAllRecurringRulesPending()
         dao.markAllTransactionsPending()
     }
 
     companion object {
+        /**
+         * How many transactions one rule may create in a single pass.
+         *
+         * A limit on damage, not on the schedule. A rule whose anchor year was
+         * mistyped, or a phone whose clock is wrong, would otherwise fill the
+         * history in one go. Occurrences are taken oldest first, so a rule with
+         * a genuine backlog still drains it — a pass at a time, visibly, instead
+         * of in one silent flood.
+         */
+        internal const val MAX_NEW_PER_PASS = 60
+
         /**
          * On the companion so a test can pin the direction without a database.
          * Inverting this is the one mistake here that fails silently and

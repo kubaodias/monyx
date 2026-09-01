@@ -53,6 +53,13 @@ class MainActivity : AppCompatActivity() {
                 // what actually threatens the five-second target.
                 LaunchedEffect(enrolled) {
                     if (enrolled == true) {
+                        // Before the sync is enqueued, so anything a repeating
+                        // rule owes rides the same push. This is also the ONLY
+                        // path that runs with no network: SyncWorker carries a
+                        // CONNECTED constraint, so on a phone that has been
+                        // offline for a week, opening the app is what makes
+                        // last week's rent appear.
+                        app.repository.materializeRecurring()
                         SyncWorker.enqueue(this@MainActivity)
                         SyncWorker.schedulePeriodic(this@MainActivity)
                     }

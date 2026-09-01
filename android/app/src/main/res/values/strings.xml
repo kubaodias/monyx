@@ -191,4 +191,31 @@
     <string name="settings_add_subcategory">Add a subcategory</string>
     <string name="settings_kind">Kind</string>
     <string name="settings_member_since">Joined: %1$s</string>
+
+    <!-- Recurring transactions -->
+    <string name="settings_recurring">Repeating</string>
+    <string name="settings_add_recurring">Add a repeating transaction</string>
+    <string name="settings_no_recurring">Nothing repeats yet. Rent, the phone bill and salary belong here.</string>
+    <string name="recurring_freq_weekly">Every week</string>
+    <string name="recurring_freq_monthly">Every month</string>
+    <string name="recurring_freq_yearly">Every year</string>
+    <string name="recurring_next">Next on %1$s</string>
+    <string name="recurring_finished">Finished</string>
+    <string name="recurring_added_count">%1$d added so far</string>
+    <string name="recurring_add_title">New repeating transaction</string>
+    <string name="recurring_edit_title">Edit repeating transaction</string>
+    <string name="recurring_amount">Amount</string>
+    <string name="recurring_how_often">How often</string>
+    <string name="recurring_first_on">First on</string>
+    <string name="recurring_until">Until</string>
+    <string name="recurring_no_end">No end date</string>
+    <string name="recurring_clear_end">Remove the end date</string>
+    <string name="recurring_month_end_note">A rule on the 29th, 30th or 31st falls on the last day of a shorter month.</string>
+    <string name="recurring_delete_confirm_none">Stop this repeating transaction? It has not added anything yet.</string>
+    <plurals name="recurring_delete_confirm">
+        <item quantity="one">Stop this repeating transaction? The one transaction it has already added stays where it is.</item>
+        <item quantity="other">Stop this repeating transaction? The %1$d transactions it has already added stay where they are.</item>
+    </plurals>
+    <string name="recurring_needs_account">Add an account first</string>
+    <string name="recurring_from_rule">Added by a repeating transaction</string>
 </resources>

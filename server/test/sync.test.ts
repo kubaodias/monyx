@@ -338,3 +338,128 @@ test("a plan needs a well-formed period", async () => {
   ]);
   assert.equal(result.rejected[0]?.reason, "bad_period");
 });
+
+// -------------------------------------------------------- recurring rules
+
+function rule(id: string, over: Record<string, unknown> = {}) {
+  return {
+    table: "recurring_rules",
+    row: {
+      id,
+      kind: "expense",
+      amount_minor: 250000,
+      account_id: "acc1",
+      category_id: "cat1",
+      note: "Czynsz",
+      freq: "monthly",
+      starts_on: "2026-09-01",
+      ends_on: null,
+      created_by: "mem1",
+      created_at: 1_756_000_000_000,
+      deleted: 0,
+      ...over,
+    },
+  };
+}
+
+/** A generated transaction: an ordinary expense that names the rule behind it. */
+function fromRule(id: string, ruleId: string, occurredOn: string) {
+  const base = expense(id, 250000, "cat1", occurredOn);
+  return { ...base, row: { ...base.row, recurring_rule_id: ruleId } };
+}
+
+test("a recurring rule pushes, pulls, and is revised in place", async () => {
+  const { db } = setup();
+  await push(db, [rule("r1")]);
+  await push(db, [rule("r1", { amount_minor: 270000 })]);
+
+  const page = await pull(db, 0, 100);
+  const rules = page.changes.filter((c) => c.table === "recurring_rules");
+  assert.equal(rules.at(-1)?.row["amount_minor"], 270000);
+  assert.equal(rules.at(-1)?.row["freq"], "monthly");
+});
+
+test("a rule is refused unless the anchor is a well-formed date", async () => {
+  const { db } = setup();
+  const result = await push(db, [rule("r1", { starts_on: "2026-9-1" })]);
+  assert.equal(result.rejected[0]?.reason, "bad_starts_on");
+});
+
+test("only the three frequencies are accepted", async () => {
+  const { db } = setup();
+  for (const freq of ["weekly", "monthly", "yearly"]) {
+    const ok = await push(db, [rule(`ok-${freq}`, { freq })]);
+    assert.deepEqual(ok.rejected, [], `${freq} must be accepted`);
+  }
+  // Daily is deliberately absent: 365 rows a year is a footgun, not a feature.
+  const daily = await push(db, [rule("r-daily", { freq: "daily" })]);
+  assert.equal(daily.rejected[0]?.reason, "bad_freq");
+});
+
+test("a rule cannot be a transfer", async () => {
+  const { db } = setup();
+  const result = await push(db, [rule("r1", { kind: "transfer" })]);
+  assert.equal(result.rejected[0]?.reason, "bad_kind");
+});
+
+test("a rule that ends before it starts is refused", async () => {
+  const { db } = setup();
+  const result = await push(db, [rule("r1", { ends_on: "2026-08-01" })]);
+  assert.equal(result.rejected[0]?.reason, "ends_before_starts");
+
+  const openEnded = await push(db, [rule("r2", { ends_on: null })]);
+  assert.deepEqual(openEnded.rejected, [], "no end date means it runs forever");
+});
+
+test("a rule pointing at another household's account is refused", async () => {
+  const { fake } = setup();
+  seedHousehold(fake, "hh2");
+  const db = forHousehold("hh1", fake);
+  const result = await push(db, [rule("r1", { account_id: "hh2-acc1" })]);
+  assert.equal(result.rejected[0]?.reason, "missing_account_id");
+});
+
+test("a generated transaction and the rule that made it push together", async () => {
+  const { fake, db } = setup();
+  // The client sends both in one batch on the very first materialisation. The
+  // rule must be written before the transaction that references it, or the
+  // foreign key check rejects a real expense while the user watches it save.
+  const result = await push(db, [rule("r1"), fromRule("t1", "r1", "2026-09-01")]);
+  assert.deepEqual(result.rejected, []);
+  assert.equal(result.applied, 2);
+
+  const row = fake.db
+    .prepare("SELECT recurring_rule_id FROM transactions WHERE id='t1'")
+    .get() as { recurring_rule_id: string };
+  assert.equal(row.recurring_rule_id, "r1");
+});
+
+test("a transaction naming a rule that does not exist is refused, not orphaned", async () => {
+  const { db } = setup();
+  const tx = expense("t1", 1000, "cat1");
+  const result = await push(db, [{ ...tx, row: { ...tx.row, recurring_rule_id: "nope" } }]);
+  assert.equal(result.rejected[0]?.reason, "missing_recurring_rule_id");
+});
+
+test("an ordinary transaction still pushes with no rule attached", async () => {
+  const { fake, db } = setup();
+  const result = await push(db, [expense("t1", 1000, "cat1")]);
+  assert.deepEqual(result.rejected, []);
+  const row = fake.db
+    .prepare("SELECT recurring_rule_id FROM transactions WHERE id='t1'")
+    .get() as { recurring_rule_id: unknown };
+  assert.equal(row.recurring_rule_id, null);
+});
+
+test("deleting a rule is a tombstone that pulls, leaving its transactions alone", async () => {
+  const { db } = setup();
+  await push(db, [rule("r1"), fromRule("t1", "r1", "2026-09-01")]);
+  await push(db, [rule("r1", { deleted: 1 })]);
+
+  const page = await pull(db, 0, 100);
+  const rules = page.changes.filter((c) => c.table === "recurring_rules");
+  assert.equal(rules.at(-1)?.row["deleted"], 1, "the rule stops, as a tombstone");
+
+  const txs = page.changes.filter((c) => c.table === "transactions");
+  assert.equal(txs.at(-1)?.row["deleted"], 0, "money already spent does not un-spend");
+});

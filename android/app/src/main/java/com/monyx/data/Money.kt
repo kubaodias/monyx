@@ -141,6 +141,29 @@ object Dates {
     fun dayLabel(occurredOn: String): String =
         LocalDate.parse(occurredOn).format(formatters().first)
 
+    private var shortLocale: Locale? = null
+    private var cachedShortDay: DateTimeFormatter? = null
+
+    /**
+     * "30 Sep", not "30 September".
+     *
+     * For rows where the date shares a line with other text. The full month name
+     * wrapped "Next on 30 / September" across two lines in the repeating list,
+     * which breaks the phrase in the middle of itself.
+     */
+    fun shortDayLabel(occurredOn: String): String {
+        val formatter = synchronized(this) {
+            val locale = Locale.getDefault()
+            cachedShortDay?.takeIf { shortLocale == locale } ?: run {
+                DateTimeFormatter.ofPattern("d MMM", locale).also {
+                    shortLocale = locale
+                    cachedShortDay = it
+                }
+            }
+        }
+        return LocalDate.parse(occurredOn).format(formatter)
+    }
+
     /** Polish month names are lowercase; a heading wants them capitalised. */
     fun monthLabel(period: String): String =
         LocalDate.parse("$period-01").format(formatters().second)

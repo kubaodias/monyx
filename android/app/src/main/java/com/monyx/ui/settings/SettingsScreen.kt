@@ -95,6 +95,8 @@ fun SettingsScreen() {
     val accounts by viewModel.accountRows.collectAsStateWithLifecycle(initialValue = emptyList())
     val categoryGroups by viewModel.categoryGroups.collectAsStateWithLifecycle(initialValue = emptyList())
     val members by viewModel.members.collectAsStateWithLifecycle(initialValue = emptyList())
+    val allCategories by viewModel.categories.collectAsStateWithLifecycle(initialValue = emptyList())
+    val recurringRules by viewModel.recurringRules.collectAsStateWithLifecycle(initialValue = emptyList())
     val syncState by viewModel.syncState.collectAsStateWithLifecycle(initialValue = null)
     val rejectedCount by viewModel.rejectedCount.collectAsStateWithLifecycle(initialValue = 0)
     val inviteState by viewModel.inviteState.collectAsStateWithLifecycle()
@@ -142,6 +144,17 @@ fun SettingsScreen() {
                     onDelete = viewModel::deleteCategory,
                 )
             }
+            item {
+                RecurringSection(
+                    rules = recurringRules,
+                    accounts = accounts.filter { it.entity.archived == 0 }.map { it.entity },
+                    categories = allCategories,
+                    onAdd = viewModel::addRecurringRule,
+                    onUpdate = viewModel::updateRecurringRule,
+                    onDelete = viewModel::deleteRecurringRule,
+                )
+            }
+
             item {
                 MembersSection(members = members)
             }

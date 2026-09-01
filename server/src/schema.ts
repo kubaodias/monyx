@@ -12,6 +12,7 @@ export type TableName =
   | "categories"
   | "month_plans"
   | "budgets"
+  | "recurring_rules"
   | "transactions";
 
 /**
@@ -28,6 +29,10 @@ export const DEPENDENCY_ORDER: readonly TableName[] = [
   // where it is read.
   "month_plans",
   "budgets",
+  // Before transactions, because a generated transaction carries
+  // recurring_rule_id and the foreign key check would reject it if the rule
+  // that produced it had not arrived yet.
+  "recurring_rules",
   "transactions",
 ] as const;
 
@@ -58,10 +63,16 @@ export const COLUMNS: Record<TableName, readonly string[]> = {
     "id", "household_id", "category_id", "period", "limit_minor",
     "seq", "deleted",
   ],
+  recurring_rules: [
+    "id", "household_id", "kind", "amount_minor", "account_id",
+    "category_id", "note", "freq", "starts_on", "ends_on",
+    "created_by", "created_at", "seq", "deleted",
+  ],
   transactions: [
     "id", "household_id", "kind", "amount_minor", "account_id",
     "transfer_account_id", "category_id", "note", "occurred_at",
-    "occurred_on", "created_by", "source", "created_at", "seq", "deleted",
+    "occurred_on", "created_by", "source", "recurring_rule_id",
+    "created_at", "seq", "deleted",
   ],
 };
 
@@ -75,11 +86,17 @@ export const FOREIGN_KEYS: Record<
   categories: [{ column: "parent_id", table: "categories" }],
   month_plans: [],
   budgets: [{ column: "category_id", table: "categories" }],
+  recurring_rules: [
+    { column: "account_id", table: "accounts" },
+    { column: "category_id", table: "categories" },
+    { column: "created_by", table: "members" },
+  ],
   transactions: [
     { column: "account_id", table: "accounts" },
     { column: "transfer_account_id", table: "accounts" },
     { column: "category_id", table: "categories" },
     { column: "created_by", table: "members" },
+    { column: "recurring_rule_id", table: "recurring_rules" },
   ],
 };
 
@@ -104,6 +121,7 @@ const PERIOD_RE = /^\d{4}-\d{2}$/;
 const TX_KINDS = new Set(["expense", "income", "transfer"]);
 const CAT_KINDS = new Set(["expense", "income"]);
 const SOURCES = new Set(["manual", "voice", "receipt"]);
+const FREQS = new Set(["weekly", "monthly", "yearly"]);
 
 function isPlainObject(v: unknown): v is Record<string, unknown> {
   return typeof v === "object" && v !== null && !Array.isArray(v);
@@ -198,6 +216,37 @@ export function validateChange(raw: unknown): ValidationResult {
       if (!isInt(row["limit_minor"]) || row["limit_minor"] < 0) return reject("bad_limit_minor");
       break;
     }
+    case "recurring_rules": {
+      // A rule cannot be a transfer. AddScreen offers expense and income only,
+      // and a repeating transfer between two of the household's own accounts is
+      // a standing order the bank already runs.
+      if (!CAT_KINDS.has(String(row["kind"]))) return reject("bad_kind");
+      if (!isInt(row["amount_minor"]) || (row["amount_minor"] as number) <= 0) {
+        return reject("bad_amount_minor");
+      }
+      if (typeof row["account_id"] !== "string" || !ID_RE.test(row["account_id"])) {
+        return reject("bad_account_id");
+      }
+      if (!optionalId(row["category_id"])) return reject("bad_category_id");
+      if (!optionalText(row["note"])) return reject("bad_note");
+      if (!FREQS.has(String(row["freq"]))) return reject("bad_freq");
+      // starts_on IS the schedule, not merely the first date it is valid from:
+      // a monthly rule repeats on the anchor's day-of-month, a yearly one on its
+      // month and day. A malformed anchor is therefore a malformed rule.
+      if (typeof row["starts_on"] !== "string" || !DATE_RE.test(row["starts_on"])) {
+        return reject("bad_starts_on");
+      }
+      const endsOn = row["ends_on"];
+      if (endsOn !== undefined && endsOn !== null) {
+        if (typeof endsOn !== "string" || !DATE_RE.test(endsOn)) return reject("bad_ends_on");
+        if (endsOn < (row["starts_on"] as string)) return reject("ends_before_starts");
+      }
+      if (typeof row["created_by"] !== "string" || !ID_RE.test(row["created_by"])) {
+        return reject("bad_created_by");
+      }
+      if (!isInt(row["created_at"])) return reject("bad_created_at");
+      break;
+    }
     case "transactions": {
       const kind = String(row["kind"]);
       if (!TX_KINDS.has(kind)) return reject("bad_kind");
@@ -214,6 +263,7 @@ export function validateChange(raw: unknown): ValidationResult {
       // because batch() is all-or-nothing, takes the whole push down with it.
       if (!isInt(row["created_at"])) return reject("bad_created_at");
       if (row["source"] !== undefined && !SOURCES.has(String(row["source"]))) return reject("bad_source");
+      if (!optionalId(row["recurring_rule_id"])) return reject("bad_recurring_rule_id");
       // A transfer has no category and never enters spending statistics.
       if (kind === "transfer") {
         if (typeof row["transfer_account_id"] !== "string") return reject("transfer_needs_target");

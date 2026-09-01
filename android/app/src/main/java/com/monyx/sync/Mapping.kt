@@ -5,6 +5,7 @@ import com.monyx.data.BudgetEntity
 import com.monyx.data.MonthPlanEntity
 import com.monyx.data.CategoryEntity
 import com.monyx.data.MemberEntity
+import com.monyx.data.RecurringRuleEntity
 import com.monyx.data.TransactionEntity
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -12,7 +13,7 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonPrimitive
 
 /**
- * A Kotlin data class and a TypeScript interface describe the same seven tables,
+ * A Kotlin data class and a TypeScript interface describe the same tables,
  * and the duplication is on purpose. A code generator or an OpenAPI schema
  * in between is a pipeline to maintain in order to save rewriting ~80 lines that
  * change a few times a year. These mappings are that duplication, written out.
@@ -46,6 +47,7 @@ fun TransactionEntity.toRow(): JsonObject = buildJsonObject {
     put("occurred_on", JsonPrimitive(occurredOn))
     put("created_by", JsonPrimitive(createdBy))
     put("source", JsonPrimitive(source))
+    putNullable(this, "recurring_rule_id", recurringRuleId)
     put("created_at", JsonPrimitive(createdAt))
     put("deleted", JsonPrimitive(deleted))
 }
@@ -62,6 +64,7 @@ fun JsonObject.toTransaction(): TransactionEntity = TransactionEntity(
     occurredOn = reqStr("occurred_on"),
     createdBy = reqStr("created_by"),
     source = str("source") ?: "manual",
+    recurringRuleId = str("recurring_rule_id"),
     createdAt = long("created_at"),
     seq = long("seq"),
     deleted = int("deleted"),
@@ -145,6 +148,37 @@ fun JsonObject.toBudget(): BudgetEntity = BudgetEntity(
     categoryId = reqStr("category_id"),
     period = reqStr("period"),
     limitMinor = long("limit_minor"),
+    seq = long("seq"),
+    deleted = int("deleted"),
+)
+
+fun RecurringRuleEntity.toRow(): JsonObject = buildJsonObject {
+    put("id", JsonPrimitive(id))
+    put("kind", JsonPrimitive(kind))
+    put("amount_minor", JsonPrimitive(amountMinor))
+    put("account_id", JsonPrimitive(accountId))
+    putNullable(this, "category_id", categoryId)
+    putNullable(this, "note", note)
+    put("freq", JsonPrimitive(freq))
+    put("starts_on", JsonPrimitive(startsOn))
+    putNullable(this, "ends_on", endsOn)
+    put("created_by", JsonPrimitive(createdBy))
+    put("created_at", JsonPrimitive(createdAt))
+    put("deleted", JsonPrimitive(deleted))
+}
+
+fun JsonObject.toRecurringRule(): RecurringRuleEntity = RecurringRuleEntity(
+    id = reqStr("id"),
+    kind = reqStr("kind"),
+    amountMinor = long("amount_minor"),
+    accountId = reqStr("account_id"),
+    categoryId = str("category_id"),
+    note = str("note"),
+    freq = reqStr("freq"),
+    startsOn = reqStr("starts_on"),
+    endsOn = str("ends_on"),
+    createdBy = reqStr("created_by"),
+    createdAt = long("created_at"),
     seq = long("seq"),
     deleted = int("deleted"),
 )

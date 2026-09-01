@@ -184,4 +184,33 @@
     <string name="settings_add_subcategory">Dodaj podkategorię</string>
     <string name="settings_kind">Rodzaj</string>
     <string name="settings_member_since">Dołączenie: %1$s</string>
+
+    <!-- Transakcje cykliczne -->
+    <string name="settings_recurring">Cykliczne</string>
+    <string name="settings_add_recurring">Dodaj transakcję cykliczną</string>
+    <string name="settings_no_recurring">Nic się jeszcze nie powtarza. Czynsz, rachunek za telefon i wypłata należą tutaj.</string>
+    <string name="recurring_freq_weekly">Co tydzień</string>
+    <string name="recurring_freq_monthly">Co miesiąc</string>
+    <string name="recurring_freq_yearly">Co rok</string>
+    <string name="recurring_next">Następna %1$s</string>
+    <string name="recurring_finished">Zakończona</string>
+    <string name="recurring_added_count">Dodano do tej pory: %1$d</string>
+    <string name="recurring_add_title">Nowa transakcja cykliczna</string>
+    <string name="recurring_edit_title">Edytuj transakcję cykliczną</string>
+    <string name="recurring_amount">Kwota</string>
+    <string name="recurring_how_often">Jak często</string>
+    <string name="recurring_first_on">Pierwsza</string>
+    <string name="recurring_until">Do</string>
+    <string name="recurring_no_end">Bez daty końca</string>
+    <string name="recurring_clear_end">Usuń datę końca</string>
+    <string name="recurring_month_end_note">Reguła z 29., 30. lub 31. dniem wypada ostatniego dnia krótszego miesiąca.</string>
+    <string name="recurring_delete_confirm_none">Zatrzymać tę transakcję cykliczną? Nie dodała jeszcze żadnej operacji.</string>
+    <plurals name="recurring_delete_confirm">
+        <item quantity="one">Zatrzymać tę transakcję cykliczną? Dodana już operacja pozostaje bez zmian.</item>
+        <item quantity="few">Zatrzymać tę transakcję cykliczną? Dodane już %1$d operacje pozostają bez zmian.</item>
+        <item quantity="many">Zatrzymać tę transakcję cykliczną? Dodanych już %1$d operacji pozostaje bez zmian.</item>
+        <item quantity="other">Zatrzymać tę transakcję cykliczną? Dodanych już %1$d operacji pozostaje bez zmian.</item>
+    </plurals>
+    <string name="recurring_needs_account">Najpierw dodaj konto</string>
+    <string name="recurring_from_rule">Dodane przez transakcję cykliczną</string>
 </resources>

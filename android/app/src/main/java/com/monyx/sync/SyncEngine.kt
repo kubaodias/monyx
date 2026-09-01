@@ -35,6 +35,7 @@ class SyncEngine(
         val categories = dao.pendingCategories()
         val monthPlans = dao.pendingMonthPlans()
         val budgets = dao.pendingBudgets()
+        val recurringRules = dao.pendingRecurringRules()
         val transactions = dao.pendingTransactions()
 
         val changes = buildList {
@@ -43,6 +44,9 @@ class SyncEngine(
             categories.forEach { add(Change("categories", it.toRow())) }
             monthPlans.forEach { add(Change("month_plans", it.toRow())) }
             budgets.forEach { add(Change("budgets", it.toRow())) }
+            // Before transactions: a generated row names its rule, and the
+            // server's foreign key check rejects it if the rule is not there yet.
+            recurringRules.forEach { add(Change("recurring_rules", it.toRow())) }
             transactions.forEach { add(Change("transactions", it.toRow())) }
         }
         if (changes.isEmpty()) return
@@ -85,6 +89,10 @@ class SyncEngine(
                     "budgets" -> {
                         dao.clearPendingBudgets(accepted)
                         if (bad.isNotEmpty()) dao.rejectBudgets(bad.toList())
+                    }
+                    "recurring_rules" -> {
+                        dao.clearPendingRecurringRules(accepted)
+                        if (bad.isNotEmpty()) dao.rejectRecurringRules(bad.toList())
                     }
                     "transactions" -> {
                         dao.clearPendingTransactions(accepted)
@@ -175,6 +183,7 @@ class SyncEngine(
             val categories = mutableListOf<JsonObject>()
             val monthPlans = mutableListOf<JsonObject>()
             val budgets = mutableListOf<JsonObject>()
+            val recurringRules = mutableListOf<JsonObject>()
             val transactions = mutableListOf<JsonObject>()
 
             for (change in page.changes) {
@@ -184,6 +193,7 @@ class SyncEngine(
                     "categories" -> categories += change.row
                     "month_plans" -> monthPlans += change.row
                     "budgets" -> budgets += change.row
+                    "recurring_rules" -> recurringRules += change.row
                     "transactions" -> transactions += change.row
                 }
             }
@@ -196,6 +206,7 @@ class SyncEngine(
             val pendingCategories = dao.pendingCategories().map { it.id }.toSet()
             val pendingMonthPlans = dao.pendingMonthPlans().map { it.id }.toSet()
             val pendingBudgets = dao.pendingBudgets().map { it.id }.toSet()
+            val pendingRecurringRules = dao.pendingRecurringRules().map { it.id }.toSet()
             val pendingTransactions = dao.pendingTransactions().map { it.id }.toSet()
 
             dao.upsertMembers(
@@ -212,6 +223,10 @@ class SyncEngine(
             )
             dao.upsertBudgets(
                 budgets.map { it.toBudget() }.filterNot { it.id in pendingBudgets },
+            )
+            dao.upsertRecurringRules(
+                recurringRules.map { it.toRecurringRule() }
+                    .filterNot { it.id in pendingRecurringRules },
             )
             dao.upsertTransactions(
                 transactions.map { it.toTransaction() }.filterNot { it.id in pendingTransactions },

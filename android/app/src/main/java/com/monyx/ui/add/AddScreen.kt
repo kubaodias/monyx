@@ -143,6 +143,8 @@ fun AddScreen(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp),
         )
 
+        SaveBlocker(state = state, hasMember = memberId != null)
+
         Keypad(
             onKey = { action ->
                 if (action == KeyAction.Confirm) {
@@ -214,6 +216,45 @@ private fun KindSelector(selected: EntryKind, onSelect: (EntryKind) -> Unit) {
                     },
                 )
             }
+        }
+    }
+}
+
+/**
+ * Why the tick is grey.
+ *
+ * Saving needs an amount, an account AND a category, and until this line existed
+ * the third one was invisible: you typed a price, typed a note, and the only
+ * feedback was a dead button with no explanation. The category grid is on
+ * screen the whole time, so the answer was always there — but a disabled control
+ * that will not say what it wants is not a hint, it is a guessing game.
+ *
+ * The row keeps its height when there is nothing to say, so the keypad never
+ * moves under a thumb that is already on its way down.
+ */
+@Composable
+private fun SaveBlocker(state: AddUiState, hasMember: Boolean) {
+    // In the order the screen is filled in, so it names the NEXT thing to do
+    // rather than an arbitrary one of several.
+    val message = when {
+        state.amountMinor <= 0 -> stringResource(R.string.add_needs_amount)
+        state.accountId == null -> stringResource(R.string.add_needs_account)
+        state.categoryId == null -> stringResource(R.string.add_needs_category)
+        else -> null
+    }
+    Box(
+        modifier = Modifier.fillMaxWidth().height(24.dp).padding(horizontal = 16.dp),
+        contentAlignment = Alignment.CenterStart,
+    ) {
+        // A pending sum is not a blocked save — the tick evaluates it, and
+        // saying "pick a category" mid-addition would be answering a question
+        // nobody asked yet.
+        if (message != null && hasMember && !state.amount.hasPendingOperation) {
+            Text(
+                text = message,
+                fontSize = 13.sp,
+                color = MaterialTheme.colorScheme.primary,
+            )
         }
     }
 }

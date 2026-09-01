@@ -21,6 +21,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.CloudUpload
+import androidx.compose.material.icons.filled.Repeat
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.Search
@@ -454,6 +455,18 @@ private fun TransactionRow(item: TransactionListItem, onClick: () -> Unit) {
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f, fill = false),
                 )
+                // A row nobody remembers typing is alarming. The mark is what
+                // separates "the app invented an expense" from "the rule you
+                // set up in March fired this morning".
+                if (item.recurringRuleId != null) {
+                    Spacer(Modifier.width(6.dp))
+                    Icon(
+                        imageVector = Icons.Filled.Repeat,
+                        contentDescription = stringResource(R.string.recurring_from_rule),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(14.dp),
+                    )
+                }
                 if (item.pending == 1) {
                     Spacer(Modifier.width(6.dp))
                     Icon(

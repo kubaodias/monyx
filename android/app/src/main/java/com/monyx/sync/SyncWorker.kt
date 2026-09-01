@@ -11,6 +11,7 @@ import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import com.monyx.data.MonyxDatabase
+import com.monyx.data.MonyxRepository
 import java.util.concurrent.TimeUnit
 
 /**
@@ -32,10 +33,20 @@ class SyncWorker(
         if (!session.isEnrolled()) return Result.success()
 
         // WorkManager handles retry with backoff; we do not write our own.
-        return SyncEngine(db, session).sync().fold(
-            onSuccess = { Result.success() },
-            onFailure = { Result.retry() },
-        )
+        val outcome = SyncEngine(db, session).sync()
+        if (outcome.isFailure) return Result.retry()
+
+        // AFTER the pull, so a tombstone for an occurrence someone else deleted
+        // has already landed and is never briefly rewritten and re-pushed.
+        //
+        // A rule that fell due writes rows marked pending, and those would
+        // otherwise sit on the phone until the next hourly run. One extra sync —
+        // conditional, so an ordinary run still makes exactly one round trip,
+        // and not a loop, because the second pass by definition writes nothing.
+        val written = MonyxRepository(db.dao()).materializeRecurring()
+        if (written > 0) SyncEngine(db, session).sync()
+
+        return Result.success()
     }
 
     companion object {

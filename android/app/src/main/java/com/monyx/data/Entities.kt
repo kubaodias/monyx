@@ -89,6 +89,15 @@ data class TransactionEntity(
     val occurredOn: String,
     val createdBy: String,
     val source: String = "manual",
+    /**
+     * The rule that generated this row, or null for one a person typed.
+     *
+     * A column rather than an extra `source` value, because `source` is a CHECK
+     * constraint on the server and SQLite cannot alter one — see
+     * migrations/0004. It says more anyway: which rule, not just that there was
+     * one.
+     */
+    val recurringRuleId: String? = null,
     val createdAt: Long,
     val seq: Long = 0,
     val deleted: Int = 0,
@@ -110,6 +119,42 @@ data class MonthPlanEntity(
     /** 'YYYY-MM'. */
     val period: String,
     val plannedMinor: Long,
+    val seq: Long = 0,
+    val deleted: Int = 0,
+    val pending: Int = 0,
+    val rejected: Int = 0,
+)
+
+/**
+ * A repeating expense or income: rent, the phone bill, salary.
+ *
+ * `startsOn` is the anchor AND the schedule — a weekly rule repeats every seven
+ * days from it, a monthly one on its day-of-month, a yearly one on its month and
+ * day. There is deliberately no dayOfMonth / dayOfWeek / monthOfYear beside it:
+ * separate columns can contradict the frequency, and a schema that cannot
+ * express a contradiction needs no validation to rule one out.
+ *
+ * The rule is a statement about the future. Nothing is ever generated before
+ * `startsOn`, so a phone that has been offline for a month catches up by exactly
+ * that month and a new rule never backfills a history nobody asked for.
+ */
+@Entity(tableName = "recurring_rules")
+data class RecurringRuleEntity(
+    @PrimaryKey val id: String,
+    /** 'expense' or 'income'. Never 'transfer'. */
+    val kind: String,
+    val amountMinor: Long,
+    val accountId: String,
+    val categoryId: String? = null,
+    val note: String? = null,
+    /** 'weekly', 'monthly' or 'yearly'. See [Recurrence]. */
+    val freq: String,
+    /** 'YYYY-MM-DD'. The first occurrence, and the pattern for every later one. */
+    val startsOn: String,
+    /** 'YYYY-MM-DD', inclusive. Null runs forever. */
+    val endsOn: String? = null,
+    val createdBy: String,
+    val createdAt: Long,
     val seq: Long = 0,
     val deleted: Int = 0,
     val pending: Int = 0,

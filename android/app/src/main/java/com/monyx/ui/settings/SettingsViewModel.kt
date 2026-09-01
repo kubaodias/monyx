@@ -7,6 +7,7 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import com.monyx.MonyxApp
 import com.monyx.data.AccountEntity
 import com.monyx.data.CategoryEntity
+import com.monyx.data.RecurringRuleListItem
 import com.monyx.sync.Api
 import com.monyx.sync.SyncWorker
 import kotlinx.coroutines.Dispatchers
@@ -73,6 +74,8 @@ class SettingsViewModel(private val app: MonyxApp) : ViewModel() {
     }
 
     val members = repository.members()
+    val categories: Flow<List<CategoryEntity>> = repository.categories()
+    val recurringRules: Flow<List<RecurringRuleListItem>> = repository.recurringRules()
     val syncState = repository.syncStateFlow()
     val rejectedCount = repository.rejectedCount()
 
@@ -129,6 +132,73 @@ class SettingsViewModel(private val app: MonyxApp) : ViewModel() {
             repository.deleteCategory(entity)
             SyncWorker.enqueue(app)
         }
+    }
+
+    // ------------------------------------------------------- recurring rules
+
+    /**
+     * The rule is authored by whoever set it up, and every transaction it later
+     * produces is credited to them rather than to whichever phone happened to
+     * be open when it fell due — see Repository.materializeRecurring.
+     */
+    fun addRecurringRule(draft: RuleDraft) {
+        viewModelScope.launch {
+            val memberId = session.memberId() ?: return@launch
+            repository.addRecurringRule(
+                kind = draft.kind,
+                amountMinor = draft.amountMinor,
+                accountId = draft.accountId,
+                categoryId = draft.categoryId,
+                note = draft.note,
+                freq = draft.freq,
+                startsOn = draft.startsOn,
+                endsOn = draft.endsOn,
+                createdBy = memberId,
+            )
+            materializeAndSync()
+        }
+    }
+
+    /**
+     * Editing changes what the rule will do NEXT. Transactions it has already
+     * produced keep the amount they were created with, because they are a record
+     * of money that moved, not a view onto the rule — the same reason a bank
+     * does not restate last month's standing order when you change it.
+     */
+    fun updateRecurringRule(id: String, draft: RuleDraft) {
+        viewModelScope.launch {
+            val existing = repository.recurringRule(id) ?: return@launch
+            repository.updateRecurringRule(
+                existing.copy(
+                    kind = draft.kind,
+                    amountMinor = draft.amountMinor,
+                    accountId = draft.accountId,
+                    categoryId = draft.categoryId,
+                    note = draft.note,
+                    freq = draft.freq,
+                    startsOn = draft.startsOn.toString(),
+                    endsOn = draft.endsOn?.toString(),
+                ),
+            )
+            materializeAndSync()
+        }
+    }
+
+    fun deleteRecurringRule(id: String) {
+        viewModelScope.launch {
+            val existing = repository.recurringRule(id) ?: return@launch
+            repository.deleteRecurringRule(existing)
+            SyncWorker.enqueue(app)
+        }
+    }
+
+    /**
+     * A rule anchored today owes a transaction today, and waiting for the next
+     * app open to show it would read as the rule not having worked.
+     */
+    private suspend fun materializeAndSync() {
+        repository.materializeRecurring()
+        SyncWorker.enqueue(app)
     }
 
     fun syncNow() {
