@@ -65,7 +65,7 @@ class AddViewModel(private val repository: MonyxRepository) : ViewModel() {
             KeyAction.Separator -> current.amount.separator()
             KeyAction.Backspace -> current.amount.backspace()
             is KeyAction.Operator -> current.amount.operator(action.op)
-            KeyAction.Confirm -> current.amount.evaluate()
+            KeyAction.Equals -> current.amount.evaluate()
         }
         _state.value = current.copy(amount = next)
     }

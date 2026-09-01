@@ -25,7 +25,8 @@
     <!-- Add screen -->
     <string name="add_expense">Expense</string>
     <string name="add_income">Income</string>
-    <string name="add_save">Save</string>
+    <string name="add_save_expense">Save expense · %1$s</string>
+    <string name="add_save_income">Save income · %1$s</string>
     <string name="add_note_hint">Note</string>
     <string name="add_pick_category">Pick a category</string>
     <string name="add_pick_account">Account</string>
@@ -71,7 +72,7 @@
     <string name="transactions_undo">Undo</string>
     <string name="transactions_pending">Waiting to sync</string>
     <string name="transactions_rejected">Rejected by the server</string>
-    <string name="transactions_filter_period">Period</string>
+    <string name="transactions_all_time">All time</string>
     <string name="transactions_delete_confirm_title">Delete this transaction?</string>
     <string name="transactions_delete_confirm_message">This cannot be undone.</string>
 
@@ -84,7 +85,6 @@
     <string name="budget_plan_spent">Spent</string>
     <string name="budget_plan_left_to_spend">Left to spend</string>
     <string name="budget_plan_assigned_hint">Already assigned: %1$s · left to assign: %2$s</string>
-    <string name="budget_title">Budget</string>
     <string name="budget_empty">No limits set yet</string>
     <string name="budget_set_limit">Set a limit</string>
     <string name="budget_edit_limit">Change limit</string>

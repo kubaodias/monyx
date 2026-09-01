@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Backspace
-import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -33,7 +32,9 @@ sealed interface KeyAction {
     data object Separator : KeyAction
     data object Backspace : KeyAction
     data class Operator(val op: Char) : KeyAction
-    data object Confirm : KeyAction
+
+    /** Folds a pending sum into one number. It does NOT save — see SaveBar. */
+    data object Equals : KeyAction
 }
 
 private data class Key(
@@ -44,7 +45,7 @@ private data class Key(
     val span: Float = 1f,
 )
 
-private enum class Emphasis { Digit, Function, Confirm }
+private enum class Emphasis { Digit, Function }
 
 /**
  * A hand-drawn grid, roughly forty lines of layout. No system keyboard is ever
@@ -56,7 +57,7 @@ private enum class Emphasis { Digit, Function, Confirm }
 @Composable
 fun Keypad(
     onKey: (KeyAction) -> Unit,
-    confirmEnabled: Boolean,
+    equalsEnabled: Boolean,
     modifier: Modifier = Modifier,
 ) {
     // Read through LocalConfiguration, not Locale.getDefault(), so switching
@@ -87,7 +88,11 @@ fun Keypad(
         listOf(
             Key(separator.toString(), KeyAction.Separator),
             Key("0", KeyAction.Digit('0'), span = 2f),
-            Key("✓", KeyAction.Confirm, Emphasis.Confirm),
+            // "=" and nothing more. This key used to be a filled green tick,
+            // which is the shape and the colour of a commit button — so the one
+            // control that looked like it finished the expense actually only
+            // finished the arithmetic. Saving now has a button of its own.
+            Key("=", KeyAction.Equals, Emphasis.Function),
         ),
     )
 
@@ -103,7 +108,7 @@ fun Keypad(
                 row.forEach { key ->
                     KeyButton(
                         key = key,
-                        enabled = key.action != KeyAction.Confirm || confirmEnabled,
+                        enabled = key.action != KeyAction.Equals || equalsEnabled,
                         onClick = { onKey(key.action) },
                         modifier = Modifier.weight(key.span).fillMaxSize(),
                     )
@@ -124,13 +129,11 @@ private fun KeyButton(
     val background = when (key.emphasis) {
         Emphasis.Digit -> scheme.surface
         Emphasis.Function -> scheme.surfaceVariant
-        Emphasis.Confirm -> if (enabled) scheme.primary else scheme.surfaceVariant
     }
     val foreground = when (key.emphasis) {
         Emphasis.Digit -> scheme.onSurface
         Emphasis.Function -> scheme.onSurfaceVariant
-        Emphasis.Confirm -> if (enabled) scheme.onPrimary else scheme.onSurfaceVariant.copy(alpha = 0.5f)
-    }
+    }.let { if (enabled) it else it.copy(alpha = 0.4f) }
 
     Box(
         modifier = modifier
@@ -143,11 +146,6 @@ private fun KeyButton(
             is KeyAction.Backspace -> Icon(
                 Icons.AutoMirrored.Filled.Backspace,
                 contentDescription = stringResource(R.string.add_backspace),
-                tint = foreground,
-            )
-            is KeyAction.Confirm -> Icon(
-                Icons.Filled.Check,
-                contentDescription = stringResource(R.string.add_save),
                 tint = foreground,
             )
             else -> Text(

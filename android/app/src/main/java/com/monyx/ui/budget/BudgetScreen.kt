@@ -23,8 +23,6 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.KeyboardArrowLeft
-import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -60,6 +58,7 @@ import com.monyx.data.CategoryEntity
 import com.monyx.data.Dates
 import com.monyx.data.Money
 import com.monyx.sync.SyncWorker
+import com.monyx.ui.MonthSwitcher
 import com.monyx.ui.theme.Palette
 import kotlinx.coroutines.launch
 
@@ -132,15 +131,11 @@ fun BudgetScreen(
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             item {
-                Column {
-                    Text(stringResource(R.string.budget_title), style = MaterialTheme.typography.headlineSmall)
-                    Spacer(modifier = Modifier.height(12.dp))
-                    MonthSwitcher(
-                        period = period,
-                        onPrevious = { viewModel.previousMonth() },
-                        onNext = { viewModel.nextMonth() },
-                    )
-                }
+                MonthSwitcher(
+                    label = Dates.monthLabel(period),
+                    onPrevious = { viewModel.previousMonth() },
+                    onNext = { viewModel.nextMonth() },
+                )
             }
 
             item {
@@ -437,23 +432,6 @@ private fun EditPlanDialog(
             TextButton(onClick = onDismiss) { Text(stringResource(R.string.settings_cancel)) }
         },
     )
-}
-
-@Composable
-private fun MonthSwitcher(period: String, onPrevious: () -> Unit, onNext: () -> Unit) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        IconButton(onClick = onPrevious) {
-            Icon(Icons.Filled.KeyboardArrowLeft, contentDescription = stringResource(R.string.overview_previous_month))
-        }
-        Text(Dates.monthLabel(period), style = MaterialTheme.typography.titleMedium)
-        IconButton(onClick = onNext) {
-            Icon(Icons.Filled.KeyboardArrowRight, contentDescription = stringResource(R.string.overview_next_month))
-        }
-    }
 }
 
 @Composable

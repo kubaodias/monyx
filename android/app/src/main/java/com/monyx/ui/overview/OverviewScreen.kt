@@ -26,14 +26,11 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.KeyboardArrowLeft
-import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.ShowChart
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -63,6 +60,7 @@ import com.monyx.data.CategorySpend
 import com.monyx.data.Dates
 import com.monyx.data.Money
 import com.monyx.data.TransactionListItem
+import com.monyx.ui.MonthSwitcher
 import com.monyx.ui.theme.Palette
 
 /**
@@ -85,7 +83,7 @@ fun OverviewScreen(
     ) {
         item {
             MonthSwitcher(
-                period = state.period,
+                label = Dates.monthLabel(state.period),
                 onPrevious = viewModel::previousMonth,
                 onNext = viewModel::nextMonth,
             )
@@ -122,33 +120,6 @@ fun OverviewScreen(
                 recent = state.recent,
                 onOpenTransaction = { onOpenTransactions(null, state.period) },
                 onSeeAll = { onOpenTransactions(null, state.period) },
-            )
-        }
-    }
-}
-
-@Composable
-private fun MonthSwitcher(period: String, onPrevious: () -> Unit, onNext: () -> Unit) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        IconButton(onClick = onPrevious) {
-            Icon(
-                imageVector = Icons.Filled.KeyboardArrowLeft,
-                contentDescription = stringResource(R.string.overview_previous_month),
-            )
-        }
-        Text(
-            text = Dates.monthLabel(period),
-            style = MaterialTheme.typography.titleLarge,
-            fontWeight = FontWeight.SemiBold,
-        )
-        IconButton(onClick = onNext) {
-            Icon(
-                imageVector = Icons.Filled.KeyboardArrowRight,
-                contentDescription = stringResource(R.string.overview_next_month),
             )
         }
     }

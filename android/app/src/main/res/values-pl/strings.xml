@@ -22,7 +22,8 @@
     <!-- Add screen -->
     <string name="add_expense">Wydatek</string>
     <string name="add_income">Przychód</string>
-    <string name="add_save">Zapisz</string>
+    <string name="add_save_expense">Zapisz wydatek · %1$s</string>
+    <string name="add_save_income">Zapisz przychód · %1$s</string>
     <string name="add_note_hint">Notatka</string>
     <string name="add_pick_category">Wybierz kategorię</string>
     <string name="add_pick_account">Konto</string>
@@ -68,7 +69,7 @@
     <string name="transactions_undo">Cofnij</string>
     <string name="transactions_pending">Czeka na wysłanie</string>
     <string name="transactions_rejected">Odrzucona przez serwer</string>
-    <string name="transactions_filter_period">Okres</string>
+    <string name="transactions_all_time">Cały okres</string>
     <string name="transactions_delete_confirm_title">Usunąć transakcję?</string>
     <string name="transactions_delete_confirm_message">Tej operacji nie można cofnąć.</string>
 
@@ -81,7 +82,6 @@
     <string name="budget_plan_spent">Wydane</string>
     <string name="budget_plan_left_to_spend">Pozostało do wydania</string>
     <string name="budget_plan_assigned_hint">Już przypisane: %1$s · do rozdysponowania: %2$s</string>
-    <string name="budget_title">Budżet</string>
     <string name="budget_empty">Nie ustawiono jeszcze żadnych limitów</string>
     <string name="budget_set_limit">Ustaw limit</string>
     <string name="budget_edit_limit">Zmień limit</string>

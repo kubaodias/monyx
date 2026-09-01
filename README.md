@@ -31,6 +31,13 @@ what makes the calculator possible — `60 +` stays on screen while the second
 operand is typed, instead of the running total vanishing the moment you press
 an operator.
 
+Committing the expense is a button of its own, the width of the screen, with the
+amount already on it. It used to be a filled tick in the corner of the keypad —
+exactly where a calculator puts `=`, so the key that ended the entry and the key
+that ended the sum were the same shape in the same place. The tick is honestly
+`=` now, and when the button cannot save it names what is still missing instead
+of sitting there grey.
+
 Tapping the balance turns the card over. The back draws the last thirty days as
 one connected line: payday is the step up, and the long grind down to the next
 one is the month being lived. Green above break-even, red below, cut at the zero
@@ -40,6 +47,11 @@ was on that evening and what moved on the day; dragging along it walks the
 month. Every day is a vertex even when nothing happened on it, and the line is
 never smoothed, because a curve fitted between two points invents balances the
 household never had.
+
+One month, an arrow either side, and the same control on Overview, History and
+Budget. History used to choose its period from a dropdown that stopped six
+months back; the arrows have no floor. Blank — every month there has ever been —
+is still where that tab opens, and `Clear filters` is the way back to it.
 
 Interface English, category names Polish: the names are rows that sync to every
 device, so they are data the family owns, not translated copy. Switching the

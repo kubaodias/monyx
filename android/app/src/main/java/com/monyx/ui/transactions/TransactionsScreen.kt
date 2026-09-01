@@ -67,6 +67,7 @@ import com.monyx.data.Dates
 import com.monyx.data.Money
 import com.monyx.data.TransactionEntity
 import com.monyx.data.TransactionListItem
+import com.monyx.ui.MonthSwitcher
 import com.monyx.ui.theme.Palette
 import kotlinx.coroutines.launch
 
@@ -119,6 +120,19 @@ fun TransactionsScreen(
 
     Scaffold(snackbarHost = { SnackbarHost(snackbarHostState) }) { padding ->
         Column(modifier = Modifier.fillMaxSize().padding(padding)) {
+            MonthSwitcher(
+                // Blank is every month there has ever been, which is what the
+                // tab opens on and what "Clear filters" comes back to.
+                label = if (period.isBlank()) {
+                    stringResource(R.string.transactions_all_time)
+                } else {
+                    Dates.monthLabel(period)
+                },
+                onPrevious = { viewModel.stepMonth(-1) },
+                onNext = { viewModel.stepMonth(1) },
+                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+            )
+
             OutlinedTextField(
                 value = query,
                 onValueChange = viewModel::setQuery,
@@ -159,11 +173,6 @@ fun TransactionsScreen(
                     accounts = accounts,
                     selectedId = accountId,
                     onSelect = viewModel::setAccountFilter,
-                )
-                PeriodFilterChip(
-                    options = viewModel.periodOptions,
-                    selectedPeriod = period,
-                    onSelect = viewModel::setPeriodFilter,
                 )
                 if (hasActiveFilters) {
                     AssistChip(
@@ -314,37 +323,6 @@ private fun AccountFilterChip(
                 DropdownMenuItem(
                     text = { Text(account.name) },
                     onClick = { onSelect(account.id); expanded = false },
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun PeriodFilterChip(
-    options: List<PeriodOption>,
-    selectedPeriod: String,
-    onSelect: (String?) -> Unit,
-) {
-    var expanded by remember { mutableStateOf(false) }
-    val label = options.firstOrNull { it.period == selectedPeriod }?.label
-        ?: stringResource(R.string.transactions_filter_period)
-    Box {
-        FilterChip(
-            selected = selectedPeriod.isNotBlank(),
-            onClick = { expanded = true },
-            label = { Text(label) },
-            trailingIcon = { Icon(Icons.Filled.ArrowDropDown, contentDescription = null) },
-        )
-        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-            DropdownMenuItem(
-                text = { Text(stringResource(R.string.transactions_filter_all)) },
-                onClick = { onSelect(null); expanded = false },
-            )
-            options.forEach { option ->
-                DropdownMenuItem(
-                    text = { Text(option.label) },
-                    onClick = { onSelect(option.period); expanded = false },
                 )
             }
         }

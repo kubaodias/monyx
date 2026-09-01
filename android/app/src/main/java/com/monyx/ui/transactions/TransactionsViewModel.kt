@@ -20,8 +20,19 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
-/** One selectable period filter option: "YYYY-MM" plus a Polish label to show for it. */
-data class PeriodOption(val period: String, val label: String)
+/**
+ * The month a step of [delta] lands on.
+ *
+ * Blank is "all time", and it is the state the tab opens in — a ledger with no
+ * month on it is the right default for a list you search. An arrow pressed there
+ * has no month to move from, so either arrow drops into [fallback] rather than
+ * guessing a direction out of nothing.
+ *
+ * Pure, and unbounded on purpose: the dropdown this replaced stopped six months
+ * back, which is roughly where "when did we last pay for that?" starts.
+ */
+fun steppedPeriod(current: String, delta: Long, fallback: String = Dates.currentPeriod()): String =
+    if (current.isBlank()) fallback else Dates.shiftPeriod(current, delta)
 
 /**
  * Backs the Transactions screen: chronological list, plain-LIKE
@@ -55,16 +66,6 @@ class TransactionsViewModel(
 
     val accounts: StateFlow<List<AccountEntity>> = repository.accounts()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
-
-    /** Current month plus the five before it — enough to find anything recent
-     *  without paging through every period the household has ever used. */
-    val periodOptions: List<PeriodOption> = buildList {
-        var p = Dates.currentPeriod()
-        repeat(6) {
-            add(PeriodOption(p, Dates.monthLabel(p)))
-            p = Dates.shiftPeriod(p, -1)
-        }
-    }
 
     @OptIn(ExperimentalCoroutinesApi::class)
     val transactions: StateFlow<List<TransactionListItem>> =
@@ -100,6 +101,11 @@ class TransactionsViewModel(
 
     fun setPeriodFilter(period: String?) {
         _period.value = period.orEmpty()
+    }
+
+    /** One month back or forward, with no floor and no ceiling. */
+    fun stepMonth(delta: Long) {
+        _period.value = steppedPeriod(_period.value, delta)
     }
 
     /**

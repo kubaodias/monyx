@@ -25,6 +25,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.Wallet
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -55,6 +57,7 @@ import com.monyx.R
 import com.monyx.data.AccountEntity
 import com.monyx.data.CategoryEntity
 import com.monyx.data.Dates
+import com.monyx.data.Money
 import com.monyx.ui.theme.Palette
 import java.time.Instant
 import java.time.LocalDate
@@ -143,22 +146,16 @@ fun AddScreen(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp),
         )
 
-        SaveBlocker(state = state, hasMember = memberId != null)
-
         Keypad(
-            onKey = { action ->
-                if (action == KeyAction.Confirm) {
-                    if (state.amount.hasPendingOperation) {
-                        viewModel.onKey(action)
-                    } else if (state.canSave && memberId != null) {
-                        viewModel.save(memberId, onSaved)
-                    }
-                } else {
-                    viewModel.onKey(action)
-                }
-            },
-            confirmEnabled = state.amount.hasPendingOperation || (state.canSave && memberId != null),
-            modifier = Modifier.height(280.dp),
+            onKey = viewModel::onKey,
+            equalsEnabled = state.amount.hasPendingOperation,
+            modifier = Modifier.height(236.dp),
+        )
+
+        SaveBar(
+            state = state,
+            hasMember = memberId != null,
+            onSave = { memberId?.let { viewModel.save(it, onSaved) } },
         )
     }
 
@@ -221,41 +218,57 @@ private fun KindSelector(selected: EntryKind, onSelect: (EntryKind) -> Unit) {
 }
 
 /**
- * Why the tick is grey.
+ * The one control that commits the expense, and it says so in words.
  *
- * Saving needs an amount, an account AND a category, and until this line existed
- * the third one was invisible: you typed a price, typed a note, and the only
- * feedback was a dead button with no explanation. The category grid is on
- * screen the whole time, so the answer was always there — but a disabled control
- * that will not say what it wants is not a hint, it is a guessing game.
+ * It used to be the tick in the corner of the keypad — filled, primary-coloured,
+ * sitting exactly where a calculator puts "=". So the key that ended the ENTRY
+ * looked identical to the key that ended the SUM, and nothing on screen said
+ * which of the two a tap was about to do. The tick is now honestly "=", grey
+ * with the other function keys, and this is the only filled thing on the screen.
  *
- * The row keeps its height when there is nothing to say, so the keypad never
- * moves under a thumb that is already on its way down.
+ * When it cannot save it says what is missing instead of sitting there dead:
+ * saving needs an amount, an account AND a category, and the third one used to
+ * be invisible — you typed a price, typed a note, and the only feedback was a
+ * grey button that would not explain itself.
+ *
+ * The amount is on the label because a save button is the last thing read before
+ * money is written down, and "47,50 zł" there catches the mis-tap that "Save"
+ * never would.
  */
 @Composable
-private fun SaveBlocker(state: AddUiState, hasMember: Boolean) {
+private fun SaveBar(state: AddUiState, hasMember: Boolean, onSave: () -> Unit) {
     // In the order the screen is filled in, so it names the NEXT thing to do
     // rather than an arbitrary one of several.
-    val message = when {
+    val blocker = when {
         state.amountMinor <= 0 -> stringResource(R.string.add_needs_amount)
         state.accountId == null -> stringResource(R.string.add_needs_account)
         state.categoryId == null -> stringResource(R.string.add_needs_category)
         else -> null
     }
-    Box(
-        modifier = Modifier.fillMaxWidth().height(24.dp).padding(horizontal = 16.dp),
-        contentAlignment = Alignment.CenterStart,
+    val label = blocker ?: stringResource(
+        if (state.kind == EntryKind.Income) R.string.add_save_income else R.string.add_save_expense,
+        // The evaluated total, not the digits on screen: with "60 +" pending and
+        // 40 typed, this reads 100,00 — which is what pressing it will write.
+        Money.formatWithCurrency(state.amountMinor),
+    )
+
+    Button(
+        onClick = onSave,
+        enabled = blocker == null && hasMember,
+        shape = RoundedCornerShape(18.dp),
+        colors = ButtonDefaults.buttonColors(
+            // Material greys disabled text to 38% opacity, which is fine for a
+            // label nobody needs to read and wrong for one that is the entire
+            // instruction. Disabled here means "unfinished", not "unavailable".
+            disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+            disabledContentColor = MaterialTheme.colorScheme.primary,
+        ),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 12.dp, vertical = 6.dp)
+            .height(50.dp),
     ) {
-        // A pending sum is not a blocked save — the tick evaluates it, and
-        // saying "pick a category" mid-addition would be answering a question
-        // nobody asked yet.
-        if (message != null && hasMember && !state.amount.hasPendingOperation) {
-            Text(
-                text = message,
-                fontSize = 13.sp,
-                color = MaterialTheme.colorScheme.primary,
-            )
-        }
+        Text(text = label, fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
     }
 }
 
@@ -266,7 +279,7 @@ private fun SaveBlocker(state: AddUiState, hasMember: Boolean) {
 @Composable
 private fun AmountDisplay(state: AddUiState) {
     Column(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 12.dp),
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 8.dp),
         horizontalAlignment = Alignment.End,
     ) {
         // The running total, not just the sign: "60,00 +" while the second
