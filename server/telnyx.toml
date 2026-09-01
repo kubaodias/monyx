@@ -5,7 +5,7 @@ compatibility_date = "2026-05-01"
 # The shared source of truth. Bound as env.DB: bindings come from
 # `import { env } from "@telnyx/edge-runtime"`, never from the fetch argument.
 [storage.sqldb.DB]
-id = "f5f603d7-0032-45a1-8951-bd0ba4a002f5"
+id = "0f99e845-cb59-413c-b6a3-0ffe9ac22160"
 
 # Caches the FCM OAuth access token (key "fcm/token" — KV keys may not
 # contain a colon). The cached value carries its own expires_at.

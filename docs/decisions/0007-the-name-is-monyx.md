@@ -61,9 +61,19 @@ functions, SQL databases or KV namespaces on v0.5.1, which is the same wall
 0003 hit and worked around by recreating the resources while they were empty.
 They are not empty now, so `monyx`, `monyx-kv` and `monyx-api` were created
 alongside the old three and the data copied across — 97 rows over 11 tables,
-verified row by row and object by object rather than trusted, because the
-replay reported HTTP 500 after in fact applying cleanly. Secrets are
+verified row by row and object by object rather than trusted. Secrets are
 organisation-scoped and bound by name with nothing re-entered.
+
+That verification is why this worked. The first `monyx` database was faulty
+from creation: every write returned `ShipError: write committed but snapshot
+ship failed`, meaning it committed in memory, read back correctly, and never
+persisted. `GET /health` was 200 throughout. What exposed it was the end-to-end
+smoke test — enrolment returned `internal_error` while still writing the member,
+the device and burning the invite, which on a phone reads as "try again" with
+the code already spent. The database was deleted and rebuilt, and the rule
+learned is that a new database gets a write probe BEFORE it is trusted with a
+copy, because on this platform a failed write and a successful one can look the
+same from either side.
 
 `monio-api`, `monio` and `monio-kv` are left running and untouched. That is not
 an oversight to tidy up later: every phone still has the old app installed and
