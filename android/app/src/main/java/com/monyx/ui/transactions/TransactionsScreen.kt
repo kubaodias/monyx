@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -116,21 +117,26 @@ fun TransactionsScreen(
     val deletedMessage = stringResource(R.string.transactions_deleted)
     val savedMessage = stringResource(R.string.add_saved)
 
-    val hasActiveFilters = query.isNotBlank() || categoryId != null || accountId != null || period.isNotBlank()
+    // The month is not in here. It is the scope of the screen, always set, the
+    // way it is on Overview and Budget — a chip offering to clear it would be
+    // offering to clear something that cannot be empty.
+    val hasActiveFilters = query.isNotBlank() || categoryId != null || accountId != null
 
-    Scaffold(snackbarHost = { SnackbarHost(snackbarHostState) }) { padding ->
+    Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
+        // Zero, because the bar this screen lives in has already applied them.
+        // Taking the status bar inset a second time pushed the switcher a
+        // centimetre below where the identical control sits on Overview.
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
+    ) { padding ->
         Column(modifier = Modifier.fillMaxSize().padding(padding)) {
             MonthSwitcher(
-                // Blank is every month there has ever been, which is what the
-                // tab opens on and what "Clear filters" comes back to.
-                label = if (period.isBlank()) {
-                    stringResource(R.string.transactions_all_time)
-                } else {
-                    Dates.monthLabel(period)
-                },
+                label = Dates.monthLabel(period),
                 onPrevious = { viewModel.stepMonth(-1) },
                 onNext = { viewModel.stepMonth(1) },
-                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                // Matches Overview's contentPadding exactly. The switcher is the
+                // same control on three screens; it has to start at the same x.
+                modifier = Modifier.padding(horizontal = 20.dp, vertical = 20.dp),
             )
 
             OutlinedTextField(

@@ -126,11 +126,16 @@ fun OverviewScreen(
 }
 
 /**
- * The month's balance on the front, the thirty days behind it on the back.
+ * The month's balance on the front, how it got there on the back.
  *
  * A flip rather than a second card or a screen of its own, because it is one
  * fact seen two ways: the running total on the back is the number on the front,
  * arriving. Two cards side by side would have claimed two separate facts.
+ *
+ * Which is why the same three figures are printed on both faces. The back used
+ * to headline the thirty-day net instead, so a September that had not started
+ * yet read 0,00 on the front and 4 447,00 on the back — one card, two answers,
+ * and no way to tell from either which question it had answered.
  */
 @Composable
 private fun SummaryCard(income: Long, expense: Long, balance: Long, trend: TrendSeries) {
@@ -169,6 +174,9 @@ private fun SummaryCard(income: Long, expense: Long, balance: Long, trend: Trend
             if (showingBack) {
                 TrendFace(
                     trend = trend,
+                    income = income,
+                    expense = expense,
+                    balance = balance,
                     focused = focused,
                     onFocus = { focused = it },
                     onBack = {
@@ -238,14 +246,21 @@ private fun TotalsFace(income: Long, expense: Long, balance: Long, onOpenTrend: 
 /**
  * The back: where the balance stood, and what moved to put it there.
  *
- * Header and footer always describe the SAME scope — the whole window, or the
- * one day being pointed at. Letting the big number mean the window while the
- * two figures under the chart meant a single day would have been two answers
- * to one question.
+ * Untouched, it prints the month's own three figures — the same three the front
+ * prints — so turning the card over never changes a number. All the back adds
+ * is the path: the line arrives at the headline rather than restating it.
+ *
+ * Touched, header and footer switch together to the one day being pointed at,
+ * and the header says so. Letting the big number mean the month while the two
+ * figures under the chart meant a single day would have been two answers to one
+ * question.
  */
 @Composable
 private fun TrendFace(
     trend: TrendSeries,
+    income: Long,
+    expense: Long,
+    balance: Long,
     focused: Int?,
     onFocus: (Int?) -> Unit,
     onBack: () -> Unit,
@@ -256,10 +271,10 @@ private fun TrendFace(
     // moved on the day itself — a bare date would have read as both.
     val label = point
         ?.let { stringResource(R.string.overview_trend_through, Dates.dayLabel(it.date.toString())) }
-        ?: stringResource(R.string.overview_trend)
-    val headline = if (point == null) trend.netMinor else trend.runningAt(focused)
-    val income = point?.incomeMinor ?: trend.incomeMinor
-    val expense = point?.expenseMinor ?: trend.expenseMinor
+        ?: stringResource(R.string.overview_balance)
+    val headline = if (point == null) balance else trend.runningAt(focused)
+    val shownIncome = point?.incomeMinor ?: income
+    val shownExpense = point?.expenseMinor ?: expense
 
     Column(modifier = Modifier.fillMaxWidth().padding(24.dp)) {
         Row(
@@ -294,12 +309,12 @@ private fun TrendFace(
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             SummaryStat(
                 label = stringResource(R.string.overview_income),
-                amountMinor = income,
+                amountMinor = shownIncome,
                 tint = MaterialTheme.colorScheme.primary,
             )
             SummaryStat(
                 label = stringResource(R.string.overview_expenses),
-                amountMinor = expense,
+                amountMinor = shownExpense,
                 tint = MaterialTheme.colorScheme.error,
             )
         }

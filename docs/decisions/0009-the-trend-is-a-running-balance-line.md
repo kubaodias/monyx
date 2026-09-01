@@ -1,6 +1,6 @@
 # 0009 — The trend is a running-balance line, not a chart of daily amounts
 
-**Date:** 2026-09-01 · **Status:** accepted
+**Date:** 2026-09-01 · **Status:** accepted, amended by [0012](0012-both-faces-of-the-balance-card-agree.md)
 
 ## Context
 

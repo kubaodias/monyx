@@ -8,7 +8,6 @@ import com.monyx.ui.budget.PlanState
 import com.monyx.ui.overview.PieSlice
 import com.monyx.ui.overview.sliceIdAt
 import com.monyx.ui.theme.Palette
-import com.monyx.ui.transactions.steppedPeriod
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNull
@@ -229,47 +228,5 @@ class InteractionTest {
     fun `icon and colour keys are unique`() {
         assertEquals(Palette.icons.size, Palette.icons.map { it.first }.toSet().size)
         assertEquals(Palette.colors.size, Palette.colors.map { it.first }.toSet().size)
-    }
-
-    // The Transactions month switcher. The dropdown it replaced offered the
-    // current month and five behind it and nothing else, so a receipt from last
-    // spring could not be filtered to at all.
-
-    @Test
-    fun `an arrow pressed on all time lands on the month it falls back to`() {
-        // Either arrow. There is no month to move away from, so there is no
-        // direction to move in — both mean "start somewhere".
-        assertEquals("2026-09", steppedPeriod("", -1, fallback = "2026-09"))
-        assertEquals("2026-09", steppedPeriod("", 1, fallback = "2026-09"))
-    }
-
-    @Test
-    fun `a step from a month moves one month`() {
-        assertEquals("2026-08", steppedPeriod("2026-09", -1))
-        assertEquals("2026-10", steppedPeriod("2026-09", 1))
-    }
-
-    @Test
-    fun `stepping crosses the year in both directions`() {
-        assertEquals("2025-12", steppedPeriod("2026-01", -1))
-        assertEquals("2027-01", steppedPeriod("2026-12", 1))
-    }
-
-    @Test
-    fun `there is no floor on how far back the arrows reach`() {
-        // The whole point of replacing the dropdown: 2019 is reachable, which is
-        // where "when did we last pay for that?" tends to live.
-        assertEquals("2019-03", steppedPeriod("2019-04", -1))
-    }
-
-    @Test
-    fun `stepping never lands back on all time`() {
-        // Blank is a state only the tab itself and Clear filters can produce.
-        // An arrow that could reach it would strand the other arrow: from all
-        // time both go forwards.
-        var period = "2026-09"
-        repeat(24) { period = steppedPeriod(period, -1) }
-        assertNotEquals("", period)
-        assertEquals("2024-09", period)
     }
 }

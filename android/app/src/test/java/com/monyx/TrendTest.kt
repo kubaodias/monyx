@@ -29,6 +29,9 @@ class TrendTest {
     private fun day(date: String, income: Long = 0, expense: Long = 0) =
         DailyTotals(date, income, expense)
 
+    private fun ClosedRange<LocalDate>.dayCount(): Int =
+        (java.time.temporal.ChronoUnit.DAYS.between(start, endInclusive) + 1).toInt()
+
     // ------------------------------------------------------------- the window
 
     @Test
@@ -41,7 +44,9 @@ class TrendTest {
     fun `a month that is over ends on its own last day`() {
         val window = trendWindow("2026-07", today)
         assertEquals(LocalDate.of(2026, 7, 31), window.endInclusive)
-        assertEquals(LocalDate.of(2026, 7, 2), window.start)
+        // Not the 2nd. July has 31 days, so a plain thirty would start on the
+        // 2nd and the run would never meet the 1st it has to restart on.
+        assertEquals(LocalDate.of(2026, 7, 1), window.start)
     }
 
     /**
@@ -53,16 +58,33 @@ class TrendTest {
     fun `a month in the future stays in its own month`() {
         val window = trendWindow("2026-10", today)
         assertEquals(LocalDate.of(2026, 10, 31), window.endInclusive)
-        assertEquals(LocalDate.of(2026, 10, 2), window.start)
+        assertEquals(LocalDate.of(2026, 10, 1), window.start)
     }
 
+    /**
+     * Thirty is the floor, not the length. A 31-day month viewed on its last day
+     * needs one more, or the window starts on the 2nd and never sees the 1st —
+     * and the card's two faces would then disagree by whatever was spent on it.
+     */
     @Test
-    fun `every window is exactly thirty days long, February included`() {
+    fun `a window is at least thirty days and always reaches the first of its month`() {
         listOf("2026-02", "2026-07", "2026-09", "2026-12").forEach { period ->
             val window = trendWindow(period, today)
             val series = trendSeries(emptyList(), window.start, window.endInclusive)
-            assertEquals(period, TREND_DAYS, series.points.size)
+            assertTrue(period, series.points.size >= TREND_DAYS)
+            assertTrue(period, series.points.size <= TREND_DAYS + 1)
+            assertFalse(period, window.start.isAfter(Dates.firstDayOf(period)))
         }
+    }
+
+    @Test
+    fun `thirty is enough for a short month and one too few for a long one`() {
+        // February on the 28th: 30 January is already before the 1st.
+        assertEquals(30, trendWindow("2026-02", today).let { it.start..it.endInclusive }.dayCount())
+        // December on the 31st: thirty would start on the 2nd, so it is 31.
+        assertEquals(31, trendWindow("2026-12", today).let { it.start..it.endInclusive }.dayCount())
+        // September while today is the 1st: nothing to stretch for.
+        assertEquals(30, trendWindow("2026-09", today).let { it.start..it.endInclusive }.dayCount())
     }
 
     // ------------------------------------------------------------ gap filling
@@ -99,7 +121,7 @@ class TrendTest {
             LocalDate.of(2026, 8, 3),
             LocalDate.of(2026, 8, 4),
         )
-        assertEquals(1_000L, series.expenseMinor)
+        assertEquals(listOf(1_000L, 0L), series.points.map { it.expenseMinor })
     }
 
     /** Callers pass a window, not a list; being handed a backwards one must not
@@ -129,25 +151,91 @@ class TrendTest {
     }
 
     @Test
-    fun `the last running figure is the window's net, which is what the card shows`() {
+    fun `the last running figure is where the line ends, which is what the card shows`() {
         val series = trendSeries(
             listOf(day("2026-08-03", income = 3_000), day("2026-08-04", expense = 8_000)),
             LocalDate.of(2026, 8, 3),
             LocalDate.of(2026, 8, 4),
         )
-        assertEquals(-5_000L, series.netMinor)
-        assertEquals(series.netMinor, series.runningMinor.last())
-        assertEquals(series.netMinor, series.runningAt(1))
+        assertEquals(-5_000L, series.monthToDateMinor)
+        assertEquals(series.monthToDateMinor, series.runningMinor.last())
+        assertEquals(series.monthToDateMinor, series.runningAt(1))
     }
 
     @Test
-    fun `pointing past the end of the series falls back to the window's net`() {
+    fun `pointing past the end of the series falls back to where the line ends`() {
         val series = trendSeries(
             listOf(day("2026-08-03", income = 3_000)),
             LocalDate.of(2026, 8, 3),
             LocalDate.of(2026, 8, 4),
         )
-        assertEquals(series.netMinor, series.runningAt(7))
+        assertEquals(series.monthToDateMinor, series.runningAt(7))
+    }
+
+    // --------------------------------------------------- the turn of the month
+
+    /**
+     * The reason any of this exists. The card's front prints the SELECTED
+     * month's balance; before the reset the back headlined the whole window's
+     * net, so a September that had barely started read 0,00 on one face and
+     * last month's payday on the other.
+     */
+    @Test
+    fun `the run restarts on the first, so the line ends on the month's own balance`() {
+        val series = trendSeries(
+            listOf(
+                day("2026-08-30", income = 800_000),
+                day("2026-08-31", expense = 50_000),
+                day("2026-09-01", expense = 12_000),
+                day("2026-09-02", expense = 3_000),
+            ),
+            LocalDate.of(2026, 8, 30),
+            LocalDate.of(2026, 9, 2),
+        )
+        assertEquals(
+            listOf(800_000L, 750_000L, -12_000L, -15_000L),
+            series.runningMinor,
+        )
+        // September's balance, not the four days' net of 735 000.
+        assertEquals(-15_000L, series.monthToDateMinor)
+    }
+
+    @Test
+    fun `the boundary is marked where the run restarts`() {
+        val across = trendSeries(
+            emptyList(),
+            LocalDate.of(2026, 8, 30),
+            LocalDate.of(2026, 9, 2),
+        )
+        assertEquals(2, across.monthStartIndex)
+    }
+
+    /** A window that never crosses a 1st has nothing to mark, and a window that
+     *  BEGINS on one has already restarted before its first point. */
+    @Test
+    fun `a window inside one month has no boundary to draw`() {
+        assertNull(
+            trendSeries(emptyList(), LocalDate.of(2026, 8, 3), LocalDate.of(2026, 8, 20))
+                .monthStartIndex,
+        )
+        assertNull(
+            trendSeries(emptyList(), LocalDate.of(2026, 8, 1), LocalDate.of(2026, 8, 20))
+                .monthStartIndex,
+        )
+    }
+
+    /** The stretch and the reset together: on the 31st the 1st is still in the
+     *  window, so the month's opening day is counted. */
+    @Test
+    fun `the last day of a long month still counts the first`() {
+        val period = "2026-07"
+        val window = trendWindow(period, today)
+        val series = trendSeries(
+            listOf(day("2026-07-01", expense = 20_000), day("2026-07-15", expense = 5_000)),
+            window.start,
+            window.endInclusive,
+        )
+        assertEquals(-25_000L, series.monthToDateMinor)
     }
 
     // ----------------------------------------------------- the line's range
@@ -234,7 +322,7 @@ class TrendTest {
             LocalDate.of(2026, 8, 3),
             LocalDate.of(2026, 8, 3),
         )
-        assertEquals(0L, series.netMinor)
+        assertEquals(0L, series.monthToDateMinor)
         assertEquals(listOf(0L), series.runningMinor)
         assertFalse(series.isEmpty)
         assertEquals(400_000L, series.points.first().incomeMinor)

@@ -25,8 +25,7 @@
     <!-- Add screen -->
     <string name="add_expense">Expense</string>
     <string name="add_income">Income</string>
-    <string name="add_save_expense">Save expense · %1$s</string>
-    <string name="add_save_income">Save income · %1$s</string>
+    <string name="add_save_amount">Save · %1$s</string>
     <string name="add_note_hint">Note</string>
     <string name="add_pick_category">Pick a category</string>
     <string name="add_pick_account">Account</string>
@@ -52,9 +51,8 @@
     <string name="overview_previous_month">Previous month</string>
     <string name="overview_next_month">Next month</string>
     <string name="overview_percent">%1$d%%</string>
-    <string name="overview_trend">Last 30 days</string>
     <string name="overview_trend_through">Through %1$s</string>
-    <string name="overview_trend_empty">Nothing moved in these 30 days</string>
+    <string name="overview_trend_empty">Nothing moved here yet</string>
     <string name="overview_show_trend">Show the last 30 days</string>
     <string name="overview_show_totals">Back to the month\'s totals</string>
 
@@ -72,7 +70,6 @@
     <string name="transactions_undo">Undo</string>
     <string name="transactions_pending">Waiting to sync</string>
     <string name="transactions_rejected">Rejected by the server</string>
-    <string name="transactions_all_time">All time</string>
     <string name="transactions_delete_confirm_title">Delete this transaction?</string>
     <string name="transactions_delete_confirm_message">This cannot be undone.</string>
 

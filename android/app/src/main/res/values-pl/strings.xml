@@ -22,8 +22,7 @@
     <!-- Add screen -->
     <string name="add_expense">Wydatek</string>
     <string name="add_income">Przychód</string>
-    <string name="add_save_expense">Zapisz wydatek · %1$s</string>
-    <string name="add_save_income">Zapisz przychód · %1$s</string>
+    <string name="add_save_amount">Zapisz · %1$s</string>
     <string name="add_note_hint">Notatka</string>
     <string name="add_pick_category">Wybierz kategorię</string>
     <string name="add_pick_account">Konto</string>
@@ -49,9 +48,8 @@
     <string name="overview_previous_month">Poprzedni miesiąc</string>
     <string name="overview_next_month">Następny miesiąc</string>
     <string name="overview_percent">%1$d%%</string>
-    <string name="overview_trend">Ostatnie 30 dni</string>
     <string name="overview_trend_through">Do %1$s</string>
-    <string name="overview_trend_empty">W tych 30 dniach nic się nie działo</string>
+    <string name="overview_trend_empty">Jeszcze nic się tu nie działo</string>
     <string name="overview_show_trend">Pokaż ostatnie 30 dni</string>
     <string name="overview_show_totals">Wróć do podsumowania miesiąca</string>
 
@@ -69,7 +67,6 @@
     <string name="transactions_undo">Cofnij</string>
     <string name="transactions_pending">Czeka na wysłanie</string>
     <string name="transactions_rejected">Odrzucona przez serwer</string>
-    <string name="transactions_all_time">Cały okres</string>
     <string name="transactions_delete_confirm_title">Usunąć transakcję?</string>
     <string name="transactions_delete_confirm_message">Tej operacji nie można cofnąć.</string>
 

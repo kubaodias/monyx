@@ -24,19 +24,31 @@ rather than a period, because Transactions has a state that is not a month —
 The Transactions dropdown is gone. The arrows have no floor and no ceiling:
 stepping is `LocalDate.plusMonths`, unbounded in both directions.
 
-Blank stays the Transactions default and still means every month there has ever
-been. An arrow pressed there has no month to move away from, so **both** arrows
-drop into the current month rather than inventing a direction. Nothing can step
-back to blank; the way back is the `Clear filters` chip, which appears the
-moment a month is chosen because a chosen month is an active filter.
+**Transactions always has a month**, defaulting to this one. The repository
+still understands `""` as every month there has ever been, and the first cut of
+this kept it as the tab's default with the label "All time" — but a switcher
+reading "All time" between two month arrows is a control naming a state it
+cannot step back to, and the tab is scoped the way Overview and Budget are
+scoped. So the month is the screen's **scope**, not one of its filters:
+`Clear filters` leaves it alone and the chip does not appear for it.
 
 The Budget title is deleted. A screen does not need to introduce itself when the
 bottom bar is already pointing at it.
 
 ## Consequences
 
-- `PeriodOption` and `periodOptions` are gone, and with them the string
-  `transactions_filter_period`. `budget_title` is gone too.
+- `PeriodOption` and `periodOptions` are gone, and with them the strings
+  `transactions_filter_period` and `transactions_all_time`. `budget_title` is
+  gone too.
+- Search is now month-scoped, which is the one thing lost. Stepping is cheap and
+  unbounded, so finding a receipt is arrows rather than a dropdown's six-month
+  floor — but it is a real trade, made deliberately.
+- All three switchers are placed identically: the arrows start 20dp in and 20dp
+  down on every screen. Budget's list is padded 16 and Overview's 20, so the
+  missing four are added to the switcher rather than to every budget row; and
+  Transactions' own `Scaffold` now declares zero content insets, because the bar
+  it lives in had already applied them and taking the status bar twice pushed it
+  a centimetre below the others.
 - Overview and Budget now share Overview's typography, which is the larger of
   the two — the switcher is the heading of those screens, so it should read like
   one.

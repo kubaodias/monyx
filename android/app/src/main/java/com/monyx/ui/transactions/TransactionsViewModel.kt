@@ -21,20 +21,6 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 /**
- * The month a step of [delta] lands on.
- *
- * Blank is "all time", and it is the state the tab opens in — a ledger with no
- * month on it is the right default for a list you search. An arrow pressed there
- * has no month to move from, so either arrow drops into [fallback] rather than
- * guessing a direction out of nothing.
- *
- * Pure, and unbounded on purpose: the dropdown this replaced stopped six months
- * back, which is roughly where "when did we last pay for that?" starts.
- */
-fun steppedPeriod(current: String, delta: Long, fallback: String = Dates.currentPeriod()): String =
-    if (current.isBlank()) fallback else Dates.shiftPeriod(current, delta)
-
-/**
  * Backs the Transactions screen: chronological list, plain-LIKE
  * search, and filter by category / account / period. Filters live here so the
  * search field and the filter chips share one source of truth and the query
@@ -57,8 +43,16 @@ class TransactionsViewModel(
     private val _accountId = MutableStateFlow<String?>(null)
     val accountId: StateFlow<String?> = _accountId.asStateFlow()
 
-    /** Empty string means "all time" — matches MonyxRepository.transactions' default. */
-    private val _period = MutableStateFlow(initialPeriod.orEmpty())
+    /**
+     * The month on screen. Never blank.
+     *
+     * The repository still understands "" as every month there has ever been,
+     * and the search would arguably be better across all of it — but a switcher
+     * that reads "All time" between two month arrows is a control describing a
+     * state it cannot step back to, and this tab is scoped the way Overview and
+     * Budget are scoped. A month it is, defaulting to this one.
+     */
+    private val _period = MutableStateFlow(initialPeriod?.takeIf { it.isNotBlank() } ?: Dates.currentPeriod())
     val period: StateFlow<String> = _period.asStateFlow()
 
     val categories: StateFlow<List<CategoryEntity>> = repository.categories()
@@ -99,13 +93,9 @@ class TransactionsViewModel(
         _accountId.value = id
     }
 
-    fun setPeriodFilter(period: String?) {
-        _period.value = period.orEmpty()
-    }
-
     /** One month back or forward, with no floor and no ceiling. */
     fun stepMonth(delta: Long) {
-        _period.value = steppedPeriod(_period.value, delta)
+        _period.value = Dates.shiftPeriod(_period.value, delta)
     }
 
     /**
@@ -114,18 +104,23 @@ class TransactionsViewModel(
      * The transactions tab keeps its ViewModel across a tab switch, so a jump
      * in from a budget row or a pie slice cannot pass its filter through the
      * constructor — by then the ViewModel already exists. Tapping the tab
-     * itself sends (null, null) and lands here as a clear.
+     * itself sends (null, null) and lands here as a clear, which returns the
+     * month to this one rather than to no month at all.
      */
     fun applyFilter(categoryId: String?, period: String?) {
         _categoryId.value = categoryId
-        _period.value = period.orEmpty()
+        _period.value = period?.takeIf { it.isNotBlank() } ?: Dates.currentPeriod()
     }
 
+    /**
+     * The month is deliberately left alone. It is the scope of the screen, the
+     * way it is on Overview and Budget — not one of the things "Clear filters"
+     * is offering to undo.
+     */
     fun clearFilters() {
         _query.value = ""
         _categoryId.value = null
         _accountId.value = null
-        _period.value = ""
     }
 
     /**

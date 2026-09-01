@@ -232,8 +232,10 @@ private fun KindSelector(selected: EntryKind, onSelect: (EntryKind) -> Unit) {
  * grey button that would not explain itself.
  *
  * The amount is on the label because a save button is the last thing read before
- * money is written down, and "47,50 zł" there catches the mis-tap that "Save"
- * never would.
+ * money is written down, and "47,50 zł" there catches the mis-tap that the verb
+ * alone never would. The verb does NOT name the kind: Expense/Income is a
+ * segmented control at the top of the same screen, already showing which one is
+ * selected, and repeating it on the button only made the button longer.
  */
 @Composable
 private fun SaveBar(state: AddUiState, hasMember: Boolean, onSave: () -> Unit) {
@@ -246,7 +248,7 @@ private fun SaveBar(state: AddUiState, hasMember: Boolean, onSave: () -> Unit) {
         else -> null
     }
     val label = blocker ?: stringResource(
-        if (state.kind == EntryKind.Income) R.string.add_save_income else R.string.add_save_expense,
+        R.string.add_save_amount,
         // The evaluated total, not the digits on screen: with "60 +" pending and
         // 40 typed, this reads 100,00 — which is what pressing it will write.
         Money.formatWithCurrency(state.amountMinor),

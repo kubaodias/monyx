@@ -174,6 +174,8 @@ object Dates {
 
     fun iso(date: LocalDate): String = date.format(ISO)
 
+    fun firstDayOf(period: String): LocalDate = LocalDate.parse("$period-01")
+
     fun lastDayOf(period: String): LocalDate =
         LocalDate.parse("$period-01").plusMonths(1).minusDays(1)
 

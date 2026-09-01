@@ -9,7 +9,7 @@ Edge Compute. English and Polish interface, switchable in Settings.
   <tr>
     <td align="center" width="16%"><img src="docs/screenshots/add.png" alt="Adding an expense on the built-in keypad" width="100%"></td>
     <td align="center" width="16%"><img src="docs/screenshots/overview.png" alt="Monthly overview with a category breakdown" width="100%"></td>
-    <td align="center" width="16%"><img src="docs/screenshots/trend.png" alt="The balance card flipped over, showing the running balance as a line across thirty days" width="100%"></td>
+    <td align="center" width="16%"><img src="docs/screenshots/trend.png" alt="The balance card flipped over, showing the month's balance arriving as a line" width="100%"></td>
     <td align="center" width="16%"><img src="docs/screenshots/history.png" alt="Transaction history with search and filters" width="100%"></td>
     <td align="center" width="16%"><img src="docs/screenshots/budget.png" alt="Monthly plan and per-category budgets" width="100%"></td>
     <td align="center" width="16%"><img src="docs/screenshots/settings.png" alt="Accounts and categories in settings" width="100%"></td>
@@ -17,7 +17,7 @@ Edge Compute. English and Polish interface, switchable in Settings.
   <tr>
     <td align="center"><b>Add</b><br>the launch screen</td>
     <td align="center"><b>Overview</b><br>where the money goes</td>
-    <td align="center"><b>Trend</b><br>thirty days of balance</td>
+    <td align="center"><b>Trend</b><br>how the balance arrived</td>
     <td align="center"><b>History</b><br>search and filter</td>
     <td align="center"><b>Budget</b><br>plan and limits</td>
     <td align="center"><b>Settings</b><br>accounts, categories</td>
@@ -38,20 +38,24 @@ that ended the sum were the same shape in the same place. The tick is honestly
 `=` now, and when the button cannot save it names what is still missing instead
 of sitting there grey.
 
-Tapping the balance turns the card over. The back draws the last thirty days as
-one connected line: payday is the step up, and the long grind down to the next
-one is the month being lived. Green above break-even, red below, cut at the zero
-line rather than coloured by wherever the month happens to end — a month that
-dipped under and recovered says so. Touching the line answers what the balance
-was on that evening and what moved on the day; dragging along it walks the
-month. Every day is a vertex even when nothing happened on it, and the line is
-never smoothed, because a curve fitted between two points invents balances the
-household never had.
+Tapping the balance turns the card over, and the three figures on it do not
+change — the back adds the path, not a second opinion. The line is the month's
+balance arriving: payday is the step up, and the long grind down to the next one
+is the month being lived. It restarts on the 1st, so the last point on the line
+is the number printed on the front; the thirty days reach back into the month
+before, drawn as their own run with a break at the turn, because a balance does
+not slide from last month's total down to zero overnight. Green above break-even,
+red below, cut at the zero line rather than coloured by wherever the month
+happens to end — a month that dipped under and recovered says so. Touching the
+line answers what the balance was on that evening and what moved on the day;
+dragging along it walks the month. Every day is a vertex even when nothing
+happened on it, and the line is never smoothed, because a curve fitted between
+two points invents balances the household never had.
 
-One month, an arrow either side, and the same control on Overview, History and
-Budget. History used to choose its period from a dropdown that stopped six
-months back; the arrows have no floor. Blank — every month there has ever been —
-is still where that tab opens, and `Clear filters` is the way back to it.
+One month, an arrow either side, and the same control in the same place on
+Overview, History and Budget. History used to choose its period from a dropdown
+that stopped six months back; the arrows have no floor, and every one of the
+three screens is scoped to a month it always has.
 
 Interface English, category names Polish: the names are rows that sync to every
 device, so they are data the family owns, not translated copy. Switching the

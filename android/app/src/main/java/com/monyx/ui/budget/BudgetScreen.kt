@@ -135,6 +135,11 @@ fun BudgetScreen(
                     label = Dates.monthLabel(period),
                     onPrevious = { viewModel.previousMonth() },
                     onNext = { viewModel.nextMonth() },
+                    // This list is padded 16, Overview's is padded 20. The four
+                    // that are missing are added back here so the switcher lands
+                    // in the same place on both screens without widening every
+                    // budget row to match.
+                    modifier = Modifier.padding(start = 4.dp, end = 4.dp, top = 4.dp),
                 )
             }
 

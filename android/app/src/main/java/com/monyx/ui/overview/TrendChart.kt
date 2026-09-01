@@ -33,7 +33,10 @@ import com.monyx.data.Dates
 import java.time.LocalDate
 import kotlin.math.roundToInt
 
-/** How many days the balance card's trend covers. */
+/**
+ * The MINIMUM span of the balance card's trend. The window is stretched past it
+ * when it has to be — see [trendWindow].
+ */
 const val TREND_DAYS = 30
 
 /** One day on the trend: what came in, what went out. */
@@ -57,15 +60,27 @@ data class TrendSeries(
     val points: List<TrendPoint>,
     val runningMinor: List<Long>,
 ) {
-    val incomeMinor: Long = points.sumOf { it.incomeMinor }
-    val expenseMinor: Long = points.sumOf { it.expenseMinor }
-    val netMinor: Long get() = incomeMinor - expenseMinor
-
     /** Whether anything happened in the window at all. */
     val isEmpty: Boolean = points.all { it.incomeMinor == 0L && it.expenseMinor == 0L }
 
     val from: LocalDate get() = points.first().date
     val to: LocalDate get() = points.last().date
+
+    /**
+     * Where the line ends: the balance of the month the card is showing, as it
+     * stood at the end of the window. This is the same figure the front of the
+     * card prints under "Balance", and it is the same figure because the run
+     * restarts at the first of the month — see [trendSeries].
+     */
+    val monthToDateMinor: Long = runningMinor.lastOrNull() ?: 0L
+
+    /**
+     * Where the run restarts, if the window reaches back into the month before.
+     * The chart marks it, because otherwise the step down to zero on the 1st
+     * looks like something the household did rather than the calendar turning.
+     */
+    val monthStartIndex: Int? =
+        points.drop(1).indexOfFirst { it.date.dayOfMonth == 1 }.takeIf { it >= 0 }?.plus(1)
 
     /**
      * The vertical extent of the line. Zero is forced inside it on both sides,
@@ -76,7 +91,7 @@ data class TrendSeries(
     val lowRunningMinor: Long = minOf(0L, runningMinor.minOrNull() ?: 0L)
     val highRunningMinor: Long = maxOf(0L, runningMinor.maxOrNull() ?: 0L)
 
-    fun runningAt(index: Int): Long = runningMinor.getOrElse(index) { netMinor }
+    fun runningAt(index: Int): Long = runningMinor.getOrElse(index) { monthToDateMinor }
 }
 
 /**
@@ -87,6 +102,13 @@ data class TrendSeries(
  * A line drawn only through the days that had transactions would space Tuesday
  * and Friday the same distance apart as Tuesday and Wednesday, and the slope —
  * which is the whole message — would be a lie about how fast money went.
+ *
+ * The running total RESTARTS at the first of each month, which is what keeps
+ * the two faces of the card telling the same story: the line's last point is
+ * then the selected month's balance — the number printed on the front — rather
+ * than a thirty-day figure that quietly includes last month's payday. A window
+ * reaching back before the 1st shows the previous month's own run and a step
+ * down to zero at the boundary, which is what a monthly budget actually does.
  *
  * Always returns at least one point, so callers cannot be handed a series with
  * no ends for the axis to label.
@@ -103,6 +125,7 @@ fun trendSeries(rows: List<DailyTotals>, from: LocalDate, to: LocalDate): TrendS
     }
     var running = 0L
     val cumulative = points.map {
+        if (it.date.dayOfMonth == 1) running = 0L
         running += it.netMinor
         running
     }
@@ -110,12 +133,19 @@ fun trendSeries(rows: List<DailyTotals>, from: LocalDate, to: LocalDate): TrendS
 }
 
 /**
- * The window the chart covers for [period]: [TREND_DAYS] days ending on the
- * last day that month can honestly show.
+ * The window the chart covers for [period]: [TREND_DAYS] days ending on the last
+ * day that month can honestly show — stretched back further when thirty days is
+ * not enough to reach the first of the month.
+ *
+ * That stretch is what makes the chart agree with the card's front face on the
+ * 31st of a 31-day month, where a plain thirty days would start on the 2nd and
+ * the run would never see the 1st to restart on it. So the window is 30 days
+ * most of the time and 31 on the last day of a long month.
  */
 fun trendWindow(period: String, today: LocalDate = Dates.today()): ClosedRange<LocalDate> {
     val end = Dates.windowEnd(period, today)
-    return end.minusDays((TREND_DAYS - 1).toLong())..end
+    val thirty = end.minusDays((TREND_DAYS - 1).toLong())
+    return minOf(thirty, Dates.firstDayOf(period))..end
 }
 
 /**
@@ -234,27 +264,44 @@ fun TrendChart(
 
             val zeroY = py(0L)
 
-            val line = Path()
-            series.runningMinor.forEachIndexed { index, value ->
-                val x = px(index)
-                val y = py(value)
-                if (index == 0) line.moveTo(x, y) else line.lineTo(x, y)
+            // One run per month, and the line is NOT carried across the 1st.
+            // The balance does not slide from last month's total down to zero
+            // overnight — it starts again — and a segment joining the two would
+            // draw a plunge on a day nobody spent anything.
+            val runs = buildList {
+                var start = 0
+                series.points.forEachIndexed { index, point ->
+                    if (index > 0 && point.date.dayOfMonth == 1) {
+                        add(start until index)
+                        start = index
+                    }
+                }
+                add(start..series.points.lastIndex)
             }
 
-            // The same line closed down onto break-even, so the fill measures
-            // the distance from zero rather than from the bottom of the canvas.
-            val area = Path().apply {
-                addPath(line)
-                lineTo(px(count - 1), zeroY)
-                lineTo(px(0), zeroY)
-                close()
+            fun lineOf(segment: IntRange): Path = Path().apply {
+                segment.forEach { index ->
+                    val x = px(index)
+                    val y = py(series.runningMinor[index])
+                    if (index == segment.first) moveTo(x, y) else lineTo(x, y)
+                }
             }
 
-            clipRect(top = 0f, bottom = zeroY) {
-                drawPath(area, aboveColor.copy(alpha = 0.16f))
-            }
-            clipRect(top = zeroY, bottom = size.height) {
-                drawPath(area, belowColor.copy(alpha = 0.16f))
+            // Each run closed down onto break-even, so the fill measures the
+            // distance from zero rather than from the bottom of the canvas.
+            runs.forEach { segment ->
+                if (segment.first == segment.last) return@forEach
+                val area = lineOf(segment).apply {
+                    lineTo(px(segment.last), zeroY)
+                    lineTo(px(segment.first), zeroY)
+                    close()
+                }
+                clipRect(top = 0f, bottom = zeroY) {
+                    drawPath(area, aboveColor.copy(alpha = 0.16f))
+                }
+                clipRect(top = zeroY, bottom = size.height) {
+                    drawPath(area, belowColor.copy(alpha = 0.16f))
+                }
             }
 
             drawLine(
@@ -264,13 +311,41 @@ fun TrendChart(
                 strokeWidth = 1.dp.toPx(),
             )
 
+            // The turn of the month, in the gap between the two runs. Fainter
+            // than break-even, because it is context for the break rather than
+            // a threshold of its own.
+            series.monthStartIndex?.let { index ->
+                drawLine(
+                    color = axisColor.copy(alpha = 0.22f),
+                    start = Offset(px(index), 0f),
+                    end = Offset(px(index), size.height),
+                    strokeWidth = 1.dp.toPx(),
+                )
+            }
+
             val stroke = Stroke(
                 width = 2.5.dp.toPx(),
                 cap = StrokeCap.Round,
                 join = StrokeJoin.Round,
             )
-            clipRect(top = 0f, bottom = zeroY) { drawPath(line, aboveColor, style = stroke) }
-            clipRect(top = zeroY, bottom = size.height) { drawPath(line, belowColor, style = stroke) }
+            runs.forEach { segment ->
+                if (segment.first == segment.last) {
+                    // A month one day old is a single point, and a Path holding
+                    // one point strokes to nothing at all.
+                    val value = series.runningMinor[segment.first]
+                    drawCircle(
+                        color = if (value < 0) belowColor else aboveColor,
+                        radius = 1.75.dp.toPx(),
+                        center = Offset(px(segment.first), py(value)),
+                    )
+                    return@forEach
+                }
+                val line = lineOf(segment)
+                clipRect(top = 0f, bottom = zeroY) { drawPath(line, aboveColor, style = stroke) }
+                clipRect(top = zeroY, bottom = size.height) {
+                    drawPath(line, belowColor, style = stroke)
+                }
+            }
 
             focused?.let { index ->
                 val value = series.runningMinor.getOrNull(index) ?: return@let
