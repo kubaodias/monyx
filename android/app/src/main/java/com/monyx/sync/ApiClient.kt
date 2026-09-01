@@ -20,15 +20,13 @@ import java.util.concurrent.TimeUnit
  */
 object Api {
     /**
-     * Still the monio-api host, and deliberately so.
-     *
-     * A Telnyx invoke URL is minted from the function's name and id, and the
-     * CLI has no rename for a function — so this string cannot follow the
-     * rename until a monyx-api function exists and the data has been copied
-     * across. Purging the name from a URL that is not ours yet would only
-     * produce a host that resolves to nothing.
+     * A new host, not a renamed one. Telnyx mints an invoke URL from a
+     * function's name and id and has no rename, so monyx-api is a different
+     * function from monio-api with a different id — which is why the old host
+     * is still up and still serving whatever is installed on a phone that has
+     * not been updated. It is the rollback, not a leftover.
      */
-    const val BASE_URL = "https://monio-api-db2fb8bb-e.telnyxcompute.com"
+    const val BASE_URL = "https://monyx-api-31cdf6d8-0.telnyxcompute.com"
 
     val json = Json {
         ignoreUnknownKeys = true

@@ -59,14 +59,19 @@ cannot be recovered.
 The cloud resources still cannot be renamed. The CLI has no rename for
 functions, SQL databases or KV namespaces on v0.5.1, which is the same wall
 0003 hit and worked around by recreating the resources while they were empty.
-They are not empty now, so the rename means creating `monyx`, `monyx-kv` and
-`monyx-api` and copying the data across, with the old three left in place and
-untouched as the rollback. Secrets are organisation-scoped and bind by name, so
-they do not have to be re-entered.
+They are not empty now, so `monyx`, `monyx-kv` and `monyx-api` were created
+alongside the old three and the data copied across — 97 rows over 11 tables,
+verified row by row and object by object rather than trusted, because the
+replay reported HTTP 500 after in fact applying cleanly. Secrets are
+organisation-scoped and bound by name with nothing re-entered.
 
-Until that is done `Api.BASE_URL` still names `monio-api`, because a Telnyx
-invoke URL is minted from a function's name and id and there is no monyx-api to
-point at yet. That is the one place the old name survives on purpose.
+`monio-api`, `monio` and `monio-kv` are left running and untouched. That is not
+an oversight to tidy up later: every phone still has the old app installed and
+still points at the old host, and will until someone reinstalls. Deleting them
+is what breaks those phones, not keeping them.
+
+`Api.BASE_URL` is a new host rather than a renamed one, for the same reason —
+`monyx-api-31cdf6d8-0` shares no identity with `monio-api-db2fb8bb-e`.
 
 This is the third naming decision in three days, and the last one that is cheap.
 Doing it again after anything reaches Google Play costs an installed base rather

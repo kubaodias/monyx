@@ -14,7 +14,7 @@ const invite = args.find((a) => !a.startsWith("--"));
 const urlIndex = args.indexOf("--url");
 const BASE = urlIndex >= 0
   ? args[urlIndex + 1]
-  : "https://monio-api-db2fb8bb-e.telnyxcompute.com";
+  : "https://monyx-api-31cdf6d8-0.telnyxcompute.com";
 
 if (!invite) {
   console.error("usage: node scripts/smoke-test.mjs <invite_code> [--url …]");
