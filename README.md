@@ -3,6 +3,39 @@
 A shared household budget app for one family. Native Android, backend on Telnyx
 Edge Compute. English and Polish interface, switchable in Settings.
 
+## Screenshots
+
+<table>
+  <tr>
+    <td align="center" width="20%"><img src="docs/screenshots/add.png" alt="Adding an expense on the built-in keypad" width="100%"></td>
+    <td align="center" width="20%"><img src="docs/screenshots/overview.png" alt="Monthly overview with a category breakdown" width="100%"></td>
+    <td align="center" width="20%"><img src="docs/screenshots/history.png" alt="Transaction history with search and filters" width="100%"></td>
+    <td align="center" width="20%"><img src="docs/screenshots/budget.png" alt="Monthly plan and per-category budgets" width="100%"></td>
+    <td align="center" width="20%"><img src="docs/screenshots/settings.png" alt="Accounts and categories in settings" width="100%"></td>
+  </tr>
+  <tr>
+    <td align="center"><b>Add</b><br>the launch screen</td>
+    <td align="center"><b>Overview</b><br>where the money goes</td>
+    <td align="center"><b>History</b><br>search and filter</td>
+    <td align="center"><b>Budget</b><br>plan and limits</td>
+    <td align="center"><b>Settings</b><br>accounts, categories</td>
+  </tr>
+</table>
+
+The app opens straight onto the keypad, because entering an expense is the one
+thing that decides whether a household is still using this in a month. There is
+no system keyboard in that flow: the grid is the amount field, which is also
+what makes the calculator possible — `60 +` stays on screen while the second
+operand is typed, instead of the running total vanishing the moment you press
+an operator.
+
+Interface English, category names Polish: the names are rows that sync to every
+device, so they are data the family owns, not translated copy. Switching the
+interface language does not rename anyone's categories.
+
+Captured on an emulator against a local database of demo data — not the
+family's own numbers.
+
 ## Layout
 
 ```
