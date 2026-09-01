@@ -50,6 +50,10 @@
     <string name="overview_see_all">See all</string>
     <string name="overview_previous_month">Previous month</string>
     <string name="overview_next_month">Next month</string>
+    <string name="month_picker_open">Choose a month</string>
+    <string name="month_picker_previous_year">Previous year</string>
+    <string name="month_picker_next_year">Next year</string>
+    <string name="month_picker_current">Jump to this month</string>
     <string name="overview_percent">%1$d%%</string>
     <string name="overview_trend_through">Through %1$s</string>
     <string name="overview_trend_empty">Nothing moved here yet</string>

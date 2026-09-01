@@ -73,7 +73,7 @@ fun OverviewScreen(
     onOpenTransactions: (categoryId: String?, period: String?) -> Unit,
 ) {
     val app = LocalContext.current.applicationContext as MonyxApp
-    val viewModel: OverviewViewModel = viewModel(factory = OverviewViewModel.factory(app.repository))
+    val viewModel: OverviewViewModel = viewModel(factory = OverviewViewModel.factory(app.repository, app.selectedMonth))
     val state by viewModel.uiState.collectAsStateWithLifecycle()
 
     LazyColumn(
@@ -83,9 +83,8 @@ fun OverviewScreen(
     ) {
         item {
             MonthSwitcher(
-                label = Dates.monthLabel(state.period),
-                onPrevious = viewModel::previousMonth,
-                onNext = viewModel::nextMonth,
+                period = state.period,
+                onSelect = viewModel::setPeriod,
             )
         }
         if (state.accounts.size > 1) {

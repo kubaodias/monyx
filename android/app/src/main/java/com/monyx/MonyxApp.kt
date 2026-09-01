@@ -7,12 +7,20 @@ import android.os.Build
 import com.monyx.data.MonyxDatabase
 import com.monyx.data.MonyxRepository
 import com.monyx.sync.Session
+import com.monyx.ui.SelectedMonth
 
 class MonyxApp : Application() {
 
     val database by lazy { MonyxDatabase.get(this) }
     val repository by lazy { MonyxRepository(database.dao()) }
     val session by lazy { Session(this) }
+
+    /**
+     * Held here because it has to outlive every ViewModel that reads it. Three
+     * tabs show one month between them, and the tab you left is destroyed while
+     * you are on the one you went to.
+     */
+    val selectedMonth by lazy { SelectedMonth() }
 
     override fun onCreate() {
         super.onCreate()

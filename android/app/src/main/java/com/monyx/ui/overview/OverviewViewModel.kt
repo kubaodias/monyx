@@ -9,6 +9,7 @@ import com.monyx.data.CategorySpend
 import com.monyx.data.Dates
 import com.monyx.data.MonyxRepository
 import com.monyx.data.TransactionListItem
+import com.monyx.ui.SelectedMonth
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -56,14 +57,18 @@ private fun emptyState(period: String): OverviewUiState {
 }
 
 /**
- * Holds the month switcher's selected period, defaulting to the current one,
- * and joins it against the repository's reactive queries. Everything here
+ * Joins the app's [SelectedMonth] against the repository's reactive queries.
+ * The month is NOT owned here — it is the same one Transactions and Budget are
+ * showing, so stepping back on this screen steps all three back. Everything here
  * reads straight from Room — no network wait: the phone answers from its own
  * replica and the server is only ever a sync peer.
  */
-class OverviewViewModel(private val repository: MonyxRepository) : ViewModel() {
+class OverviewViewModel(
+    private val repository: MonyxRepository,
+    private val selectedMonth: SelectedMonth,
+) : ViewModel() {
 
-    private val period = MutableStateFlow(Dates.currentPeriod())
+    private val period = selectedMonth.period
     private val selectedAccounts = MutableStateFlow<Set<String>>(emptySet())
 
     @OptIn(ExperimentalCoroutinesApi::class)
@@ -101,12 +106,8 @@ class OverviewViewModel(private val repository: MonyxRepository) : ViewModel() {
             initialValue = emptyState(period.value),
         )
 
-    fun previousMonth() {
-        period.value = Dates.shiftPeriod(period.value, -1)
-    }
-
-    fun nextMonth() {
-        period.value = Dates.shiftPeriod(period.value, 1)
+    fun setPeriod(period: String) {
+        selectedMonth.set(period)
     }
 
     /**
@@ -124,8 +125,8 @@ class OverviewViewModel(private val repository: MonyxRepository) : ViewModel() {
     }
 
     companion object {
-        fun factory(repository: MonyxRepository) = viewModelFactory {
-            initializer { OverviewViewModel(repository) }
+        fun factory(repository: MonyxRepository, selectedMonth: SelectedMonth) = viewModelFactory {
+            initializer { OverviewViewModel(repository, selectedMonth) }
         }
     }
 }

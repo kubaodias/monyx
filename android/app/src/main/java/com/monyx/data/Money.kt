@@ -172,6 +172,37 @@ object Dates {
     fun shiftPeriod(period: String, months: Long): String =
         LocalDate.parse("$period-01").plusMonths(months).format(PERIOD)
 
+    fun yearOf(period: String): Int = period.take(4).toInt()
+
+    /** The 1-based month of a period, so a grid can mark the one that is on. */
+    fun monthOf(period: String): Int = period.takeLast(2).toInt()
+
+    fun period(year: Int, month: Int): String = "%04d-%02d".format(year, month)
+
+    /**
+     * Twelve short month names in the interface language, for the picker grid.
+     *
+     * Standalone form (LLL, not MMM) because a grid cell is not part of a date:
+     * Polish inflects the genitive "stycznia" when a day precedes it, and a
+     * lone cell reading "stycznia" is a month name in the wrong case.
+     */
+    fun monthNames(): List<String> = synchronized(this) {
+        val locale = Locale.getDefault()
+        cachedMonthNames?.takeIf { monthNamesLocale == locale } ?: run {
+            val formatter = DateTimeFormatter.ofPattern("LLL", locale)
+            (1..12).map { month ->
+                LocalDate.of(2000, month, 1).format(formatter)
+                    .replaceFirstChar { it.uppercase() }
+            }.also {
+                monthNamesLocale = locale
+                cachedMonthNames = it
+            }
+        }
+    }
+
+    private var monthNamesLocale: Locale? = null
+    private var cachedMonthNames: List<String>? = null
+
     fun iso(date: LocalDate): String = date.format(ISO)
 
     fun firstDayOf(period: String): LocalDate = LocalDate.parse("$period-01")

@@ -55,7 +55,6 @@ import com.monyx.MonyxApp
 import com.monyx.R
 import com.monyx.data.BudgetUsage
 import com.monyx.data.CategoryEntity
-import com.monyx.data.Dates
 import com.monyx.data.Money
 import com.monyx.sync.SyncWorker
 import com.monyx.ui.MonthSwitcher
@@ -87,7 +86,7 @@ fun BudgetScreen(
     onOpenCategoryTransactions: (String, String) -> Unit,
 ) {
     val app = LocalContext.current.applicationContext as MonyxApp
-    val viewModel: BudgetViewModel = viewModel(factory = BudgetViewModel.factory(app.repository))
+    val viewModel: BudgetViewModel = viewModel(factory = BudgetViewModel.factory(app.repository, app.selectedMonth))
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
@@ -104,7 +103,7 @@ fun BudgetScreen(
     var deepLinkHandled by rememberSaveable { mutableStateOf(false) }
 
     LaunchedEffect(initialPeriod) {
-        if (!initialPeriod.isNullOrBlank()) viewModel.setInitialPeriod(initialPeriod)
+        if (!initialPeriod.isNullOrBlank()) viewModel.setPeriod(initialPeriod)
     }
 
     // Auto-open the edit dialog for the deep-linked category, once its data
@@ -132,9 +131,8 @@ fun BudgetScreen(
         ) {
             item {
                 MonthSwitcher(
-                    label = Dates.monthLabel(period),
-                    onPrevious = { viewModel.previousMonth() },
-                    onNext = { viewModel.nextMonth() },
+                    period = period,
+                    onSelect = viewModel::setPeriod,
                     // This list is padded 16, Overview's is padded 20. The four
                     // that are missing are added back here so the switcher lands
                     // in the same place on both screens without widening every

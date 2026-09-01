@@ -92,7 +92,7 @@ fun TransactionsScreen(
     val viewModel: TransactionsViewModel = viewModel(
         factory = viewModelFactory {
             initializer {
-                TransactionsViewModel(app.repository, app.applicationContext, filterCategoryId, filterPeriod)
+                TransactionsViewModel(app.repository, app.applicationContext, app.selectedMonth, filterCategoryId)
             }
         },
     )
@@ -131,9 +131,8 @@ fun TransactionsScreen(
     ) { padding ->
         Column(modifier = Modifier.fillMaxSize().padding(padding)) {
             MonthSwitcher(
-                label = Dates.monthLabel(period),
-                onPrevious = { viewModel.stepMonth(-1) },
-                onNext = { viewModel.stepMonth(1) },
+                period = period,
+                onSelect = viewModel::setPeriod,
                 // Matches Overview's contentPadding exactly. The switcher is the
                 // same control on three screens; it has to start at the same x.
                 modifier = Modifier.padding(horizontal = 20.dp, vertical = 20.dp),

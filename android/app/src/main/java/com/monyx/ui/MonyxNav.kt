@@ -1,9 +1,13 @@
 package com.monyx.ui
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.Add
@@ -22,10 +26,14 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
@@ -221,17 +229,20 @@ private fun MainScaffold(
                             }
                             navController.switchTab(tab.route)
                         },
-                        icon = { Icon(tab.icon, contentDescription = null) },
+                        icon = {
+                            if (isAdd) AddIcon() else Icon(tab.icon, contentDescription = null)
+                        },
                         label = { Text(stringResource(tab.labelRes)) },
                         // Add is the one thing the app exists to do, so it is the
                         // one item that is coloured rather than monochrome.
                         colors = when {
                             isAdd -> NavigationBarItemDefaults.colors(
-                                selectedIconColor = ADD_ON_ACCENT,
                                 selectedTextColor = ADD_ACCENT,
-                                unselectedIconColor = ADD_ACCENT,
                                 unselectedTextColor = ADD_ACCENT,
-                                indicatorColor = ADD_ACCENT,
+                                // The pill is drawn by AddIcon and is there in
+                                // both states, so the one Material would draw on
+                                // selection would only double it.
+                                indicatorColor = Color.Transparent,
                             )
                             isMark -> NavigationBarItemDefaults.colors(
                                 selectedIconColor = MaterialTheme.colorScheme.onSurface,
@@ -300,5 +311,30 @@ private fun MainScaffold(
     }
 }
 
+/**
+ * The Add tab's icon, in a filled green pill that does not wait to be selected.
+ *
+ * A green glyph on the bar was still a glyph among four other glyphs — the same
+ * size, the same weight, one hue apart. This is the tab the app exists for and
+ * it is now the only filled shape down there, which is the difference between
+ * "coloured differently" and "visible".
+ *
+ * 64x32 is Material's own active-indicator size, so the pill lands exactly where
+ * the selection indicator would and the item does not resize when tapped.
+ */
+@Composable
+private fun AddIcon() {
+    Box(
+        modifier = Modifier
+            .width(64.dp)
+            .height(32.dp)
+            .clip(RoundedCornerShape(16.dp))
+            .background(ADD_ACCENT),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(Icons.Filled.Add, contentDescription = null, tint = ADD_ON_ACCENT)
+    }
+}
+
 private val ADD_ACCENT = Palette.color("green")
-private val ADD_ON_ACCENT = androidx.compose.ui.graphics.Color.White
+private val ADD_ON_ACCENT = Color.White

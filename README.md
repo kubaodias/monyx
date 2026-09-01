@@ -9,17 +9,19 @@ Edge Compute. English and Polish interface, switchable in Settings.
 
 <table>
   <tr>
-    <td align="center" width="16%"><img src="docs/screenshots/add.png" alt="Adding an expense on the built-in keypad" width="100%"></td>
-    <td align="center" width="16%"><img src="docs/screenshots/overview.png" alt="Monthly overview with a category breakdown" width="100%"></td>
-    <td align="center" width="16%"><img src="docs/screenshots/trend.png" alt="The balance card flipped over, showing the month's balance arriving as a line" width="100%"></td>
-    <td align="center" width="16%"><img src="docs/screenshots/history.png" alt="Transaction history with search and filters" width="100%"></td>
-    <td align="center" width="16%"><img src="docs/screenshots/budget.png" alt="Monthly plan and per-category budgets" width="100%"></td>
-    <td align="center" width="16%"><img src="docs/screenshots/settings.png" alt="Accounts and categories in settings" width="100%"></td>
+    <td align="center" width="14%"><img src="docs/screenshots/add.png" alt="Adding an expense on the built-in keypad" width="100%"></td>
+    <td align="center" width="14%"><img src="docs/screenshots/overview.png" alt="Monthly overview with a category breakdown" width="100%"></td>
+    <td align="center" width="14%"><img src="docs/screenshots/trend.png" alt="The balance card flipped over, showing the month's balance arriving as a line" width="100%"></td>
+    <td align="center" width="14%"><img src="docs/screenshots/months.png" alt="The month picker open over the overview, with the chosen month filled and the present one ringed" width="100%"></td>
+    <td align="center" width="14%"><img src="docs/screenshots/history.png" alt="Transaction history with search and filters" width="100%"></td>
+    <td align="center" width="14%"><img src="docs/screenshots/budget.png" alt="Monthly plan and per-category budgets" width="100%"></td>
+    <td align="center" width="14%"><img src="docs/screenshots/settings.png" alt="Accounts and categories in settings" width="100%"></td>
   </tr>
   <tr>
     <td align="center"><b>Add</b><br>the launch screen</td>
     <td align="center"><b>Overview</b><br>where the money goes</td>
     <td align="center"><b>Trend</b><br>how the balance arrived</td>
+    <td align="center"><b>Months</b><br>one, shared by three</td>
     <td align="center"><b>History</b><br>search and filter</td>
     <td align="center"><b>Budget</b><br>plan and limits</td>
     <td align="center"><b>Settings</b><br>accounts, categories</td>
@@ -55,9 +57,21 @@ happened on it, and the line is never smoothed, because a curve fitted between
 two points invents balances the household never had.
 
 One month, an arrow either side, and the same control in the same place on
-Overview, History and Budget. History used to choose its period from a dropdown
-that stopped six months back; the arrows have no floor, and every one of the
-three screens is scoped to a month it always has.
+Overview, History and Budget — showing the same month on all three. Stepping
+back to March on the overview and then opening the budget used to show
+September: the identical control, in the identical place, disagreeing with the
+one you were just looking at. They are not three questions about three months.
+They are three views of one: what it cost, what it went on, and what it was
+meant to cost.
+
+The arrows are for a neighbouring month. For any other, the title opens a
+picker — a year, twelve months under it, and one button back to the present.
+The present month keeps a ring in the grid even while another is chosen, so it
+always says where now is relative to what is on screen.
+
+Add is the only filled shape in the bottom bar, and it is filled whether or not
+it is the tab you are on. A green glyph among four grey glyphs is still a
+glyph; this is the thing the app exists for.
 
 Interface English, category names Polish: the names are rows that sync to every
 device, so they are data the family owns, not translated copy. Switching the

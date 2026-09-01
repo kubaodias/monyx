@@ -6,12 +6,10 @@ import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.monyx.data.BudgetUsage
 import com.monyx.data.CategoryEntity
-import com.monyx.data.Dates
 import com.monyx.data.MonyxRepository
-import kotlinx.coroutines.flow.MutableStateFlow
+import com.monyx.ui.SelectedMonth
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.stateIn
@@ -52,10 +50,14 @@ data class PlanState(
     val overAssigned: Boolean get() = (leftToAssignMinor ?: 0) < 0
 }
 
-class BudgetViewModel(private val repository: MonyxRepository) : ViewModel() {
+class BudgetViewModel(
+    private val repository: MonyxRepository,
+    private val selectedMonth: SelectedMonth,
+) : ViewModel() {
 
-    private val _period = MutableStateFlow(Dates.currentPeriod())
-    val period: StateFlow<String> = _period.asStateFlow()
+    /** Shared with Overview and Transactions — see [SelectedMonth]. */
+    private val _period = selectedMonth.period
+    val period: StateFlow<String> = _period
 
     val budgetUsage: StateFlow<List<BudgetUsage>> = _period
         .flatMapLatest { p -> repository.budgetUsage(p) }
@@ -92,16 +94,8 @@ class BudgetViewModel(private val repository: MonyxRepository) : ViewModel() {
         categories.filter { it.id !in budgeted }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
-    fun setInitialPeriod(period: String) {
-        if (period.isNotBlank()) _period.value = period
-    }
-
-    fun previousMonth() {
-        _period.value = Dates.shiftPeriod(_period.value, -1)
-    }
-
-    fun nextMonth() {
-        _period.value = Dates.shiftPeriod(_period.value, 1)
+    fun setPeriod(period: String) {
+        selectedMonth.set(period)
     }
 
     suspend fun setPlan(plannedMinor: Long) {
@@ -123,8 +117,8 @@ class BudgetViewModel(private val repository: MonyxRepository) : ViewModel() {
     }
 
     companion object {
-        fun factory(repository: MonyxRepository) = viewModelFactory {
-            initializer { BudgetViewModel(repository) }
+        fun factory(repository: MonyxRepository, selectedMonth: SelectedMonth) = viewModelFactory {
+            initializer { BudgetViewModel(repository, selectedMonth) }
         }
     }
 }

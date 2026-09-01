@@ -1,6 +1,6 @@
 # 0011 — One month switcher, on every screen that has months
 
-**Date:** 2026-09-01 · **Status:** accepted
+**Date:** 2026-09-01 · **Status:** accepted, amended by [0013](0013-one-month-for-the-whole-app.md)
 
 ## Context
 
@@ -19,7 +19,9 @@ below.
 
 One `MonthSwitcher` in `com.monyx.ui`, used by all three. It takes a **label**
 rather than a period, because Transactions has a state that is not a month —
-"All time" — and still wants the arrows to step out of it.
+"All time" — and still wants the arrows to step out of it. ([0013] reverses
+this: "All time" did not survive the same decision, and the title has since
+become a control that needs the period it is editing.)
 
 The Transactions dropdown is gone. The arrows have no floor and no ceiling:
 stepping is `LocalDate.plusMonths`, unbounded in both directions.
@@ -54,3 +56,7 @@ bottom bar is already pointing at it.
   one.
 - Deep links still pass a period directly through `applyFilter`; they never went
   through the dropdown.
+- The three switchers still each held their own month. [0013] takes that away
+  too.
+
+[0013]: 0013-one-month-for-the-whole-app.md

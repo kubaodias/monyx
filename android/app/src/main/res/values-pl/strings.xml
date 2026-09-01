@@ -47,6 +47,10 @@
     <string name="overview_see_all">Zobacz wszystkie</string>
     <string name="overview_previous_month">Poprzedni miesiąc</string>
     <string name="overview_next_month">Następny miesiąc</string>
+    <string name="month_picker_open">Wybierz miesiąc</string>
+    <string name="month_picker_previous_year">Poprzedni rok</string>
+    <string name="month_picker_next_year">Następny rok</string>
+    <string name="month_picker_current">Przejdź do bieżącego miesiąca</string>
     <string name="overview_percent">%1$d%%</string>
     <string name="overview_trend_through">Do %1$s</string>
     <string name="overview_trend_empty">Jeszcze nic się tu nie działo</string>

@@ -10,6 +10,7 @@ import com.monyx.data.MonyxRepository
 import com.monyx.data.TransactionEntity
 import com.monyx.data.TransactionListItem
 import com.monyx.sync.SyncWorker
+import com.monyx.ui.SelectedMonth
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -30,8 +31,8 @@ import kotlinx.coroutines.launch
 class TransactionsViewModel(
     private val repository: MonyxRepository,
     private val appContext: Context,
+    private val selectedMonth: SelectedMonth,
     initialCategoryId: String? = null,
-    initialPeriod: String? = null,
 ) : ViewModel() {
 
     private val _query = MutableStateFlow("")
@@ -44,16 +45,16 @@ class TransactionsViewModel(
     val accountId: StateFlow<String?> = _accountId.asStateFlow()
 
     /**
-     * The month on screen. Never blank.
+     * The month on screen. Never blank, and not this screen's to own.
      *
      * The repository still understands "" as every month there has ever been,
      * and the search would arguably be better across all of it — but a switcher
      * that reads "All time" between two month arrows is a control describing a
      * state it cannot step back to, and this tab is scoped the way Overview and
-     * Budget are scoped. A month it is, defaulting to this one.
+     * Budget are scoped. The same month as them, in fact — see [SelectedMonth].
      */
-    private val _period = MutableStateFlow(initialPeriod?.takeIf { it.isNotBlank() } ?: Dates.currentPeriod())
-    val period: StateFlow<String> = _period.asStateFlow()
+    private val _period = selectedMonth.period
+    val period: StateFlow<String> = _period
 
     val categories: StateFlow<List<CategoryEntity>> = repository.categories()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
@@ -93,9 +94,8 @@ class TransactionsViewModel(
         _accountId.value = id
     }
 
-    /** One month back or forward, with no floor and no ceiling. */
-    fun stepMonth(delta: Long) {
-        _period.value = Dates.shiftPeriod(_period.value, delta)
+    fun setPeriod(period: String) {
+        selectedMonth.set(period)
     }
 
     /**
@@ -103,13 +103,16 @@ class TransactionsViewModel(
      *
      * The transactions tab keeps its ViewModel across a tab switch, so a jump
      * in from a budget row or a pie slice cannot pass its filter through the
-     * constructor — by then the ViewModel already exists. Tapping the tab
-     * itself sends (null, null) and lands here as a clear, which returns the
-     * month to this one rather than to no month at all.
+     * constructor — by then the ViewModel already exists.
+     *
+     * A null period leaves the month ALONE. It used to snap back to the present
+     * one, which was defensible while every tab held its own month and was a
+     * bug the moment they started sharing: tapping the tab after choosing March
+     * on the overview would have thrown March away on arrival.
      */
     fun applyFilter(categoryId: String?, period: String?) {
         _categoryId.value = categoryId
-        _period.value = period?.takeIf { it.isNotBlank() } ?: Dates.currentPeriod()
+        selectedMonth.set(period)
     }
 
     /**
