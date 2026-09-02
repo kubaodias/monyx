@@ -36,8 +36,11 @@
     <string name="add_clear">Clear</string>
     <string name="add_backspace">Delete character</string>
     <string name="add_today">Today</string>
-    <string name="add_yesterday">Yesterday</string>
+    <string name="add_make_recurring">Make it repeat</string>
+    <string name="add_show_keypad">Show the keypad</string>
+    <string name="date_jump_today">Today</string>
     <string name="add_pick_date">Pick a date</string>
+    <string name="add_yesterday">Yesterday</string>
 
     <!-- Overview -->
     <string name="overview_income">Income</string>
@@ -112,8 +115,9 @@
 
     <!-- Settings -->
     <string name="settings_tab_general">General</string>
-    <string name="settings_tab_recurring">Repeating</string>
-    <string name="settings_tab_people">Household</string>
+    <string name="settings_tab_recurring">Repeating rules</string>
+    <string name="settings_tab_people">Users</string>
+    <string name="settings_tab_region">Region</string>
     <string name="settings_tab_advanced">Advanced</string>
     <string name="settings_accounts">Accounts</string>
     <string name="settings_categories">Categories</string>

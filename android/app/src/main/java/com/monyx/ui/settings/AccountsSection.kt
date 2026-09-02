@@ -11,10 +11,11 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AccountBalanceWallet
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Archive
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
@@ -33,6 +34,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
@@ -57,6 +60,7 @@ fun AccountsSection(
     onUpdate: (AccountEntity) -> Unit,
     onArchive: (AccountEntity, Boolean) -> Unit,
     onDelete: (AccountEntity) -> Unit,
+    onReorder: (List<AccountEntity>) -> Unit,
 ) {
     var showAdd by remember { mutableStateOf(false) }
     var editing by remember { mutableStateOf<AccountEntity?>(null) }
@@ -81,9 +85,17 @@ fun AccountsSection(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         } else {
-            open.forEach { row ->
+            // Long press and drag to reorder. Only the open accounts: an
+            // archived one is not offered when adding a transaction, so its
+            // position decides nothing.
+            ReorderableColumn(
+                items = open,
+                keyOf = { it.entity.id },
+                onReorder = { rows -> onReorder(rows.map { it.entity }) },
+            ) { row, dragging ->
                 AccountRowItem(
                     row = row,
+                    dragging = dragging,
                     onEdit = { editing = row.entity },
                     onArchive = { archiving = row.entity },
                     onRestore = null,
@@ -101,6 +113,7 @@ fun AccountsSection(
             archived.forEach { row ->
                 AccountRowItem(
                     row = row,
+                    dragging = false,
                     onEdit = { editing = row.entity },
                     onArchive = null,
                     // Restoring is not destructive and is the whole reason the
@@ -172,6 +185,7 @@ fun AccountsSection(
 @Composable
 private fun AccountRowItem(
     row: AccountRow,
+    dragging: Boolean,
     onEdit: () -> Unit,
     onArchive: (() -> Unit)?,
     onRestore: (() -> Unit)?,
@@ -181,6 +195,12 @@ private fun AccountRowItem(
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            // Picked up: shaded and rounded, so the row that is following the
+            // finger is obviously not one of the ones holding still.
+            .clip(RoundedCornerShape(14.dp))
+            .background(
+                if (dragging) MaterialTheme.colorScheme.surfaceVariant else Color.Transparent,
+            )
             .padding(vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {

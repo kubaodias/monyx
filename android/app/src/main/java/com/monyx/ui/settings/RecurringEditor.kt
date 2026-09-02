@@ -67,7 +67,7 @@ import com.monyx.data.CategoryEntity
 import com.monyx.data.Dates
 import com.monyx.data.Money
 import com.monyx.data.Recurrence
-import com.monyx.data.RecurringRuleListItem
+import com.monyx.ui.JumpToToday
 import com.monyx.ui.theme.Palette
 import java.time.Instant
 import java.time.LocalDate
@@ -98,31 +98,22 @@ import java.time.ZoneOffset
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun RecurringEditor(
-    initial: RecurringRuleListItem?,
+    seed: RuleSeed,
     accounts: List<AccountEntity>,
     categories: List<CategoryEntity>,
     onDismiss: () -> Unit,
     onSave: (RuleDraft) -> Unit,
 ) {
-    var kind by remember { mutableStateOf(initial?.kind ?: "expense") }
+    var kind by remember { mutableStateOf(seed.kind) }
     var amountText by remember {
-        mutableStateOf(initial?.amountMinor?.let { Money.format(it) } ?: "")
+        mutableStateOf(seed.amountMinor?.takeIf { it > 0 }?.let { Money.format(it) } ?: "")
     }
-    var accountId by remember {
-        mutableStateOf(initial?.accountId ?: accounts.firstOrNull()?.id)
-    }
-    var categoryId by remember { mutableStateOf(initial?.categoryId) }
-    var note by remember { mutableStateOf(initial?.note.orEmpty()) }
-    var freq by remember { mutableStateOf(initial?.freq ?: Recurrence.MONTHLY) }
-    var startsOn by remember {
-        mutableStateOf(
-            initial?.startsOn?.let { runCatching { LocalDate.parse(it) }.getOrNull() }
-                ?: Dates.today(),
-        )
-    }
-    var endsOn by remember {
-        mutableStateOf(initial?.endsOn?.let { runCatching { LocalDate.parse(it) }.getOrNull() })
-    }
+    var accountId by remember { mutableStateOf(seed.accountId ?: accounts.firstOrNull()?.id) }
+    var categoryId by remember { mutableStateOf(seed.categoryId) }
+    var note by remember { mutableStateOf(seed.note.orEmpty()) }
+    var freq by remember { mutableStateOf(seed.freq) }
+    var startsOn by remember { mutableStateOf(seed.startsOn ?: Dates.today()) }
+    var endsOn by remember { mutableStateOf(seed.endsOn) }
     var picking by remember { mutableStateOf<DateField?>(null) }
 
     /**
@@ -137,9 +128,9 @@ fun RecurringEditor(
      * opening September's rent in November would show its start date greyed out
      * and unselectable, which reads as the app having broken the rule.
      */
-    val anchorFloor = remember(initial) {
+    val anchorFloor = remember(seed) {
         val today = Dates.today()
-        val original = initial?.startsOn?.let { runCatching { LocalDate.parse(it) }.getOrNull() }
+        val original = seed.startsOn?.takeIf { seed.ruleId != null }
         if (original != null && original.isBefore(today)) original else today
     }
 
@@ -187,7 +178,7 @@ fun RecurringEditor(
                 title = {
                     Text(
                         stringResource(
-                            if (initial == null) R.string.recurring_add_title
+                            if (seed.ruleId == null) R.string.recurring_add_title
                             else R.string.recurring_edit_title,
                         ),
                         maxLines = 1,
@@ -638,7 +629,7 @@ private fun RuleDatePickerDialog(
             TextButton(onClick = onDismiss) { Text(stringResource(R.string.settings_cancel)) }
         },
     ) {
-        DatePicker(state = state)
+        DatePicker(state = state, title = { JumpToToday(state) })
     }
 }
 

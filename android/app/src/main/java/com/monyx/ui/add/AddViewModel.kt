@@ -6,6 +6,7 @@ import com.monyx.data.AccountEntity
 import com.monyx.data.CategoryEntity
 import com.monyx.data.Dates
 import com.monyx.data.MonyxRepository
+import com.monyx.ui.settings.RuleDraft
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -133,6 +134,36 @@ class AddViewModel(private val repository: MonyxRepository) : ViewModel() {
                 kind = current.kind,
                 accountId = current.accountId,
             )
+            onSaved()
+        }
+    }
+
+    /**
+     * Turns the half-typed transaction into a repeating rule instead of a row.
+     *
+     * One rule, not a rule AND the transaction that seeded it. The rule's first
+     * occurrence IS that transaction — materialising here rather than waiting
+     * for the next app open means it lands in the ledger while the person who
+     * asked for it is still looking at the screen. Materialisation is idempotent
+     * (the occurrence id is derived from rule and date), so running it early
+     * cannot double up with the pass that runs on the next sync.
+     */
+    fun saveRecurring(draft: RuleDraft, createdBy: String, onSaved: () -> Unit) {
+        viewModelScope.launch {
+            repository.addRecurringRule(
+                kind = draft.kind,
+                amountMinor = draft.amountMinor,
+                accountId = draft.accountId,
+                categoryId = draft.categoryId,
+                note = draft.note,
+                freq = draft.freq,
+                startsOn = draft.startsOn,
+                endsOn = draft.endsOn,
+                createdBy = createdBy,
+            )
+            repository.materializeRecurring()
+            val current = _state.value
+            _state.value = AddUiState(kind = current.kind, accountId = current.accountId)
             onSaved()
         }
     }

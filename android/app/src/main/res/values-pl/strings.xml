@@ -33,8 +33,11 @@
     <string name="add_clear">Wyczyść</string>
     <string name="add_backspace">Usuń znak</string>
     <string name="add_today">Dziś</string>
-    <string name="add_yesterday">Wczoraj</string>
+    <string name="add_make_recurring">Ustaw jako cykliczne</string>
+    <string name="add_show_keypad">Pokaż klawiaturę</string>
+    <string name="date_jump_today">Dziś</string>
     <string name="add_pick_date">Wybierz datę</string>
+    <string name="add_yesterday">Wczoraj</string>
 
     <!-- Overview -->
     <string name="overview_income">Przychody</string>
@@ -109,8 +112,9 @@
 
     <!-- Settings -->
     <string name="settings_tab_general">Ogólne</string>
-    <string name="settings_tab_recurring">Cykliczne</string>
-    <string name="settings_tab_people">Domownicy</string>
+    <string name="settings_tab_recurring">Reguły cykliczne</string>
+    <string name="settings_tab_people">Użytkownicy</string>
+    <string name="settings_tab_region">Region</string>
     <string name="settings_tab_advanced">Zaawansowane</string>
     <string name="settings_accounts">Konta</string>
     <string name="settings_categories">Kategorie</string>

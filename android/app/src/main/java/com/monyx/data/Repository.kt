@@ -128,6 +128,26 @@ class MonyxRepository(private val dao: MonyxDao) {
     }
 
     /**
+     * Writes the order the user dragged the accounts into.
+     *
+     * Position, not rank: sortOrder becomes the index, so there are no gaps to
+     * run out of and no renumbering pass to schedule later. Every row is
+     * rewritten because a single move shifts every position after it anyway,
+     * and the whole list is a handful of rows.
+     *
+     * `pending = 1` on all of them: order is shared household state, the same
+     * as a name or a colour, and a phone that reorders offline has to carry
+     * that to everyone else.
+     */
+    suspend fun reorderAccounts(ordered: List<AccountEntity>) {
+        dao.upsertAccounts(
+            ordered.mapIndexed { index, entity ->
+                entity.copy(sortOrder = index, pending = 1, rejected = 0)
+            },
+        )
+    }
+
+    /**
      * Archiving is an ordinary edit that happens to sync, not a deletion: the
      * row keeps its id, its balance and every transaction pointing at it.
      */
@@ -165,6 +185,23 @@ class MonyxRepository(private val dao: MonyxDao) {
 
     suspend fun updateCategory(entity: CategoryEntity) {
         dao.upsertCategories(listOf(entity.copy(pending = 1, rejected = 0)))
+    }
+
+    /**
+     * Writes the order of ONE list of siblings — the roots of a kind, or the
+     * children of a single parent. See [reorderAccounts].
+     *
+     * Siblings only, because dragging a category out of its family would be a
+     * reparent, and nesting is exactly one level deep by construction. The
+     * numbering restarts per list, which is why every read path orders by
+     * `sortOrder, name` and groups before it sorts.
+     */
+    suspend fun reorderCategories(ordered: List<CategoryEntity>) {
+        dao.upsertCategories(
+            ordered.mapIndexed { index, entity ->
+                entity.copy(sortOrder = index, pending = 1, rejected = 0)
+            },
+        )
     }
 
     suspend fun deleteCategory(entity: CategoryEntity) {

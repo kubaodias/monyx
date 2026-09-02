@@ -141,6 +141,25 @@ class SettingsViewModel(private val app: MonyxApp) : ViewModel() {
      * produces is credited to them rather than to whichever phone happened to
      * be open when it fell due — see Repository.materializeRecurring.
      */
+    /**
+     * The order the user dragged them into. Local write, then the usual sync —
+     * order is household state, not a per-phone preference.
+     */
+    fun reorderAccounts(ordered: List<AccountEntity>) {
+        viewModelScope.launch {
+            repository.reorderAccounts(ordered)
+            SyncWorker.enqueue(app)
+        }
+    }
+
+    /** One list of siblings at a time. See the repository. */
+    fun reorderCategories(ordered: List<CategoryEntity>) {
+        viewModelScope.launch {
+            repository.reorderCategories(ordered)
+            SyncWorker.enqueue(app)
+        }
+    }
+
     fun addRecurringRule(draft: RuleDraft) {
         viewModelScope.launch {
             val memberId = session.memberId() ?: return@launch

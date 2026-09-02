@@ -198,6 +198,44 @@ private fun RuleRow(
     }
 }
 
+/**
+ * What the editor opens with: either an existing rule, or the half-typed
+ * transaction the keypad handed over.
+ *
+ * Every field is optional because a seed from the keypad is a partial rule —
+ * an amount and maybe a category, with the frequency and the end date still to
+ * be chosen. [ruleId] is the one field that decides whether saving updates or
+ * creates.
+ */
+data class RuleSeed(
+    val ruleId: String? = null,
+    val kind: String = "expense",
+    val amountMinor: Long? = null,
+    val accountId: String? = null,
+    val categoryId: String? = null,
+    val note: String? = null,
+    val freq: String = Recurrence.MONTHLY,
+    val startsOn: LocalDate? = null,
+    val endsOn: LocalDate? = null,
+) {
+    companion object {
+        private fun date(value: String?): LocalDate? =
+            value?.let { runCatching { LocalDate.parse(it) }.getOrNull() }
+
+        fun of(rule: RecurringRuleListItem) = RuleSeed(
+            ruleId = rule.id,
+            kind = rule.kind,
+            amountMinor = rule.amountMinor,
+            accountId = rule.accountId,
+            categoryId = rule.categoryId,
+            note = rule.note,
+            freq = rule.freq,
+            startsOn = date(rule.startsOn),
+            endsOn = date(rule.endsOn),
+        )
+    }
+}
+
 /** Everything a rule needs that the caller does not already know. */
 data class RuleDraft(
     val kind: String,

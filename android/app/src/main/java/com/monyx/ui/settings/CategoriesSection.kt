@@ -37,6 +37,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardCapitalization
@@ -55,6 +56,7 @@ fun CategoriesSection(
     onAdd: (name: String, kind: String, parentId: String?, icon: String?, color: String?) -> Unit,
     onUpdate: (CategoryEntity) -> Unit,
     onDelete: (CategoryEntity) -> Unit,
+    onReorder: (List<CategoryEntity>) -> Unit,
 ) {
     var addTarget by remember { mutableStateOf<AddCategoryTarget?>(null) }
     var editing by remember { mutableStateOf<CategoryEntity?>(null) }
@@ -75,14 +77,24 @@ fun CategoriesSection(
                 kind = group.kind,
                 onAdd = { addTarget = AddCategoryTarget(kind = group.kind, parentId = null) },
             )
-            group.roots.forEach { node ->
+            // Siblings reorder among siblings: the roots of this kind here,
+            // the children of one parent inside the node below. Dragging a
+            // category out of its family would be a reparent, and nesting is
+            // exactly one level deep by construction.
+            ReorderableColumn(
+                items = group.roots,
+                keyOf = { it.entity.id },
+                onReorder = { nodes -> onReorder(nodes.map { it.entity }) },
+            ) { node, dragging ->
                 CategoryNodeItem(
                     node = node,
+                    dragging = dragging,
                     onEditRoot = { editing = node.entity },
                     onDeleteRoot = { deleting = node.entity },
                     onAddChild = { addTarget = AddCategoryTarget(kind = group.kind, parentId = node.entity.id) },
                     onEditChild = { editing = it },
                     onDeleteChild = { deleting = it },
+                    onReorderChildren = onReorder,
                 )
             }
         }
@@ -170,17 +182,30 @@ private fun CategoryKindHeader(kind: String, onAdd: () -> Unit) {
 @Composable
 private fun CategoryNodeItem(
     node: CategoryNode,
+    dragging: Boolean,
     onEditRoot: () -> Unit,
     onDeleteRoot: () -> Unit,
     onAddChild: () -> Unit,
     onEditChild: (CategoryEntity) -> Unit,
     onDeleteChild: (CategoryEntity) -> Unit,
+    onReorderChildren: (List<CategoryEntity>) -> Unit,
 ) {
     Column {
-        CategoryLeafRow(entity = node.entity, onEdit = onEditRoot, onDelete = onDeleteRoot, onAddChild = onAddChild)
-        node.children.forEach { child ->
+        CategoryLeafRow(
+            entity = node.entity,
+            dragging = dragging,
+            onEdit = onEditRoot,
+            onDelete = onDeleteRoot,
+            onAddChild = onAddChild,
+        )
+        ReorderableColumn(
+            items = node.children,
+            keyOf = { it.id },
+            onReorder = onReorderChildren,
+        ) { child, childDragging ->
             CategoryLeafRow(
                 entity = child,
+                dragging = childDragging,
                 onEdit = { onEditChild(child) },
                 onDelete = { onDeleteChild(child) },
                 indent = true,
@@ -192,6 +217,7 @@ private fun CategoryNodeItem(
 @Composable
 private fun CategoryLeafRow(
     entity: CategoryEntity,
+    dragging: Boolean,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
     onAddChild: (() -> Unit)? = null,
@@ -200,7 +226,14 @@ private fun CategoryLeafRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(start = if (indent) 32.dp else 0.dp, top = 4.dp, bottom = 4.dp),
+            .padding(start = if (indent) 32.dp else 0.dp)
+            // Picked up: shaded and rounded, so the row following the finger is
+            // obviously not one of the ones holding still.
+            .clip(RoundedCornerShape(14.dp))
+            .background(
+                if (dragging) MaterialTheme.colorScheme.surfaceVariant else Color.Transparent,
+            )
+            .padding(top = 4.dp, bottom = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(

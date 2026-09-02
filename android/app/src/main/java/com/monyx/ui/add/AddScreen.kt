@@ -6,6 +6,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -23,6 +25,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CalendarToday
+import androidx.compose.material.icons.filled.Dialpad
+import androidx.compose.material.icons.filled.Repeat
 import androidx.compose.material.icons.filled.Wallet
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -44,8 +48,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardCapitalization
@@ -58,6 +65,9 @@ import com.monyx.data.AccountEntity
 import com.monyx.data.CategoryEntity
 import com.monyx.data.Dates
 import com.monyx.data.Money
+import com.monyx.ui.JumpToToday
+import com.monyx.ui.settings.RecurringEditor
+import com.monyx.ui.settings.RuleSeed
 import com.monyx.ui.theme.Palette
 import java.time.Instant
 import java.time.LocalDate
@@ -70,7 +80,33 @@ import java.time.ZoneOffset
  * Target: two taps plus the amount, under five seconds from unlocking the phone.
  * Anything that stretches that — an animation, a save confirmation, a
  * network requirement — is a bug, not a matter of taste.
+ *
+ * The order down the screen is kind, then account and date, then the amount.
+ * The amount sits directly above the categories and directly above the keypad
+ * that types it, which is where the eye already is; the two chips that are
+ * almost always left on their defaults are out of that path rather than
+ * through the middle of it.
  */
+
+/**
+ * Which input the bottom of the screen is currently giving to.
+ *
+ * Only one of the two can be useful at a time, and neither is useful all of the
+ * time. The keypad is 236dp of screen that means nothing once the amount is
+ * typed, and it used to sit there through the category tap and under the note's
+ * own keyboard — so the grid was scrolling four rows at a time in a window it
+ * did not need to be sharing.
+ */
+private enum class Editing {
+    /** Typing the amount. */
+    Amount,
+
+    /** Typing the note; the system keyboard is up and the keypad is not. */
+    Note,
+
+    /** Neither — the category grid has the screen to itself. */
+    Nothing,
+}
 @Composable
 fun AddScreen(
     viewModel: AddViewModel,
@@ -114,24 +150,80 @@ fun AddScreen(
 
     var showAccountPicker by remember { mutableStateOf(false) }
     var showDatePicker by remember { mutableStateOf(false) }
+    var editing by remember { mutableStateOf(Editing.Amount) }
+    var seed by remember { mutableStateOf<RuleSeed?>(null) }
+
+    val focusManager = LocalFocusManager.current
+    val keyboard = LocalSoftwareKeyboardController.current
+
+    // Going back to the keypad has to take the system keyboard down with it,
+    // and the only way to do that is to drop the note field's focus — a
+    // keyboard hidden while its field is still focused comes straight back on
+    // the next recomposition.
+    fun editAmount() {
+        focusManager.clearFocus()
+        keyboard?.hide()
+        editing = Editing.Amount
+    }
+
+    // The keypad hands the half-typed transaction to the rule editor rather
+    // than making anyone type it twice. A rule does not backfill, so an anchor
+    // in the past is pulled forward to today; a date in the FUTURE is kept,
+    // because "this starts next month" is an ordinary thing to mean.
+    seed?.let { open ->
+        RecurringEditor(
+            seed = open,
+            accounts = accounts,
+            categories = expenseCategories + incomeCategories,
+            onDismiss = { seed = null },
+            onSave = { draft ->
+                memberId?.let { viewModel.saveRecurring(draft, it, onSaved) }
+                seed = null
+                editing = Editing.Amount
+            },
+        )
+        return
+    }
 
     Column(modifier = Modifier.fillMaxSize()) {
         KindSelector(selected = state.kind, onSelect = viewModel::setKind)
-
-        AmountDisplay(state = state)
 
         ContextRow(
             state = state,
             accounts = accounts,
             onPickAccount = { showAccountPicker = true },
             onPickDate = { showDatePicker = true },
+            onMakeRecurring = {
+                focusManager.clearFocus()
+                seed = RuleSeed(
+                    kind = state.kind.wire,
+                    amountMinor = state.amountMinor.takeIf { it > 0 },
+                    accountId = state.accountId,
+                    categoryId = state.categoryId,
+                    note = state.note.trim().takeIf { it.isNotBlank() },
+                    startsOn = maxOf(state.date, Dates.today()),
+                )
+            },
+        )
+
+        AmountDisplay(
+            state = state,
+            keypadHidden = editing != Editing.Amount,
+            onClick = { editAmount() },
         )
 
         CategoryGrid(
             categories = selectable,
             selectedId = state.categoryId,
             colorOf = colorOf,
-            onSelect = viewModel::selectCategory,
+            onSelect = {
+                viewModel.selectCategory(it)
+                // The amount is typed by now; the grid is what the screen is
+                // for at this point, so the keypad gets out of its way.
+                focusManager.clearFocus()
+                keyboard?.hide()
+                editing = Editing.Nothing
+            },
             modifier = Modifier.weight(1f),
         )
 
@@ -143,19 +235,29 @@ fun AddScreen(
             // A note is a sentence fragment ("Zakupy na weekend"), so the
             // keyboard opens shifted. A hint only: shift still wins for "iPhone".
             keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 4.dp)
+                .onFocusChanged { if (it.isFocused) editing = Editing.Note },
         )
 
-        Keypad(
-            onKey = viewModel::onKey,
-            equalsEnabled = state.amount.hasPendingOperation,
-            modifier = Modifier.height(236.dp),
-        )
+        if (editing == Editing.Amount) {
+            Keypad(
+                onKey = viewModel::onKey,
+                equalsEnabled = state.amount.hasPendingOperation,
+                modifier = Modifier.height(236.dp),
+            )
+        }
 
         SaveBar(
             state = state,
             hasMember = memberId != null,
-            onSave = { memberId?.let { viewModel.save(it, onSaved) } },
+            onSave = {
+                memberId?.let {
+                    viewModel.save(it, onSaved)
+                    editAmount()
+                }
+            },
         )
     }
 
@@ -277,11 +379,18 @@ private fun SaveBar(state: AddUiState, hasMember: Boolean, onSave: () -> Unit) {
 /**
  * A Text, not a TextField. There is no focus to request and no keyboard to wait
  * for, which is the whole point.
+ *
+ * It is tappable, and that tap is the only way back to a hidden keypad — so
+ * when the keypad is hidden it grows a small dialpad glyph. Without it the
+ * amount is a heading that happens to be a button, which nobody would guess.
  */
 @Composable
-private fun AmountDisplay(state: AddUiState) {
+private fun AmountDisplay(state: AddUiState, keypadHidden: Boolean, onClick: () -> Unit) {
     Column(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 8.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(horizontal = 20.dp, vertical = 8.dp),
         horizontalAlignment = Alignment.End,
     ) {
         // The running total, not just the sign: "60,00 +" while the second
@@ -296,6 +405,15 @@ private fun AmountDisplay(state: AddUiState) {
             )
         }
         Row(verticalAlignment = Alignment.Bottom) {
+            if (keypadHidden) {
+                Icon(
+                    imageVector = Icons.Filled.Dialpad,
+                    contentDescription = stringResource(R.string.add_show_keypad),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(20.dp).padding(bottom = 2.dp),
+                )
+                Spacer(Modifier.width(10.dp))
+            }
             Text(
                 text = state.amount.display(LocalConfiguration.current.locales[0]),
                 fontSize = 52.sp,
@@ -315,20 +433,25 @@ private fun AmountDisplay(state: AddUiState) {
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun ContextRow(
     state: AddUiState,
     accounts: List<AccountEntity>,
     onPickAccount: () -> Unit,
     onPickDate: () -> Unit,
+    onMakeRecurring: () -> Unit,
 ) {
     val accountName = accounts.firstOrNull { it.id == state.accountId }?.name
         ?: stringResource(R.string.add_needs_account)
 
-    Row(
+    // FlowRow, not Row: three chips, one of which is a whole phrase in two
+    // languages, overflow a narrow screen — and a Row does not wrap, it
+    // squeezes the last child until its label breaks between letters.
+    FlowRow(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalAlignment = Alignment.CenterVertically,
+        verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         ContextChip(
             icon = { Icon(Icons.Filled.Wallet, contentDescription = null, modifier = Modifier.size(16.dp)) },
@@ -343,6 +466,15 @@ private fun ContextRow(
                 else -> Dates.dayLabel(state.date.toString())
             },
             onClick = onPickDate,
+        )
+        // Rent and the phone bill get typed once by hand before anyone thinks
+        // "this happens every month". Catching that thought here, with the
+        // amount and the category already filled in, is the difference between
+        // setting up a rule and going to Settings to set up a rule.
+        ContextChip(
+            icon = { Icon(Icons.Filled.Repeat, contentDescription = null, modifier = Modifier.size(16.dp)) },
+            label = stringResource(R.string.add_make_recurring),
+            onClick = onMakeRecurring,
         )
     }
 }
@@ -459,18 +591,14 @@ private fun DayPickerDialog(
     onPick: (LocalDate) -> Unit,
     onDismiss: () -> Unit,
 ) {
-    // A month grid. The previous fourteen-day list could not reach a date at the
-    // end of last month, which is exactly when someone is catching up on
-    // receipts. Future days stay unselectable — an expense has already happened.
-    val today = Dates.today()
+    // A month grid, with no floor and no ceiling. It used to refuse the future
+    // on the grounds that an expense has already happened — true of a receipt
+    // and false of the standing order leaving on Friday, the deposit due next
+    // week, the flights already booked. A household budget is as much about
+    // what is coming as what went, and the month totals are the place it has
+    // to show up.
     val state = rememberDatePickerState(
         initialSelectedDateMillis = selected.atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli(),
-        selectableDates = object : androidx.compose.material3.SelectableDates {
-            override fun isSelectableDate(utcTimeMillis: Long): Boolean =
-                !utcMillisToLocalDate(utcTimeMillis).isAfter(today)
-
-            override fun isSelectableYear(year: Int): Boolean = year <= today.year
-        },
     )
 
     DatePickerDialog(
@@ -486,7 +614,7 @@ private fun DayPickerDialog(
             TextButton(onClick = onDismiss) { Text(stringResource(R.string.settings_cancel)) }
         },
     ) {
-        DatePicker(state = state, title = null)
+        DatePicker(state = state, title = { JumpToToday(state) })
     }
 }
 

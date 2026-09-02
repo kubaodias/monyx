@@ -43,6 +43,28 @@ that ended the sum were the same shape in the same place. The tick is honestly
 `=` now, and when the button cannot save it names what is still missing instead
 of sitting there grey.
 
+The keypad puts itself away. Tap a category or the note and it goes; tap the
+amount and it comes back, taking the system keyboard with it. It is a quarter
+of the screen that means nothing once the figure is typed, and it used to sit
+there through the category tap and underneath the note's own keyboard. The
+amount grows a small dialpad glyph while it is hidden, because it is the way
+back and nothing else would say so.
+
+The date can be in the future. An expense has already happened, which is true
+of a receipt and false of the standing order leaving on Friday — and a
+household budget is as much about what is coming as what went.
+
+Beside the account and the date is *Make it repeat*, which hands the half-typed
+transaction to the rule editor with everything already filled in. Rent gets
+typed by hand once before anyone thinks "this happens every month"; catching
+that thought here is the difference between setting up a rule and going to
+Settings to set one up. It creates one thing, not two — the rule's first
+occurrence is the transaction you were typing.
+
+Accounts and categories are dragged into order in Settings, and the keypad's
+grid, the budget list and the breakdown all follow. They were sorting by
+`sortOrder` from the first schema; nothing had ever written it.
+
 Tapping the balance turns the card over, and the three figures on it do not
 change — the back adds the path, not a second opinion. The line is the month's
 balance arriving: payday is the step up, and the long grind down to the next one

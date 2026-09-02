@@ -78,7 +78,6 @@ import com.monyx.MonyxApp
 import com.monyx.R
 import com.monyx.data.Dates
 import com.monyx.data.MemberEntity
-import com.monyx.data.RecurringRuleListItem
 import com.monyx.ui.theme.Palette
 import kotlinx.coroutines.launch
 
@@ -93,18 +92,19 @@ private const val BACKUP_STALE_MS = 3L * 24 * 60 * 60 * 1000
  *
  * Four groups, by what the person is there to do rather than by what the code
  * calls things: set the app up, describe the month's fixed shape, deal with
- * other people, and the operational levers that only matter when something has
- * gone wrong.
+ * other people, and the levers pulled once and then left alone.
+ *
+ * Language has a tab of its own rather than a card under General, and the tab
+ * is called Region rather than Language: currency belongs beside it, and both
+ * answer the same question — where this household is, not what the app does.
  */
 private enum class SettingsTab(val labelRes: Int) {
     General(R.string.settings_tab_general),
     Recurring(R.string.settings_tab_recurring),
     People(R.string.settings_tab_people),
+    Region(R.string.settings_tab_region),
     Advanced(R.string.settings_tab_advanced),
 }
-
-/** Which rule the editor is open on. Null inside it means a new one. */
-private data class EditorTarget(val rule: RecurringRuleListItem?)
 
 /**
  * Settings holds accounts, categories, repeating rules, members, invite code
@@ -144,23 +144,23 @@ fun SettingsScreen() {
     }
 
     var tab by rememberSaveable { mutableStateOf(SettingsTab.General) }
-    // Non-null while the repeating-rule editor is open. Wrapped rather than a
-    // bare nullable rule, because "add" and "edit rule X" are both open states
-    // and only one of them has a rule in it.
-    var editor by remember { mutableStateOf<EditorTarget?>(null) }
+    // Non-null while the repeating-rule editor is open. A seed rather than a
+    // nullable rule, because "add" and "edit rule X" are both open states and
+    // only one of them has a rule behind it.
+    var editor by remember { mutableStateOf<RuleSeed?>(null) }
 
-    editor?.let { target ->
+    editor?.let { seed ->
         RecurringEditor(
-            initial = target.rule,
+            seed = seed,
             accounts = accounts.filter { it.entity.archived == 0 }.map { it.entity },
             categories = allCategories,
             onDismiss = { editor = null },
             onSave = { draft ->
-                val existing = target.rule
-                if (existing == null) {
+                val ruleId = seed.ruleId
+                if (ruleId == null) {
                     viewModel.addRecurringRule(draft)
                 } else {
-                    viewModel.updateRecurringRule(existing.id, draft)
+                    viewModel.updateRecurringRule(ruleId, draft)
                 }
                 editor = null
             },
@@ -208,6 +208,7 @@ fun SettingsScreen() {
                             onUpdate = viewModel::updateAccount,
                             onArchive = viewModel::setAccountArchived,
                             onDelete = viewModel::deleteAccount,
+                            onReorder = viewModel::reorderAccounts,
                         )
                     }
                     item {
@@ -216,16 +217,16 @@ fun SettingsScreen() {
                             onAdd = viewModel::addCategory,
                             onUpdate = viewModel::updateCategory,
                             onDelete = viewModel::deleteCategory,
+                            onReorder = viewModel::reorderCategories,
                         )
                     }
-                    item { LanguageSection() }
                 }
 
                 SettingsTab.Recurring -> item {
                     RecurringSection(
                         rules = recurringRules,
                         hasAccounts = accounts.any { it.entity.archived == 0 },
-                        onOpen = { editor = EditorTarget(it) },
+                        onOpen = { editor = it?.let(RuleSeed::of) ?: RuleSeed() },
                         onDelete = viewModel::deleteRecurringRule,
                     )
                 }
@@ -243,6 +244,8 @@ fun SettingsScreen() {
                         )
                     }
                 }
+
+                SettingsTab.Region -> item { LanguageSection() }
 
                 SettingsTab.Advanced -> {
                     item {
