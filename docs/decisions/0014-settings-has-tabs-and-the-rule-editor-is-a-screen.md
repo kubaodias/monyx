@@ -27,12 +27,20 @@ the code calls things:
 
 | Tab | Holds |
 |---|---|
-| General | Accounts, categories, language |
-| Repeating | The rules |
-| Household | Members, invite code |
+| General | Accounts, categories |
+| Repeating rules | The rules |
+| Users | Members, invite code |
+| Language | The interface language |
 | Advanced | Sync, backup, re-upload, build identity |
 
-`ScrollableTabRow`, not `TabRow`: four Polish labels do not fit four equal
+Language began as a card under General and became a tab of its own, on the
+grounds that it is a different kind of question from "what are my accounts".
+It is named for what is in it rather than for what might join it: **Region**
+would be naming the tab after a currency setting that [0004] says will not
+exist, the currency being fixed and the timezone the household's. If that is
+ever reversed, the rename is one string.
+
+`ScrollableTabRow`, not `TabRow`: five Polish labels do not fit five equal
 columns on a narrow phone, and a fixed row answers that by shrinking the text
 until it wraps mid-word.
 
@@ -65,3 +73,5 @@ actually matters.
 - `recurring_added_count` is gone from both languages.
 - The editor keeps the anchor floor, the end-before-start guard and the
   month-end note from the dialog it replaces. None of that was the problem.
+
+[0004]: 0004-language-moves-currency-and-timezone-do-not.md

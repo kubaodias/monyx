@@ -218,11 +218,19 @@ fun AddScreen(
             colorOf = colorOf,
             onSelect = {
                 viewModel.selectCategory(it)
-                // The amount is typed by now; the grid is what the screen is
-                // for at this point, so the keypad gets out of its way.
-                focusManager.clearFocus()
-                keyboard?.hide()
-                editing = Editing.Nothing
+                // The keypad only stands down once it has done its job. With an
+                // amount already typed, the grid is what the screen is for and
+                // the keys are 236dp in its way. With no amount, picking the
+                // category first is somebody working in the other order — and
+                // taking the keys away at exactly the moment they are needed
+                // next would be the opposite of helping.
+                if (state.amountMinor > 0) {
+                    focusManager.clearFocus()
+                    keyboard?.hide()
+                    editing = Editing.Nothing
+                } else {
+                    editAmount()
+                }
             },
             modifier = Modifier.weight(1f),
         )

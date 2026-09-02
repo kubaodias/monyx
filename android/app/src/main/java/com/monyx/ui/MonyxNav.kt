@@ -3,7 +3,9 @@ package com.monyx.ui
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
@@ -261,7 +263,17 @@ private fun MainScaffold(
             // is the single thing that determines whether the family is still
             // using this in a month.
             startDestination = startDestination ?: Destinations.ADD,
-            modifier = Modifier.padding(padding),
+            // consumeWindowInsets, THEN imePadding. The window is edge to edge,
+            // so `adjustResize` in the manifest does nothing on API 30+ and the
+            // keyboard simply draws over the bottom of the screen — which is
+            // where the note field and the save button live. imePadding lifts
+            // them; consumeWindowInsets(padding) is what stops it adding the
+            // navigation bar's height a second time, since the Scaffold has
+            // already accounted for it in `padding`.
+            modifier = Modifier
+                .padding(padding)
+                .consumeWindowInsets(padding)
+                .imePadding(),
         ) {
             composable(Destinations.ADD) {
                 AddScreen(

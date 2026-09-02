@@ -117,7 +117,7 @@
     <string name="settings_tab_general">General</string>
     <string name="settings_tab_recurring">Repeating rules</string>
     <string name="settings_tab_people">Users</string>
-    <string name="settings_tab_region">Region</string>
+    <string name="settings_tab_language">Language</string>
     <string name="settings_tab_advanced">Advanced</string>
     <string name="settings_accounts">Accounts</string>
     <string name="settings_categories">Categories</string>

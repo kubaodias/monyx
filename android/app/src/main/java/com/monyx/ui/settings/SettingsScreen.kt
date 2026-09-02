@@ -94,15 +94,17 @@ private const val BACKUP_STALE_MS = 3L * 24 * 60 * 60 * 1000
  * calls things: set the app up, describe the month's fixed shape, deal with
  * other people, and the levers pulled once and then left alone.
  *
- * Language has a tab of its own rather than a card under General, and the tab
- * is called Region rather than Language: currency belongs beside it, and both
- * answer the same question — where this household is, not what the app does.
+ * Language has a tab of its own rather than a card under General. It is named
+ * for what is actually in it: Region would be naming the tab for a currency
+ * setting that [0004] says will not exist — the currency is fixed and the
+ * timezone is the household's, neither of them a preference. If that decision
+ * is ever reversed, renaming one string is the whole cost.
  */
 private enum class SettingsTab(val labelRes: Int) {
     General(R.string.settings_tab_general),
     Recurring(R.string.settings_tab_recurring),
     People(R.string.settings_tab_people),
-    Region(R.string.settings_tab_region),
+    Language(R.string.settings_tab_language),
     Advanced(R.string.settings_tab_advanced),
 }
 
@@ -245,7 +247,7 @@ fun SettingsScreen() {
                     }
                 }
 
-                SettingsTab.Region -> item { LanguageSection() }
+                SettingsTab.Language -> item { LanguageSection() }
 
                 SettingsTab.Advanced -> {
                     item {
