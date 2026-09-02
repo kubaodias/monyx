@@ -50,3 +50,11 @@ it anyway and the whole list is a handful of rows.
 - `ReorderableColumn` keys its gesture detector on the item's identity, not its
   index. Keyed by index, every swap would restart the detector and drop the
   finger that was mid-drag.
+- `ReorderableColumn` remembers the dragged order as a list of KEYS, and always
+  renders the items it was last passed. Remembering the items themselves made
+  every edit that did not change the set of ids invisible: a new subcategory
+  never appeared, because adding a child does not change the list of root ids
+  that the remembered copy was keyed on, so the root on screen kept the children
+  it was built with. A rename, a recoloured icon and a moved balance were stale
+  the same way. The override is dropped as soon as the database agrees with it,
+  so an order arriving from another phone can still win.

@@ -145,7 +145,8 @@
     <string name="settings_add_account">Add an account</string>
     <string name="settings_add_category">Add a category</string>
     <string name="settings_account_name">Account name</string>
-    <string name="settings_account_balance">Opening balance</string>
+    <string name="settings_account_balance">Current balance</string>
+    <string name="settings_account_opening">Opening balance: %1$s</string>
     <string name="settings_category_name">Category name</string>
     <string name="settings_category_parent">Parent category</string>
     <string name="settings_category_none">None</string>

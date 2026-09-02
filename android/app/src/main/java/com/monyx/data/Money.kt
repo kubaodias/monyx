@@ -65,9 +65,18 @@ object Money {
      *  - one kind, once      -> decimal, unless it is this locale's grouping
      *                           separator sitting in front of exactly three
      *                           digits, which is "1,234" in English
+     *
+     * A leading minus is honoured, because an account balance can be one: a
+     * credit card that has been used is money owed, and typing what the banking
+     * app shows has to be allowed to produce it.
      */
     fun parseToMinor(text: String): Long {
-        val grouping = DecimalFormatSymbols.getInstance(Locale.getDefault()).groupingSeparator
+        val symbols = DecimalFormatSymbols.getInstance(Locale.getDefault())
+        val grouping = symbols.groupingSeparator
+        // The locale's own minus as well as the ASCII one — a figure copied
+        // from elsewhere can carry U+2212, and NumberFormat may have printed it.
+        val negative = text.trimStart().firstOrNull()
+            ?.let { it == '-' || it == '\u2212' || it == symbols.minusSign } == true
         val stripped = text.filter { it.isDigit() || it == ',' || it == '.' }
         val commas = stripped.count { it == ',' }
         val dots = stripped.count { it == '.' }
@@ -91,7 +100,8 @@ object Money {
             }
         }
         val value = normalised.toDoubleOrNull() ?: return 0
-        return Math.round(value * 100)
+        val minor = Math.round(value * 100)
+        return if (negative) -minor else minor
     }
 }
 

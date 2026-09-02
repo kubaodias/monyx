@@ -91,6 +91,22 @@ class MoneyTest {
         assertEquals(123400L, Money.parseToMinor("1,234"))
         assertEquals(150000L, Money.parseToMinor("1500"))
     }
+
+    /**
+     * A card that has been used is money owed, and the account settings ask for
+     * the balance the banking app shows — which for that card starts with a
+     * minus. Everywhere else a negative is rejected by the caller, which checks
+     * for a positive amount before it saves.
+     */
+    @Test
+    fun `a leading minus survives the parse`() = withLocale("pl-PL") {
+        assertEquals(-4599L, Money.parseToMinor("-45,99"))
+        assertEquals(-150000L, Money.parseToMinor("-1 500,00"))
+        // U+2212, which is what a figure pasted from elsewhere often carries.
+        assertEquals(-4599L, Money.parseToMinor("\u221245,99"))
+        // Only a LEADING one: a stray minus mid-number is not a sign.
+        assertEquals(4599L, Money.parseToMinor("45-,99"))
+    }
 }
 
 class DatesTest {

@@ -47,7 +47,7 @@ import com.monyx.ui.theme.Palette
 
 /**
  * Accounts: list, add, edit, archive, restore and delete. Editing offers name,
- * opening balance, icon and colour.
+ * balance, icon and colour.
  *
  * Archived accounts sit in their own section below the open ones rather than
  * behind a screen of their own — the whole point of an archive is that it is
@@ -63,7 +63,7 @@ fun AccountsSection(
     onReorder: (List<AccountEntity>) -> Unit,
 ) {
     var showAdd by remember { mutableStateOf(false) }
-    var editing by remember { mutableStateOf<AccountEntity?>(null) }
+    var editing by remember { mutableStateOf<AccountRow?>(null) }
     var deleting by remember { mutableStateOf<AccountEntity?>(null) }
     var archiving by remember { mutableStateOf<AccountEntity?>(null) }
 
@@ -96,7 +96,7 @@ fun AccountsSection(
                 AccountRowItem(
                     row = row,
                     dragging = dragging,
-                    onEdit = { editing = row.entity },
+                    onEdit = { editing = row },
                     onArchive = { archiving = row.entity },
                     onRestore = null,
                     onDelete = { deleting = row.entity },
@@ -114,7 +114,7 @@ fun AccountsSection(
                 AccountRowItem(
                     row = row,
                     dragging = false,
-                    onEdit = { editing = row.entity },
+                    onEdit = { editing = row },
                     onArchive = null,
                     // Restoring is not destructive and is the whole reason the
                     // row is still here, so it needs no confirmation.
@@ -142,7 +142,10 @@ fun AccountsSection(
         AccountEditDialog(
             title = stringResource(R.string.settings_add_account),
             initialName = "",
-            initialBalanceMinor = 0,
+            balanceMinor = 0,
+            // A brand new account has no transactions, so the balance being
+            // typed IS the opening balance.
+            movementsMinor = 0,
             initialIcon = null,
             initialColor = null,
             onDismiss = { showAdd = false },
@@ -153,16 +156,29 @@ fun AccountsSection(
         )
     }
 
-    editing?.let { entity ->
+    editing?.let { row ->
+        val entity = row.entity
+        // Everything the transactions have done to this account since it was
+        // opened. Balance = opening + movements, so a typed balance decides the
+        // opening one and not the other way round.
+        val movements = row.balanceMinor - entity.initialBalanceMinor
         AccountEditDialog(
             title = stringResource(R.string.settings_edit_account),
             initialName = entity.name,
-            initialBalanceMinor = entity.initialBalanceMinor,
+            balanceMinor = row.balanceMinor,
+            movementsMinor = movements,
             initialIcon = entity.icon,
             initialColor = entity.color,
             onDismiss = { editing = null },
             onSave = { name, balanceMinor, icon, color ->
-                onUpdate(entity.copy(name = name, initialBalanceMinor = balanceMinor, icon = icon, color = color))
+                onUpdate(
+                    entity.copy(
+                        name = name,
+                        initialBalanceMinor = balanceMinor - movements,
+                        icon = icon,
+                        color = color,
+                    ),
+                )
                 editing = null
             },
         )
@@ -252,18 +268,35 @@ private fun AccountRowItem(
     }
 }
 
+/**
+ * The balance field is the balance the account has NOW, not the one it opened
+ * with.
+ *
+ * Nobody knows what their current account held on the day they started using
+ * this app; they know what the banking app says this morning. So that is what
+ * is asked for, and the opening balance is worked backwards from it —
+ * `opening = typed - movements` — which lands the running total exactly on the
+ * typed figure. Editing it to the same number it already shows is therefore a
+ * no-op, which is the behaviour that was missing: typing today's balance into a
+ * field holding a months-old opening figure moved the account by the difference
+ * twice over.
+ *
+ * @param movementsMinor everything the transactions have added and taken away
+ *   since. Zero for a new account, which is why the same dialog does both jobs.
+ */
 @Composable
 private fun AccountEditDialog(
     title: String,
     initialName: String,
-    initialBalanceMinor: Long,
+    balanceMinor: Long,
+    movementsMinor: Long,
     initialIcon: String?,
     initialColor: String?,
     onDismiss: () -> Unit,
     onSave: (name: String, balanceMinor: Long, icon: String?, color: String?) -> Unit,
 ) {
     var name by remember { mutableStateOf(initialName) }
-    var balanceText by remember { mutableStateOf(if (initialBalanceMinor == 0L) "" else Money.format(initialBalanceMinor)) }
+    var balanceText by remember { mutableStateOf(if (balanceMinor == 0L) "" else Money.format(balanceMinor)) }
     var icon by remember { mutableStateOf(initialIcon) }
     var color by remember { mutableStateOf(initialColor) }
 
@@ -294,6 +327,21 @@ private fun AccountEditDialog(
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                     modifier = Modifier.fillMaxWidth(),
                 )
+                // The arithmetic, shown rather than explained, and only when
+                // there is any: an account with no transactions has an opening
+                // balance identical to the field above it, and repeating the
+                // number would just look like a mistake.
+                if (movementsMinor != 0L) {
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        stringResource(
+                            R.string.settings_account_opening,
+                            Money.formatWithCurrency(Money.parseToMinor(balanceText) - movementsMinor),
+                        ),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
                 Spacer(Modifier.height(12.dp))
                 Text(stringResource(R.string.settings_icon), style = MaterialTheme.typography.labelMedium)
                 Spacer(Modifier.height(6.dp))

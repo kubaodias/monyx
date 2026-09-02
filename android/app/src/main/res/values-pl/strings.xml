@@ -142,7 +142,8 @@
     <string name="settings_add_account">Dodaj konto</string>
     <string name="settings_add_category">Dodaj kategorię</string>
     <string name="settings_account_name">Nazwa konta</string>
-    <string name="settings_account_balance">Saldo początkowe</string>
+    <string name="settings_account_balance">Aktualne saldo</string>
+    <string name="settings_account_opening">Saldo początkowe: %1$s</string>
     <string name="settings_category_name">Nazwa kategorii</string>
     <string name="settings_category_parent">Kategoria nadrzędna</string>
     <string name="settings_category_none">Brak</string>

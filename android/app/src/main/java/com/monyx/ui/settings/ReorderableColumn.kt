@@ -1,14 +1,17 @@
 package com.monyx.ui.settings
 
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
@@ -45,11 +48,19 @@ fun <T> ReorderableColumn(
     modifier: Modifier = Modifier,
     row: @Composable (item: T, dragging: Boolean) -> Unit,
 ) {
-    // The order on screen, which leads the database during a drag. Reset only
-    // when the identities change — our own swaps do not touch `items`, so the
-    // list does not snap back between the finger lifting and Room catching up.
-    val keys = items.map(keyOf)
-    var order by remember(keys) { mutableStateOf(items) }
+    // What a drag left behind, as KEYS — never as items.
+    //
+    // Remembering the items themselves is what made an edit invisible: a
+    // remembered copy only refreshes when the identities change, and adding a
+    // subcategory does not change the list of root ids, so the roots on screen
+    // kept the children they were built with and the new row never appeared.
+    // The same held for a rename, a recoloured icon and a balance that moved.
+    // Keys carry the order; the content always comes from [items].
+    //
+    // Null for all but a second or two: the order comes from the database
+    // except between the finger lifting and Room catching up, which is the one
+    // moment the list would otherwise snap back to where it started.
+    var draggedOrder by remember { mutableStateOf<List<String>?>(null) }
     var draggingKey by remember { mutableStateOf<String?>(null) }
     var offsetY by remember { mutableFloatStateOf(0f) }
 
@@ -59,8 +70,32 @@ fun <T> ReorderableColumn(
     // crossed.
     val heights = remember { mutableStateListOf<Int>() }
 
+    // The gesture reads these long after the composition that started it: the
+    // pointerInput block is keyed by identity alone, so it does not restart
+    // when the list underneath changes.
+    val latest by rememberUpdatedState(items)
+
+    // Once the database agrees with the finger, stop overriding it — otherwise
+    // an order arriving from another phone could never win.
+    LaunchedEffect(items) {
+        if (draggedOrder == items.map(keyOf)) draggedOrder = null
+    }
+
+    fun ordered(): List<T> {
+        val fresh = latest
+        val order = draggedOrder ?: return fresh
+        val byKey = fresh.associateBy(keyOf)
+        // A row added or removed while the override stands makes it meaningless
+        // — better the database's order with everything in it than a stale one
+        // missing a row.
+        if (byKey.keys != order.toSet()) return fresh
+        return order.mapNotNull(byKey::get)
+    }
+
+    val display = ordered()
+
     Column(modifier = modifier) {
-        order.forEachIndexed { index, item ->
+        display.forEachIndexed { index, item ->
             val key = keyOf(item)
             val dragging = key == draggingKey
             // key(), or the whole thing silently fails to save.
@@ -72,7 +107,7 @@ fun <T> ReorderableColumn(
             // screen and nothing is ever written. With key() the node moves
             // with its item and the gesture survives the swap that caused it.
             key(key) {
-                androidx.compose.foundation.layout.Box(
+                Box(
                     modifier = Modifier
                         // Above its neighbours while it is in the air, or the row
                         // it is passing paints over the top of it.
@@ -94,7 +129,7 @@ fun <T> ReorderableColumn(
                                 onDragEnd = {
                                     draggingKey = null
                                     offsetY = 0f
-                                    onReorder(order)
+                                    onReorder(ordered())
                                 },
                                 onDragCancel = {
                                     draggingKey = null
@@ -103,16 +138,19 @@ fun <T> ReorderableColumn(
                                 onDrag = { change, amount ->
                                     change.consume()
                                     offsetY += amount.y
-                                    val from = order.indexOfFirst { keyOf(it) == key }
+                                    val now = ordered()
+                                    val from = now.indexOfFirst { keyOf(it) == key }
                                     if (from < 0) return@detectDragGesturesAfterLongPress
                                     val to = if (offsetY > 0) from + 1 else from - 1
-                                    if (to !in order.indices) return@detectDragGesturesAfterLongPress
+                                    if (to !in now.indices) return@detectDragGesturesAfterLongPress
                                     val neighbour = heights.getOrNull(to)?.takeIf { it > 0 }
                                         ?: return@detectDragGesturesAfterLongPress
                                     if (abs(offsetY) < neighbour / 2f) {
                                         return@detectDragGesturesAfterLongPress
                                     }
-                                    order = order.toMutableList().apply { add(to, removeAt(from)) }
+                                    draggedOrder = now.map(keyOf)
+                                        .toMutableList()
+                                        .apply { add(to, removeAt(from)) }
                                     // The row has moved a whole neighbour up or
                                     // down, so the finger is that much less ahead
                                     // of it than it was.
