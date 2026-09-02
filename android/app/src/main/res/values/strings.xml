@@ -111,6 +111,10 @@
     <string name="notifications_enable">Turn on notifications</string>
 
     <!-- Settings -->
+    <string name="settings_tab_general">General</string>
+    <string name="settings_tab_recurring">Repeating</string>
+    <string name="settings_tab_people">Household</string>
+    <string name="settings_tab_advanced">Advanced</string>
     <string name="settings_accounts">Accounts</string>
     <string name="settings_categories">Categories</string>
     <string name="settings_members">Household</string>
@@ -207,7 +211,6 @@
     <string name="recurring_freq_yearly">Every year</string>
     <string name="recurring_next">Next on %1$s</string>
     <string name="recurring_finished">Finished</string>
-    <string name="recurring_added_count">%1$d added so far</string>
     <string name="recurring_add_title">New repeating transaction</string>
     <string name="recurring_edit_title">Edit repeating transaction</string>
     <string name="recurring_amount">Amount</string>

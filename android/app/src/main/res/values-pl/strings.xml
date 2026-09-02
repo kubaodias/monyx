@@ -108,6 +108,10 @@
     <string name="notifications_enable">Włącz powiadomienia</string>
 
     <!-- Settings -->
+    <string name="settings_tab_general">Ogólne</string>
+    <string name="settings_tab_recurring">Cykliczne</string>
+    <string name="settings_tab_people">Domownicy</string>
+    <string name="settings_tab_advanced">Zaawansowane</string>
     <string name="settings_accounts">Konta</string>
     <string name="settings_categories">Kategorie</string>
     <string name="settings_members">Domownicy</string>
@@ -200,7 +204,6 @@
     <string name="recurring_freq_yearly">Co rok</string>
     <string name="recurring_next">Następna %1$s</string>
     <string name="recurring_finished">Zakończona</string>
-    <string name="recurring_added_count">Dodano do tej pory: %1$d</string>
     <string name="recurring_add_title">Nowa transakcja cykliczna</string>
     <string name="recurring_edit_title">Edytuj transakcję cykliczną</string>
     <string name="recurring_amount">Kwota</string>

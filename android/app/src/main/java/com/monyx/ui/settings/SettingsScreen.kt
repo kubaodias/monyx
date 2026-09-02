@@ -42,8 +42,10 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.ScrollableTabRow
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -54,6 +56,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -75,15 +78,39 @@ import com.monyx.MonyxApp
 import com.monyx.R
 import com.monyx.data.Dates
 import com.monyx.data.MemberEntity
+import com.monyx.data.RecurringRuleListItem
 import com.monyx.ui.theme.Palette
 import kotlinx.coroutines.launch
 
 private const val BACKUP_STALE_MS = 3L * 24 * 60 * 60 * 1000
 
 /**
- * Settings holds accounts, categories, members, invite code and sync status,
- * plus the three items that make the design operable: the count of
- * rejected rows, last_backup_at from the server, and re-upload everything.
+ * What each tab holds, and the order they appear in.
+ *
+ * Settings had grown to eleven cards on one scroll — accounts, categories,
+ * every repeating rule, the household, the invite code, language, sync, backup,
+ * re-upload, build. Finding the invite code meant scrolling past the rent.
+ *
+ * Four groups, by what the person is there to do rather than by what the code
+ * calls things: set the app up, describe the month's fixed shape, deal with
+ * other people, and the operational levers that only matter when something has
+ * gone wrong.
+ */
+private enum class SettingsTab(val labelRes: Int) {
+    General(R.string.settings_tab_general),
+    Recurring(R.string.settings_tab_recurring),
+    People(R.string.settings_tab_people),
+    Advanced(R.string.settings_tab_advanced),
+}
+
+/** Which rule the editor is open on. Null inside it means a new one. */
+private data class EditorTarget(val rule: RecurringRuleListItem?)
+
+/**
+ * Settings holds accounts, categories, repeating rules, members, invite code
+ * and sync status, plus the three items that make the design operable: the
+ * count of rejected rows, last_backup_at from the server, and re-upload
+ * everything. They are split across [SettingsTab].
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -116,8 +143,53 @@ fun SettingsScreen() {
         }
     }
 
+    var tab by rememberSaveable { mutableStateOf(SettingsTab.General) }
+    // Non-null while the repeating-rule editor is open. Wrapped rather than a
+    // bare nullable rule, because "add" and "edit rule X" are both open states
+    // and only one of them has a rule in it.
+    var editor by remember { mutableStateOf<EditorTarget?>(null) }
+
+    editor?.let { target ->
+        RecurringEditor(
+            initial = target.rule,
+            accounts = accounts.filter { it.entity.archived == 0 }.map { it.entity },
+            categories = allCategories,
+            onDismiss = { editor = null },
+            onSave = { draft ->
+                val existing = target.rule
+                if (existing == null) {
+                    viewModel.addRecurringRule(draft)
+                } else {
+                    viewModel.updateRecurringRule(existing.id, draft)
+                }
+                editor = null
+            },
+        )
+        return
+    }
+
     Scaffold(
-        topBar = { TopAppBar(title = { Text(stringResource(R.string.nav_settings)) }) },
+        topBar = {
+            Column {
+                TopAppBar(title = { Text(stringResource(R.string.nav_settings)) })
+                // Scrollable rather than fixed: four Polish labels do not fit
+                // four equal columns on a narrow phone, and a fixed TabRow
+                // answers that by shrinking the text until it wraps mid-word.
+                ScrollableTabRow(
+                    selectedTabIndex = tab.ordinal,
+                    edgePadding = 12.dp,
+                    divider = {},
+                ) {
+                    SettingsTab.entries.forEach { option ->
+                        Tab(
+                            selected = tab == option,
+                            onClick = { tab = option },
+                            text = { Text(stringResource(option.labelRes), maxLines = 1) },
+                        )
+                    }
+                }
+            }
+        },
         snackbarHost = { SnackbarHost(snackbarHostState) },
     ) { padding ->
         LazyColumn(
@@ -127,65 +199,63 @@ fun SettingsScreen() {
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            item {
-                AccountsSection(
-                    accounts = accounts,
-                    onAdd = viewModel::addAccount,
-                    onUpdate = viewModel::updateAccount,
-                    onArchive = viewModel::setAccountArchived,
-                    onDelete = viewModel::deleteAccount,
-                )
-            }
-            item {
-                CategoriesSection(
-                    groups = categoryGroups,
-                    onAdd = viewModel::addCategory,
-                    onUpdate = viewModel::updateCategory,
-                    onDelete = viewModel::deleteCategory,
-                )
-            }
-            item {
-                RecurringSection(
-                    rules = recurringRules,
-                    accounts = accounts.filter { it.entity.archived == 0 }.map { it.entity },
-                    categories = allCategories,
-                    onAdd = viewModel::addRecurringRule,
-                    onUpdate = viewModel::updateRecurringRule,
-                    onDelete = viewModel::deleteRecurringRule,
-                )
-            }
+            when (tab) {
+                SettingsTab.General -> {
+                    item {
+                        AccountsSection(
+                            accounts = accounts,
+                            onAdd = viewModel::addAccount,
+                            onUpdate = viewModel::updateAccount,
+                            onArchive = viewModel::setAccountArchived,
+                            onDelete = viewModel::deleteAccount,
+                        )
+                    }
+                    item {
+                        CategoriesSection(
+                            groups = categoryGroups,
+                            onAdd = viewModel::addCategory,
+                            onUpdate = viewModel::updateCategory,
+                            onDelete = viewModel::deleteCategory,
+                        )
+                    }
+                    item { LanguageSection() }
+                }
 
-            item {
-                MembersSection(members = members)
-            }
-            item {
-                InviteSection(
-                    state = inviteState,
-                    onGenerate = viewModel::createInvite,
-                    onCopy = { code ->
-                        clipboardManager.setText(AnnotatedString(code))
-                        coroutineScope.launch { snackbarHostState.showSnackbar(copiedLabel) }
-                    },
-                )
-            }
-            item {
-                LanguageSection()
-            }
-            item {
-                SyncSection(
-                    lastSyncAt = syncState?.lastSyncAt ?: 0,
-                    rejectedCount = rejectedCount,
-                    onSyncNow = viewModel::syncNow,
-                )
-            }
-            item {
-                BackupSection(lastBackupAt = syncState?.lastBackupAt ?: 0)
-            }
-            item {
-                ReuploadSection(onReupload = { showReuploadConfirm = true })
-            }
-            item {
-                BuildIdentitySection()
+                SettingsTab.Recurring -> item {
+                    RecurringSection(
+                        rules = recurringRules,
+                        hasAccounts = accounts.any { it.entity.archived == 0 },
+                        onOpen = { editor = EditorTarget(it) },
+                        onDelete = viewModel::deleteRecurringRule,
+                    )
+                }
+
+                SettingsTab.People -> {
+                    item { MembersSection(members = members) }
+                    item {
+                        InviteSection(
+                            state = inviteState,
+                            onGenerate = viewModel::createInvite,
+                            onCopy = { code ->
+                                clipboardManager.setText(AnnotatedString(code))
+                                coroutineScope.launch { snackbarHostState.showSnackbar(copiedLabel) }
+                            },
+                        )
+                    }
+                }
+
+                SettingsTab.Advanced -> {
+                    item {
+                        SyncSection(
+                            lastSyncAt = syncState?.lastSyncAt ?: 0,
+                            rejectedCount = rejectedCount,
+                            onSyncNow = viewModel::syncNow,
+                        )
+                    }
+                    item { BackupSection(lastBackupAt = syncState?.lastBackupAt ?: 0) }
+                    item { ReuploadSection(onReupload = { showReuploadConfirm = true }) }
+                    item { BuildIdentitySection() }
+                }
             }
         }
     }
