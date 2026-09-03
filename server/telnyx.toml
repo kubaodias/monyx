@@ -42,9 +42,28 @@ name = "VOICE_CONTEXT_TOKEN"
 binding = "VOICE_TOOL_SECRET"
 name = "VOICE_TOOL_SECRET"
 
+# Bearer key for api.telnyx.com, used by POST /voice/note and nothing else.
+# There is no edge binding for inference, so the note route is an ordinary
+# outbound fetch and needs a credential of its own. Absent, the route answers
+# "keep the note you have" and the phone is none the wiser.
+[[secrets]]
+binding = "TELNYX_API_KEY"
+name = "TELNYX_API_KEY"
+
 # Second layer on enrolment; 10-character invite codes are the real defence.
 [[ratelimits]]
 name = "ENROLL_LIMIT"
+limit = 10
+period = 60
+
+# The note route is the only one that costs money per call, and it is a
+# cosmetic field. Counted per household rather than per IP: the bound worth
+# having is on the family that would be billed, not on whatever network they
+# are on. Ten a minute is far more voice entries than anyone makes — a hold, a
+# sentence and a glance is ten seconds — so it never touches real use and caps
+# a runaway client hard. The platform allows periods of 10 or 60 seconds only.
+[[ratelimits]]
+name = "NOTE_LIMIT"
 limit = 10
 period = 60
 

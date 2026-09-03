@@ -123,6 +123,15 @@ class VoiceEntryViewModel(
     private val onSyncRequested: () -> Unit,
     private val today: () -> LocalDate = Dates::today,
     /**
+     * A second opinion on the note, when the phone happens to have a model.
+     *
+     * [NoteWriter.None] by default, which is what every unit test gets and what
+     * most phones get. Nothing downstream may behave differently for its
+     * absence — the row is written and the summary shown before this is
+     * consulted at all.
+     */
+    private val noteWriter: NoteWriter = NoteWriter.None,
+    /**
      * How long the microphone waits for somebody to START.
      *
      * Three seconds is the gap between "the phone is out of the pocket and
@@ -456,14 +465,17 @@ class VoiceEntryViewModel(
      * with `deleted = 0`, resurrecting a transaction the user had just taken
      * back. Serialising the four paths is what makes that unrepresentable.
      */
-    private fun write(block: suspend () -> VoiceEntryState) {
+    private fun write(after: (VoiceEntryState) -> Unit = {}, block: suspend () -> VoiceEntryState) {
         if (writing) return
         writing = true
         work.launch {
             val outcome = runCatching { block() }
             writing = false
             show(outcome.getOrElse { VoiceEntryState.SaveFailed })
-            if (outcome.isSuccess) onSyncRequested()
+            if (outcome.isSuccess) {
+                onSyncRequested()
+                after(outcome.getOrThrow())
+            }
         }
     }
 
@@ -474,7 +486,9 @@ class VoiceEntryViewModel(
             show(VoiceEntryState.SaveFailed)
             return
         }
-        write {
+        write(after = { saved ->
+            if (saved is VoiceEntryState.Saved) polishNote(saved.summary, spoken.transcript)
+        }) {
             val id = ledger.add(
                 kind = spoken.kind,
                 amountMinor = spoken.amountMinor,
@@ -495,6 +509,74 @@ class VoiceEntryViewModel(
                     note = spoken.note.orEmpty(),
                 ),
             )
+        }
+    }
+
+    /**
+     * Ask the model whether the note could be written better, and quietly use
+     * the answer if it is.
+     *
+     * Everything about this is after the fact. The row is in Room, the summary
+     * is on screen, sync has been asked for, and the person is already reading
+     * the figures — this changes one line of text underneath them, or it does
+     * nothing at all, which is what happens on every phone without a model and
+     * in every test in this project.
+     *
+     * It is only ever asked to IMPROVE a note, never to find one. When the
+     * suffix table declined — "dodaj 200 na transport" leaves nothing behind —
+     * the model is not consulted, because a model that invents a label for a
+     * sentence that had none is strictly worse than the table it replaced.
+     *
+     * And it gives up the moment the sheet moves on. A note arriving after the
+     * summary was dismissed, reverted, or replaced by the next sentence would
+     * be an edit nobody could see being made.
+     */
+    private fun polishNote(summary: VoiceSummary, transcript: String) {
+        if (summary.note.isBlank()) return
+        work.launch {
+            val better = runCatching {
+                noteWriter.improve(
+                    NoteRequest(
+                        transcript = transcript,
+                        amountMinor = summary.amountMinor,
+                        categoryName = categories.value.firstOrNull { it.id == summary.categoryId }?.name,
+                        note = summary.note,
+                    ),
+                )
+            }.getOrNull() ?: return@launch
+
+            val current = _state.value
+            if (current !is VoiceEntryState.Saved) return@launch
+            if (current.summary.transactionId != summary.transactionId) return@launch
+            // The note has moved since — a spoken correction, or a hand edit.
+            // A person's answer outranks a model's, always.
+            if (current.summary.note != summary.note) return@launch
+            applyModelNote(current, better)
+        }
+    }
+
+    /**
+     * The same whole-row upsert every other edit makes, with one difference:
+     * failure is silent. A cosmetic write that threw must not replace a
+     * perfectly good summary with an error — the row keeps the note the rules
+     * gave it, which is the outcome on almost every phone anyway.
+     */
+    private fun applyModelNote(saved: VoiceEntryState.Saved, note: String) {
+        if (writing) return
+        writing = true
+        work.launch {
+            val written = runCatching {
+                ledger.update(readLive(saved.summary.transactionId).copy(note = note))
+            }.isSuccess
+            writing = false
+            if (!written) return@launch
+            val current = _state.value
+            if (current is VoiceEntryState.Saved &&
+                current.summary.transactionId == saved.summary.transactionId
+            ) {
+                show(current.copy(summary = current.summary.copy(note = note)))
+            }
+            onSyncRequested()
         }
     }
 

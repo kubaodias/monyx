@@ -35,20 +35,27 @@ row is written by `MonyxRepository.addTransaction` with the phone's own member
 id and `pending = 1`, exactly as the keypad writes one, and `SyncWorker` carries
 it up on its own schedule.
 
-So the question ADR 0018 left open is answered by not going there at all. **The
-voice routes stay `SELECT`-only. No write-capable route is created, no member
-without a device is invented, and no new credential exists.** The evidence is
-the absence of a `server/` diff and the absence of a `server/test/` diff in the
-change that introduced this feature: "read-only by construction" survived the
-one feature most likely to break it.
+So the question ADR 0018 left open is answered by not going there at all. **No
+write-capable route is created and no member without a device is invented.** The
+transaction itself never touches the server except through the sync epoch every
+other row uses.
 
-Recording audio and posting it somewhere to be transcribed was the alternative,
-and it loses on every axis that matters here. It costs a second or two of shop
-4G in the middle of the five seconds the add path exists to protect; it costs
-money per utterance, forever; it cannot work at all in a basement supermarket,
-which is exactly where it would be reached for; and it sends a household's audio
-to a third party. Telnyx Edge Compute has no transcription of its own, so it
-would also mean putting a *second* vendor behind the first.
+One later amendment to this, and it is worth stating rather than leaving to be
+discovered: the note — and only the note — is now improved by a call to
+`POST /voice/note`. That route is described at the end of this document. It
+writes nothing, reads nothing, and has no database binding at all; the sentence
+above still holds for every transaction this feature creates.
+
+Recording *audio* and posting it somewhere to be transcribed was the
+alternative, and it is a different question from sending the recognised TEXT of
+one sentence afterwards, which is what the note route does. This paragraph is
+about the audio, and about doing it in the middle of the add path. It loses on
+every axis that matters: a second or two of shop 4G inside the five seconds the
+add path exists to protect; money per utterance, forever; nothing at all in a
+basement supermarket, which is exactly where it would be reached for; and a
+household's audio sent to a third party. Telnyx Edge Compute has no
+transcription of its own, so it would also mean putting a *second* vendor
+behind the first.
 
 ### No model in the add path
 
@@ -226,6 +233,57 @@ Haptics carry the part that has to be eyes-free — one pulse when the microphon
 goes live, a distinct one when the row exists. Speaking back would be an opt-in
 setting for driving, and is out of scope.
 
+### The note, and the one call that leaves the phone
+
+Everything above is about the transaction. The note is a different matter, and
+it ended up on the other side of the line.
+
+The suffix table that writes it — six Polish locative endings, undone on one
+word — is honest about being a table and gets a name like *Biedronka* right most
+of the time. What it cannot do is anything it was not written for. So a model
+was put behind it, and **the first attempt was on the device**: Gemini Nano
+through AICore, `com.google.mlkit:genai-prompt`, which does take an arbitrary
+prompt and does run with no network at all. It was built and it worked.
+
+**It was set aside at the owner's request**, and the reason is worth recording
+because it is not a technical one: it needs a multi-gigabyte model downloaded to
+the phone, and they did not want that. The device list is also narrow — the
+Prompt API reaches recent flagships and nothing else — so on most phones it
+would have been a megabyte of dependency doing nothing. The research is not
+wasted; it is what let the choice be made knowingly rather than by default.
+
+**So the note is improved by a call to `POST /voice/note`**, which reaches
+Telnyx's OpenAI-compatible completion endpoint. What that costs, and none of it
+should be discovered later:
+
+- **The transcript leaves the phone.** A sentence a household said out loud
+  about its own money is sent to a third party. This is the real price, it was
+  paid deliberately, and it is why the route logs error *codes* and never the
+  sentence.
+- **It costs money per utterance.** Which is why the route is rate limited per
+  household rather than per IP — the bound worth having is on the family that
+  would be billed.
+- **It does nothing offline.** In the basement supermarket this feature was
+  designed for, the note is whatever the table wrote.
+
+**And the five-second rule survives, because the call is not in the add path at
+all.** That is the entire argument, and it is the same shape as the one against
+a server-side parse earlier in this document — which still stands. The row is
+written from the phone's own rules, with a note, and the summary is on screen
+before anything is sent. The answer is applied only while that sheet is still
+open, through the ordinary edit path, and a reply that arrives after it has gone
+is dropped: a note changing under somebody who has walked away is worse than no
+note. Nobody waits a millisecond for this. A blocking call in the same place
+would be forbidden, and the difference is not a matter of degree.
+
+The model's answer has to be **plausibly better, not merely different**. The
+server bounds it — four words, forty characters, one line, not an echo — and
+the phone applies the rule that matters, because the phone is the side that
+still has the transcript: **every word of the answer must be a word that was
+actually said, or one inflection away from one.** A model cannot introduce a
+shop nobody mentioned, cannot summarise and cannot editorialise. The worst it
+can do is nothing.
+
 ## Consequences
 
 - **The Add tab item is drawn by hand.** `NavigationBarItem` has no long press
@@ -256,10 +314,10 @@ setting for driving, and is out of scope.
   a voice to start, because nothing beginning means a mis-press or a microphone
   that is not really working, and there is nothing to write — it was five, and
   five is measurably too long to stand holding a phone that is doing nothing
-  visible. Fifteen once a voice has begun, which is a safety net against a recogniser that never endpoints and not
-  a limit on the sentence — the longest thing this grammar can usefully be
-  told takes about three. The first cancels, because nothing was said; the
-  second stops, because something was.
+  visible. Fifteen once a voice has begun, which is a safety net against a
+  recogniser that never endpoints rather than a limit on the sentence — the
+  longest thing this grammar can usefully be told takes about three. The first
+  cancels, because nothing was said; the second stops, because something was.
 
   This also removed the modifier that watched for the lift, which is a gain on
   its own: it reported every pointer-up, an ordinary tab tap included, and could
@@ -340,6 +398,33 @@ setting for driving, and is out of scope.
   itself, correctly and permanently, on a phone that plainly has one.
 - **The Android 14+ recording indicator appears while listening.** Correct, and
   expected, and not a bug.
+- **`server/` is no longer untouched, and ADR 0018's claim needs restating.**
+  That document says the voice routes are "`SELECT`-only by construction". With
+  `POST /voice/note` there are three of them, and the new one is a *stronger*
+  case rather than an exception: the other two issue SELECTs, and this one has
+  no database binding at all — not `env.DB`, not KV, nothing to build a query
+  with. It is a text transform. There is a test that reads `src/note.ts` and
+  fails if a database import, an `env.DB`, or a bare SQL keyword ever appears in
+  it, because the way a claim like that is lost is one innocuous lookup.
+- **It authenticates with the device session, not a new secret.** The assistant's
+  URL-token pattern exists for a caller that has no session; this caller is an
+  enrolled phone that already holds one. There IS a new secret, but it is on the
+  other side: `TELNYX_API_KEY`, the bearer key the route uses to reach
+  `api.telnyx.com`. There is no edge binding for inference — the runtime offers
+  sqldb, kv, secrets, rate limiters, buckets and actors — so it is an ordinary
+  outbound fetch, the same way `fcm.ts` reaches Google. Absent, the route
+  answers "keep the note you have" and nothing anywhere reports an error.
+- **Behaviour now varies with connectivity**, which it did not before. The same
+  sentence can produce one note on a phone with signal and another in a
+  basement. That is a real difference and it is the acceptable one: the offline
+  answer is the suffix table's, which is the answer this feature shipped with
+  and a decent one.
+- **The on-device version exists in the history and was set aside deliberately.**
+  If the trade is ever revisited: `com.google.mlkit:genai-prompt` takes an
+  arbitrary prompt, is minSdk 26, needs no allowlist, and must be pinned to
+  `1.0.0-beta2` — beta3 and beta4 carry Kotlin metadata 2.3.0 and will not
+  compile until this project moves off Kotlin 2.1.0. It costs about +1.4 MiB
+  unminified and a model download the owner did not want.
 - **No new Gradle dependency.** `SpeechRecognizer` is framework, the sheet is
   Material3, the gesture is `foundation`. `gradle/libs.versions.toml` did not
   need to change, which is the cheapest possible answer to "is this worth it".

@@ -5,6 +5,7 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import okhttp3.MediaType.Companion.toMediaType
@@ -39,6 +40,20 @@ object Api {
     private val client = OkHttpClient.Builder()
         .connectTimeout(15, TimeUnit.SECONDS)
         .readTimeout(30, TimeUnit.SECONDS)
+        .build()
+
+    /**
+     * The same connection pool, on a much shorter leash.
+     *
+     * Every other call here is something the household is waiting for and would
+     * rather have slowly than not at all. The note is the opposite: the row is
+     * already written and the summary is already on screen, and an answer that
+     * arrives after the sheet has gone is worse than no answer. Five seconds is
+     * about as long as a summary stays on screen.
+     */
+    private val briefClient = client.newBuilder()
+        .connectTimeout(3, TimeUnit.SECONDS)
+        .readTimeout(5, TimeUnit.SECONDS)
         .build()
 
     class ApiException(val status: Int, val code: String) : Exception("HTTP $status: $code")
@@ -96,6 +111,45 @@ object Api {
 
     fun pull(token: String, since: Long, limit: Int = 500): PullResponse =
         json.decodeFromString(get("/sync/pull?since=$since&limit=$limit", token))
+
+    /**
+     * A second opinion on a spoken note, or null.
+     *
+     * The one call in this object that never throws. Every other endpoint here
+     * reports failure because the household can act on it — retry, check the
+     * code, look at the sync banner. There is nothing to act on here: the
+     * transaction is saved, the note it already has is a decent one, and the
+     * only thing an exception could do is travel somewhere that has to remember
+     * to swallow it. Offline, rate-limited, timed out and "the server has no
+     * API key configured" all arrive as the same null.
+     */
+    fun suggestNote(
+        token: String,
+        transcript: String,
+        amountMinor: Long,
+        category: String?,
+        note: String,
+    ): String? {
+        val body = buildJsonObject {
+            put("transcript", transcript)
+            put("amount_minor", amountMinor)
+            category?.let { put("category", it) }
+            put("note", note)
+        }
+        val request = Request.Builder()
+            .url("$BASE_URL/voice/note")
+            .header("Authorization", "Bearer $token")
+            .post(body.toString().toRequestBody(JSON_MEDIA))
+            .build()
+        return runCatching {
+            briefClient.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) return@use null
+                val parsed = json.parseToJsonElement(response.body?.string().orEmpty()) as? JsonObject
+                (parsed?.get("note") as? JsonPrimitive)?.takeIf { it.isString }?.content
+            }
+        }.getOrNull()
+    }
+
 }
 
 @Serializable

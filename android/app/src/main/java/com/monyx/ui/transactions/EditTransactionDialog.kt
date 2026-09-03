@@ -183,6 +183,83 @@ fun EditTransactionDialog(
                     modifier = Modifier.fillMaxWidth(),
                 )
 
+                // Which way the money went, as a fact rather than a control.
+                //
+                // Beside the amount because that is what it qualifies: the same
+                // "45,00" is money out or money in depending on this, and the
+                // dialog has no sign in front of it to say so. It also explains
+                // the category list further down, which only ever offers
+                // categories of this kind.
+                //
+                // Read-only, deliberately, and the reason is two dozen lines
+                // above: switching an expense to income invalidates the
+                // category already chosen. Drawn as a label with no ripple and
+                // no border so nobody taps it expecting a choice.
+                if (!isTransfer) {
+                    Spacer(Modifier.height(10.dp))
+                    Text(
+                        text = stringResource(
+                            if (original.kind == "income") R.string.add_income else R.string.add_expense,
+                        ),
+                        style = MaterialTheme.typography.labelLarge,
+                        color = if (original.kind == "income") {
+                            MaterialTheme.colorScheme.primary
+                        } else {
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                        },
+                    )
+                }
+
+                Spacer(Modifier.height(14.dp))
+                Row(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(MaterialTheme.colorScheme.surfaceVariant)
+                        // Labelled, because the row's only text is the date
+                        // itself: without this TalkBack announces "3 września"
+                        // and never says it can be changed.
+                        .clickable(onClickLabel = stringResource(R.string.add_pick_date)) {
+                            showDatePicker = true
+                        }
+                        .padding(horizontal = 12.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Icon(
+                        Icons.Filled.CalendarToday,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp),
+                    )
+                    Text(Dates.dayLabel(date.toString()), style = MaterialTheme.typography.bodyMedium)
+                }
+
+                Spacer(Modifier.height(14.dp))
+                Text(
+                    stringResource(R.string.add_pick_account),
+                    style = MaterialTheme.typography.labelMedium,
+                )
+                Spacer(Modifier.height(6.dp))
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    // A closed account is not somewhere to move money to, but the
+                    // one this row already sits on stays offered — otherwise
+                    // editing the note of an old expense would silently show no
+                    // account selected at all.
+                    val selectable = accounts.filter {
+                        it.archived == 0 || it.id == original.accountId
+                    }
+                    items(selectable, key = { it.id }) { account ->
+                        ChoiceChip(
+                            label = account.name,
+                            // The account's own icon key, the same one Settings
+                            // draws it with. A wallet for everything would be a
+                            // new convention; this is the existing one.
+                            icon = Palette.icon(account.icon),
+                            selected = account.id == accountId,
+                            onClick = { accountId = account.id },
+                        )
+                    }
+                }
+
                 if (!isTransfer) {
                     Spacer(Modifier.height(14.dp))
                     Text(
@@ -230,33 +307,6 @@ fun EditTransactionDialog(
                 }
 
                 Spacer(Modifier.height(14.dp))
-                Text(
-                    stringResource(R.string.add_pick_account),
-                    style = MaterialTheme.typography.labelMedium,
-                )
-                Spacer(Modifier.height(6.dp))
-                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    // A closed account is not somewhere to move money to, but the
-                    // one this row already sits on stays offered — otherwise
-                    // editing the note of an old expense would silently show no
-                    // account selected at all.
-                    val selectable = accounts.filter {
-                        it.archived == 0 || it.id == original.accountId
-                    }
-                    items(selectable, key = { it.id }) { account ->
-                        ChoiceChip(
-                            label = account.name,
-                            // The account's own icon key, the same one Settings
-                            // draws it with. A wallet for everything would be a
-                            // new convention; this is the existing one.
-                            icon = Palette.icon(account.icon),
-                            selected = account.id == accountId,
-                            onClick = { accountId = account.id },
-                        )
-                    }
-                }
-
-                Spacer(Modifier.height(14.dp))
                 OutlinedTextField(
                     value = note,
                     onValueChange = { note = it },
@@ -268,23 +318,9 @@ fun EditTransactionDialog(
                     modifier = Modifier.fillMaxWidth(),
                 )
 
-                Spacer(Modifier.height(14.dp))
-                Row(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(10.dp))
-                        .background(MaterialTheme.colorScheme.surfaceVariant)
-                        .clickable { showDatePicker = true }
-                        .padding(horizontal = 12.dp, vertical = 10.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    Icon(
-                        Icons.Filled.CalendarToday,
-                        contentDescription = null,
-                        modifier = Modifier.size(16.dp),
-                    )
-                    Text(Dates.dayLabel(date.toString()), style = MaterialTheme.typography.bodyMedium)
-                }
+
+
+
             }
         },
         confirmButton = {

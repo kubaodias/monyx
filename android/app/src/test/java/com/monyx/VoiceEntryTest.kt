@@ -10,6 +10,8 @@ import com.monyx.voice.VoiceAccount
 import com.monyx.voice.VoiceCategory
 import com.monyx.voice.CorrectionState
 import com.monyx.voice.ListenFailure
+import com.monyx.voice.NoteRequest
+import com.monyx.voice.NoteWriter
 import com.monyx.voice.VoiceEntryState
 import com.monyx.voice.VoiceEntryViewModel
 import com.monyx.voice.SpokenTransaction
@@ -711,6 +713,131 @@ class VoiceEntryTest {
         val asking = viewModel(ledger(), FakeRecogniser(), noticeMillis = 0)
         asking.permissionRequired()
         assertEquals(VoiceEntryState.NeedsPermission, asking.state.value)
+    }
+
+    // ------------------------------------------------------- the note writer
+
+    /** Records what it was asked, answers what it was told to. The default
+     *  everywhere else in this suite is [NoteWriter.None], which is also the
+     *  default on a phone with no connection. */
+    private class FakeNoteWriter(
+        private val answer: String?,
+        private val before: () -> Unit = {},
+    ) : NoteWriter {
+        var asked: NoteRequest? = null
+        override suspend fun improve(request: NoteRequest): String? {
+            asked = request
+            before()
+            return answer
+        }
+    }
+
+    /** Built but silent, so a test can hold the ViewModel before the sentence
+     *  that will reach into it arrives. */
+    private fun writerViewModel(
+        ledger: FakeLedger,
+        writer: NoteWriter,
+    ): Pair<VoiceEntryViewModel, FakeRecogniser> {
+        val recogniser = FakeRecogniser()
+        return VoiceEntryViewModel(
+            ledger = ledger,
+            recogniser = recogniser,
+            onSyncRequested = {},
+            today = { today },
+            noteWriter = writer,
+            silenceMillis = FOREVER,
+            speechMillis = FOREVER,
+            noticeMillis = FOREVER,
+            scope = CoroutineScope(Dispatchers.Unconfined),
+        ) to recogniser
+    }
+
+    private fun sayWithWriter(
+        ledger: FakeLedger,
+        writer: NoteWriter,
+        sentence: String = "150 zł na zakupy w Biedronce",
+    ): VoiceEntryViewModel {
+        val (viewModel, recogniser) = writerViewModel(ledger, writer)
+        viewModel.startListening("pl-PL", "m-1")
+        recogniser.heard.value = ListenState.Done(sentence, emptyList())
+        return viewModel
+    }
+
+    private fun groceryLedger() = FakeLedger(
+        flowOf(listOf(VoiceCategory("c-groceries", "Zakupy spożywcze", EntryKind.Expense))),
+        flowOf(listOf(cash)),
+    )
+
+    /**
+     * The whole feature, and the order matters: the row is written and the
+     * summary shown from the phone's own rules first, and only then is anything
+     * asked. What arrives replaces one line of text.
+     */
+    @Test
+    fun `a better note replaces the rule's one while the sheet is open`() {
+        val ledger = groceryLedger()
+        val viewModel = sayWithWriter(ledger, FakeNoteWriter("Biedronka Express"))
+
+        val saved = viewModel.state.value as VoiceEntryState.Saved
+        assertEquals("Biedronka Express", saved.summary.note)
+        assertEquals("Biedronka Express", ledger.rows.getValue("t-1").note)
+    }
+
+    /** It is asked to IMPROVE a note, never to find one. A model inventing a
+     *  label for a sentence that had none is worse than the table. */
+    @Test
+    fun `the writer is not asked when the rules found no note`() {
+        val writer = FakeNoteWriter("Something")
+        val ledger = ledger()
+        val viewModel = sayWithWriter(ledger, writer, "dodaj 200 na transport")
+
+        assertNull(writer.asked)
+        assertEquals("", (viewModel.state.value as VoiceEntryState.Saved).summary.note)
+        assertNull(ledger.rows.getValue("t-1").note)
+    }
+
+    @Test
+    fun `the writer is told what the rules already worked out`() {
+        val writer = FakeNoteWriter(null)
+        sayWithWriter(groceryLedger(), writer)
+
+        val asked = writer.asked!!
+        assertEquals("150 zł na zakupy w Biedronce", asked.transcript)
+        assertEquals(15000L, asked.amountMinor)
+        assertEquals("Zakupy spożywcze", asked.categoryName)
+        assertEquals("Biedronka", asked.note)
+    }
+
+    /**
+     * An answer that arrives after the summary has gone is dropped. A note
+     * changing under somebody who has walked away is worse than no note — and
+     * offline, which is the common case, this is the path that runs.
+     */
+    @Test
+    fun `an answer arriving after the sheet has gone is dropped`() {
+        val ledger = groceryLedger()
+        var live: VoiceEntryViewModel? = null
+        val writer = FakeNoteWriter("Biedronka Express", before = { live!!.dismiss() })
+        val (viewModel, recogniser) = writerViewModel(ledger, writer)
+        live = viewModel
+        viewModel.startListening("pl-PL", "m-1")
+        recogniser.heard.value = ListenState.Done("150 zł na zakupy w Biedronce", emptyList())
+
+        assertEquals(VoiceEntryState.Hidden, viewModel.state.value)
+        assertEquals("Biedronka", ledger.rows.getValue("t-1").note)
+    }
+
+    /** A cosmetic write that threw must not replace a perfectly good summary
+     *  with an error. The row keeps the note the rules gave it. */
+    @Test
+    fun `a failed note write leaves the summary and the row alone`() {
+        val ledger = groceryLedger()
+        val writer = FakeNoteWriter("Biedronka Express", before = { ledger.failWrites = true })
+        val viewModel = sayWithWriter(ledger, writer)
+
+        val saved = viewModel.state.value as VoiceEntryState.Saved
+        assertEquals("Biedronka", saved.summary.note)
+        assertEquals("Biedronka", ledger.rows.getValue("t-1").note)
     }
 
     private companion object {

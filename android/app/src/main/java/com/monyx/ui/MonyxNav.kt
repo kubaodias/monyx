@@ -72,6 +72,7 @@ import com.monyx.ui.settings.SettingsScreen
 import com.monyx.ui.theme.MonyxMark
 import com.monyx.ui.theme.Palette
 import com.monyx.ui.transactions.TransactionsScreen
+import com.monyx.voice.EdgeNoteWriter
 import com.monyx.voice.RepositoryVoiceLedger
 import com.monyx.voice.SpeechListener
 import com.monyx.voice.VoiceEntrySheet
@@ -201,6 +202,10 @@ private fun MainScaffold(
                     ledger = RepositoryVoiceLedger(app.repository),
                     recogniser = SpeechListener(app),
                     onSyncRequested = { SyncWorker.enqueue(app) },
+                    // Asked after the row is written and only while the summary
+                    // is on screen. Offline it answers null on the first connect
+                    // attempt and nothing downstream notices.
+                    noteWriter = EdgeNoteWriter(app.session),
                 )
             }
         },

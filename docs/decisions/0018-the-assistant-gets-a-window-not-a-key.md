@@ -1,6 +1,7 @@
 # 0018 — The assistant gets a window, not a key
 
-**Date:** 2026-09-03 · **Status:** accepted · **Amended:** 2026-09-03, the PIN removed
+**Date:** 2026-09-03 · **Status:** accepted · **Amended:** 2026-09-03, the PIN
+removed; 2026-09-03, a third `/voice` route that touches no database
 
 ## Context
 
@@ -72,6 +73,16 @@ million five hundred eleven thousand and one minor units".
 Adding a transaction by voice is the feature worth having, and it writes through
 the sync epoch and needs a `created_by` member without a device — a design
 question, not an increment.
+
+> **Amended 2026-09-03.** Adding a transaction by voice was built, and it did
+> not come through here: it is recognised and parsed on the phone and written
+> through the ordinary sync epoch, so the claim above still holds for this
+> module. There is now a THIRD route under `/voice`, though —
+> `POST /voice/note`, which belongs to voice entry on the phone rather than to
+> the assistant. It carries a device session instead of a shared secret, and it
+> is not read-only-by-`SELECT` so much as read-nothing: it has no database
+> binding at all. See
+> [ADR 0019](0019-the-microphone-is-the-phones-not-the-lines.md).
 
 **The allowlist fails closed.** A secret that will not parse, or parses to
 nothing, admits no one rather than everyone — it is now the only gate, so the

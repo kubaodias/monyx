@@ -300,13 +300,22 @@ Say nothing and it gives up after three seconds. Anything it could not do — no
 understood, nothing heard, no speech pack for the language — says so and then
 takes itself away; there is no message here that has to be dismissed by hand.
 
-Nothing leaves the phone. Speech is Android's own `SpeechRecognizer`, asked to
-prefer the on-device pack; the parse is a few hundred lines of Kotlin in
-`android/app/src/main/java/com/monyx/voice/`, pure and unit-tested on the JVM.
-**There is no server route for this, no model, and no new credential** —
+**The transaction never leaves the phone to be understood.** Speech is Android's
+own `SpeechRecognizer`, asked to prefer the on-device pack; the parse is a few
+hundred lines of Kotlin in `android/app/src/main/java/com/monyx/voice/`, pure
+and unit-tested on the JVM. It works with the phone in flight mode.
+
+One thing does leave: after the row is saved, the transcript is sent to
+`POST /voice/note` to see whether the note could be written better. It is worth
+being plain about the price — a sentence the household said out loud goes to a
+third party, it is billed per call, and it does nothing offline. What makes it
+acceptable is that it is not in the add path at all: the row is written and the
+summary is on screen before the call is made, the answer is used only if it
+arrives while that sheet is still open, and a phone with no signal gets the note
+its own rules wrote.
 [ADR 0019](docs/decisions/0019-the-microphone-is-the-phones-not-the-lines.md)
-argues why, and the absence of a `server/` diff in the change that
-added it is the evidence.
+argues all of it, including the on-device model that was built first and set
+aside because it needed a multi-gigabyte download.
 
 What it cannot finish, it does not write: a sentence with an amount but no
 category opens the keypad with the amount already in it, and two transactions in
@@ -330,6 +339,12 @@ the function and there is no public SQL API.
 |---|---|---|
 | `POST /voice/context?t=…` | call setup | one XML snapshot of the month, straight into the prompt |
 | `POST /voice/digest` | mid-call | the same snapshot again |
+| `POST /voice/note` | after a voice entry saves | a better note for it, or nothing |
+
+The third is not part of the assistant at all — it belongs to voice entry on the
+phone, carries a device session rather than a shared secret, and touches no
+database. It is listed here because it is the other place this codebase sends
+text to a model.
 
 **The allowlist is the only gate.** Caller ID is not a credential, so a spoofed
 number reaches the household's finances. That is a deliberate trade and
@@ -338,7 +353,7 @@ it: a PIN and a preload are mutually exclusive, because a secret placed in a
 prompt cannot be withdrawn from it, and the preload is what makes the first
 question of a call cost nothing.
 
-Three secrets, none of them in this repository:
+Four secrets, none of them in this repository:
 
 - `VOICE_ALLOWLIST` — JSON `[{msisdn, household_id, name}]`. Who may call and
   which household they reach. A secret rather than a table because phone numbers
@@ -347,9 +362,15 @@ Three secrets, none of them in this repository:
   the assistant's webhook field allows a secret.
 - `VOICE_TOOL_SECRET` — the `x-voice-secret` header on the tool webhook, held on
   the Telnyx side as an integration secret.
+- `TELNYX_API_KEY` — the bearer key `POST /voice/note` uses to reach
+  `api.telnyx.com/v2/ai/openai/chat/completions`. There is no edge binding for
+  inference, so the route makes an ordinary outbound call the way `fcm.ts` does.
+  Absent, the route answers "keep the note you have" and nothing breaks.
 
-Both routes are `SELECT`-only, and stayed that way when adding by voice was
-built: that feature never comes near them. What ADR 0018 left open — a
+Two of the three routes are `SELECT`-only and stayed that way when adding by
+voice was built. The third, `POST /voice/note`, is stronger still: it has no
+database binding at all, because it is a text transform, and a test fails if a
+database import ever appears in it. What ADR 0018 left open — a
 server-side write, which needs a `created_by` member with no device — is still
 open, and is now unnecessary. See
 [ADR 0019](docs/decisions/0019-the-microphone-is-the-phones-not-the-lines.md).

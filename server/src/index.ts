@@ -15,6 +15,7 @@ import {
 } from "./budgets.ts";
 import { allHouseholds, forHousehold, type HouseholdDb } from "./db.ts";
 import { sendBudgetAlert, type DeviceToken } from "./fcm.ts";
+import { parseNoteInput, suggestNote } from "./note.ts";
 import { DEFAULT_PULL_LIMIT, pull, push } from "./sync.ts";
 import { currentPeriod, localDate, periodOf } from "./schema.ts";
 import {
@@ -173,6 +174,45 @@ async function handlePull(url: URL, session: SessionLike): Promise<Response> {
   }
 
   return json({ ...page, last_backup_at: lastBackupAt });
+}
+
+/**
+ * A second opinion on one spoken note, and the only route here that costs money.
+ *
+ * It carries a device session like every other phone route: the caller IS an
+ * enrolled phone, so the assistant's URL-token pattern — which exists for a
+ * caller that has no session at all — would be a second credential invented for
+ * no reason.
+ *
+ * Rate-limited per HOUSEHOLD rather than per IP. This is billed per call, so
+ * the bound worth having is on the family that would be billed for it, not on
+ * whatever network they happen to be on; two phones behind one router share
+ * their allowance the way they share the bill.
+ *
+ * It reads no database, and a missing key is not an error: the phone already
+ * has a perfectly good note and this route's whole contract is "or keep it".
+ */
+async function handleVoiceNote(req: Request, session: SessionLike): Promise<Response> {
+  const limiter = env.NOTE_LIMIT;
+  if (limiter) {
+    const { success } = await limiter.limit({ key: session.household_id });
+    if (!success) return fail(429, "rate_limited");
+  }
+
+  const body = await readJson(req);
+  if (!body) return fail(400, "bad_json");
+  const input = parseNoteInput(body);
+  if (!input) return fail(400, "bad_request");
+
+  let apiKey: string | null = null;
+  try {
+    apiKey = await env.SECRETS.get("TELNYX_API_KEY");
+  } catch {
+    // Not configured is not broken. A checkout with no key simply never
+    // improves a note, which is the same as every phone that is offline.
+    apiKey = null;
+  }
+  return json(await suggestNote(input, apiKey));
 }
 
 async function handleCron(req: Request, nowMs: number): Promise<Response> {
@@ -365,6 +405,9 @@ export default {
       }
       if (path === "/sync/pull" && req.method === "GET") {
         return await handlePull(url, session);
+      }
+      if (path === "/voice/note" && req.method === "POST") {
+        return await handleVoiceNote(req, session);
       }
 
       return fail(404, "not_found");
