@@ -41,6 +41,7 @@ interface VoiceLedger {
         categoryId: String?,
         occurredAtMs: Long,
         createdBy: String,
+        note: String?,
     ): String
 
     suspend fun read(id: String): TransactionEntity?
@@ -103,11 +104,13 @@ class RepositoryVoiceLedger(private val repository: MonyxRepository) : VoiceLedg
         categoryId: String?,
         occurredAtMs: Long,
         createdBy: String,
+        note: String?,
     ): String = repository.addTransaction(
         kind = kind.wire,
         amountMinor = amountMinor,
         accountId = accountId,
         categoryId = categoryId,
+        note = note,
         occurredAtMs = occurredAtMs,
         createdBy = createdBy,
         source = "voice",

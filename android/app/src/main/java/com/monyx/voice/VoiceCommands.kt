@@ -23,12 +23,24 @@ data class VoiceCorrection(
     val kind: EntryKind? = null,
     val date: LocalDate? = null,
     val accountId: String? = null,
+    /**
+     * Replaces whatever note the row has, rather than appending to it.
+     *
+     * This grammar is only ever reached seconds after the row was written, so
+     * there is almost never a note to preserve — and when there is, it is one
+     * the same person just dictated. A second attempt at it is a correction of
+     * the first, not a second sentence: appending would quietly keep a
+     * mis-heard "te zakupy były w lidzie" in front of the fix. The field is on
+     * the sheet and one tap opens it, which is where adding TO a note belongs.
+     */
+    val note: String? = null,
     /** Two category names scored the same. The sheet is on screen and can ask. */
     val ambiguous: List<VoiceCategory> = emptyList(),
 ) {
     val isEmpty: Boolean
         get() = !revert && !confirm && amountMinor == null && categoryId == null &&
-            kind == null && date == null && accountId == null && ambiguous.isEmpty()
+            kind == null && date == null && accountId == null && note == null &&
+            ambiguous.isEmpty()
 }
 
 /**
@@ -75,7 +87,14 @@ object VoiceCommands {
         locale: Locale,
         today: LocalDate,
     ): VoiceCorrection {
-        val tokens = CategoryMatcher.tokenise(text)
+        // "notatka …" wins over everything, including the undo verbs below it.
+        // Somebody who says the word has already told you which half of the
+        // sentence is an instruction, so "notatka anulowane zamówienie" writes
+        // those two words down and does not delete anything.
+        val (spoken, marked) = CategoryMatcher.splitOnNoteMarker(text)
+        if (marked != null) return VoiceCorrection(note = marked)
+
+        val tokens = CategoryMatcher.tokenise(spoken)
         val revertSpoken = tokens.any { VoiceWords.stem(it) in VoiceWords.revertStems }
 
         val amount = SpokenAmount.find(tokens, locale)
@@ -120,6 +139,35 @@ object VoiceCommands {
             ambiguous = (outcome as? CategoryMatcher.Outcome.Tie)?.candidates.orEmpty(),
         )
 
+        // A sentence ABOUT the transaction, rather than the name of one of its
+        // fields. This is the owner's own case and the reason the rule exists:
+        // "te zakupy były w lidlu" contains a category name and is plainly not
+        // a category correction, and filing it as one would move the row to
+        // Zakupy spożywcze because of a word that was only pointing at it.
+        //
+        // The rule, stated so it can be argued with: an utterance is a note when
+        // it carries a demonstrative or a copula — [VoiceWords.statementWords],
+        // a closed list — that is not itself part of the name that matched, AND
+        // the only thing it otherwise produced was a category, or nothing at
+        // all. An amount, a date, an account or a kind means somebody named a
+        // field, and naming a field is never a note.
+        //
+        // "zakupy" has no such word, so it stays a category. "zmień kategorię
+        // na zakupy" has none either. "250 na zakupy" set an amount, so the
+        // rule does not look. Negations are excluded because a sentence whose
+        // only signal is "nie" is somebody saying no, not describing a
+        // purchase — "to nie było anulowane" is refused rather than written
+        // down.
+        //
+        // The failure mode this accepts, deliberately: an unintended note. It
+        // is one line of text on a sheet the user is already reading, next to a
+        // field that opens an editor on one tap. A wrong category or a wrong
+        // amount is neither visible nor cheap — it moves money between columns
+        // and syncs to the other phone. Between the two readings, the note is
+        // the safer landing.
+        val statement = looksLikeAStatement(tokens, locale, correction, categories)
+        if (statement) return VoiceCorrection(note = text.trim())
+
         // An undo verb AND something concrete in the same breath is a refusal,
         // not a revert.
         //
@@ -156,6 +204,29 @@ object VoiceCommands {
             stems.any { it in VoiceWords.confirmStems } -> VoiceCorrection(confirm = true)
             else -> VoiceCorrection()
         }
+    }
+
+    /** See the comment at the call site; this is only the arithmetic of it. */
+    private fun looksLikeAStatement(
+        tokens: List<String>,
+        locale: Locale,
+        correction: VoiceCorrection,
+        categories: List<VoiceCategory>,
+    ): Boolean {
+        val namedAField = correction.amountMinor != null || correction.date != null ||
+            correction.accountId != null || correction.kind != null ||
+            correction.ambiguous.isNotEmpty()
+        if (namedAField) return false
+        if (tokens.any { it in VoiceWords.negations(locale) }) return false
+        if (tokens.any { VoiceWords.stem(it) in VoiceWords.revertStems }) return false
+
+        // A statement word that is part of the matched name is the name, not a
+        // sentence — a household with a category called "To i owo" should not
+        // find every mention of it turning into a note.
+        val ownWords = categories.firstOrNull { it.id == correction.categoryId }
+            ?.let { CategoryMatcher.tokenise(it.name) }
+            .orEmpty()
+        return tokens.any { it in VoiceWords.statementWords && it !in ownWords }
     }
 
     private data class MatchedAccount(val id: String, val tokens: IntRange)

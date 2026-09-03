@@ -109,7 +109,6 @@ fun TransactionsScreen(
     val accounts by viewModel.accounts.collectAsStateWithLifecycle()
     val transactions by viewModel.transactions.collectAsStateWithLifecycle()
 
-    var selectedItem by remember { mutableStateOf<TransactionListItem?>(null) }
     var editing by remember { mutableStateOf<TransactionEntity?>(null) }
     var refreshing by remember { mutableStateOf(false) }
     val snackbarHostState = remember { SnackbarHostState() }
@@ -222,32 +221,24 @@ fun TransactionsScreen(
                         contentPadding = PaddingValues(vertical = 8.dp, horizontal = 0.dp),
                     ) {
                         items(grouped, key = { it.first }) { (day, dayItems) ->
-                            DayGroup(day = day, items = dayItems, onRowClick = { selectedItem = it })
+                            DayGroup(
+                                day = day,
+                                items = dayItems,
+                                // Straight to the editor. What used to open here
+                                // was a sheet whose whole content was two
+                                // buttons, Edit and Delete, and both of them are
+                                // on the editor now.
+                                //
+                                // The list projection is a join, not the row —
+                                // load the real entity before handing it to
+                                // something that will write it back.
+                                onRowClick = { item -> scope.launch { editing = viewModel.load(item.id) } },
+                            )
                         }
                     }
                 }
             }
         }
-    }
-
-    selectedItem?.let { item ->
-        TransactionDetailSheet(
-            item = item,
-            onDismiss = { selectedItem = null },
-            onEdit = {
-                scope.launch {
-                    // The list projection is a join, not the row — load the real
-                    // entity before handing it to an editor that will write it back.
-                    editing = viewModel.load(item.id)
-                    selectedItem = null
-                }
-            },
-            onDelete = { id ->
-                viewModel.deleteTransaction(id)
-                selectedItem = null
-                scope.launch { snackbarHostState.showSnackbar(deletedMessage) }
-            },
-        )
     }
 
     editing?.let { original ->
@@ -267,6 +258,11 @@ fun TransactionsScreen(
                 )
                 editing = null
                 scope.launch { snackbarHostState.showSnackbar(savedMessage) }
+            },
+            onDelete = { id ->
+                viewModel.deleteTransaction(id)
+                editing = null
+                scope.launch { snackbarHostState.showSnackbar(deletedMessage) }
             },
         )
     }

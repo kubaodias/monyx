@@ -34,6 +34,7 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ShowChart
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -58,10 +59,13 @@ import com.monyx.R
 import com.monyx.data.AccountBalance
 import com.monyx.data.CategorySpend
 import com.monyx.data.Dates
+import com.monyx.data.TransactionEntity
 import com.monyx.data.Money
 import com.monyx.data.TransactionListItem
 import com.monyx.ui.MonthSwitcher
 import com.monyx.ui.theme.Palette
+import com.monyx.ui.transactions.EditTransactionDialog
+import kotlinx.coroutines.launch
 
 /**
  * The Overview screen (Przegląd): month totals, the spending breakdown, account
@@ -71,10 +75,42 @@ import com.monyx.ui.theme.Palette
 @Composable
 fun OverviewScreen(
     onOpenTransactions: (categoryId: String?, period: String?) -> Unit,
+    onSyncRequested: () -> Unit,
 ) {
     val app = LocalContext.current.applicationContext as MonyxApp
     val viewModel: OverviewViewModel = viewModel(factory = OverviewViewModel.factory(app.repository, app.selectedMonth))
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val categories by viewModel.categories.collectAsStateWithLifecycle()
+    val accounts by viewModel.accounts.collectAsStateWithLifecycle()
+    val scope = rememberCoroutineScope()
+
+    // The row somebody tapped, loaded whole. Null closes the editor.
+    var editing by remember { mutableStateOf<TransactionEntity?>(null) }
+
+    editing?.let { original ->
+        EditTransactionDialog(
+            original = original,
+            categories = categories,
+            accounts = accounts,
+            onDismiss = { editing = null },
+            onSave = { edit ->
+                viewModel.saveEdit(
+                    original = original,
+                    amountMinor = edit.amountMinor,
+                    categoryId = edit.categoryId,
+                    accountId = edit.accountId,
+                    note = edit.note,
+                    occurredAtMs = edit.occurredAtMs,
+                    onSaved = onSyncRequested,
+                )
+                editing = null
+            },
+            onDelete = { id ->
+                viewModel.deleteTransaction(id, onSyncRequested)
+                editing = null
+            },
+        )
+    }
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -117,7 +153,13 @@ fun OverviewScreen(
         item {
             RecentSection(
                 recent = state.recent,
-                onOpenTransaction = { onOpenTransactions(null, state.period) },
+                // The row's own id, which this used to throw away: every row in
+                // the list navigated to the same unfiltered month, so tapping
+                // the third and the ninth did exactly the same thing. It opens
+                // that transaction's editor, here, without a tab switch —
+                // leaving the overview would lose the place somebody tapped
+                // from. "See all" is the one that is meant to navigate.
+                onOpenTransaction = { id -> scope.launch { editing = viewModel.load(id) } },
                 onSeeAll = { onOpenTransactions(null, state.period) },
             )
         }

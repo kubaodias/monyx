@@ -124,24 +124,17 @@ fun VoiceEntrySheet(
                 // them: a control that vanishes under a thumb reaching for it
                 // is worse than no control, and none of these four is asking
                 // anything anyway.
-                is VoiceEntryState.NotUnderstood -> Message(
-                    title = stringResource(R.string.voice_not_understood),
-                    heard = state.transcript,
-                )
+                is VoiceEntryState.NotUnderstood ->
+                    Message(stringResource(R.string.voice_not_understood))
 
-                is VoiceEntryState.Incomplete -> Message(
-                    title = stringResource(R.string.voice_partial_finish),
-                    heard = state.transcript,
-                )
+                is VoiceEntryState.Incomplete ->
+                    Message(stringResource(R.string.voice_partial_finish))
 
-                is VoiceEntryState.Failed -> Message(
-                    title = stringResource(failureMessage(state.reason)),
-                )
+                is VoiceEntryState.Failed ->
+                    Message(stringResource(failureMessage(state.reason)))
 
-                is VoiceEntryState.SaveFailed -> Message(
-                    title = stringResource(R.string.voice_save_failed),
-                    heard = state.transcript,
-                )
+                is VoiceEntryState.SaveFailed ->
+                    Message(stringResource(R.string.voice_save_failed))
 
                 is VoiceEntryState.Reverted -> {
                     Header(stringResource(R.string.voice_reverted))
@@ -166,7 +159,7 @@ fun VoiceEntrySheet(
                     categories = categories,
                     accounts = accounts,
                     onRevert = onRevert,
-                    onChange = onBeginEdit,
+                    onEditField = onBeginEdit,
                     onDone = onDismiss,
                     onStop = onStop,
                     onCorrectionHoldStart = onCorrectionHoldStart,
@@ -194,6 +187,11 @@ fun VoiceEntrySheet(
             accounts = editableAccounts,
             onDismiss = onCancelEdit,
             onSave = onEdit,
+            // Deleting from the editor and tapping Revert are the same write —
+            // a tombstone on the row this sheet is describing — so they land in
+            // the same place, with Undo still on offer. Anything else would
+            // leave the summary describing a row that no longer exists.
+            onDelete = { onRevert() },
         )
     }
 }
@@ -251,7 +249,7 @@ private fun SavedBody(
     categories: List<VoiceCategory>,
     accounts: List<VoiceAccount>,
     onRevert: () -> Unit,
-    onChange: () -> Unit,
+    onEditField: () -> Unit,
     onDone: () -> Unit,
     onStop: () -> Unit,
     onCorrectionHoldStart: () -> Unit,
@@ -262,32 +260,56 @@ private fun SavedBody(
     val listening = state.correction as? CorrectionState.Listening
 
     Header(stringResource(R.string.voice_saved))
-    Spacer(Modifier.height(8.dp))
-    Amount(summary.amountMinor, summary.kind, faded = false)
 
-    if (category != null) {
-        Spacer(Modifier.height(12.dp))
-        CategoryChip(category = category, categories = categories, onClick = null)
+    // Every field on this sheet opens the editor, and the whole row is the
+    // target rather than the glyph on it — a thumb in a shop is not aiming at a
+    // 16dp icon. This is the entire "change it" affordance now: a Popraw button
+    // beside Cofnij and Gotowe said only "something here is wrong" and then
+    // made you find it again in a dialog, where the value that is wrong is
+    // already on screen and already the thing being looked at.
+    //
+    // The dialog opens on all five fields rather than on the one that was
+    // tapped. EditTransactionDialog is an AlertDialog with a scrolling Column
+    // and no focus plumbing, and threading a target field through it would mean
+    // reshaping a dialog two other screens depend on for a convenience.
+    Spacer(Modifier.height(4.dp))
+    EditableField(label = stringResource(R.string.voice_edit_amount), onClick = onEditField) {
+        Amount(summary.amountMinor, summary.kind, faded = false)
     }
 
-    Spacer(Modifier.height(10.dp))
-    Text(
-        text = "${accounts.firstOrNull { it.id == summary.accountId }?.name.orEmpty()} · ${dayLabel(summary.date)}",
-        style = MaterialTheme.typography.bodyMedium,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-    )
+    EditableField(label = stringResource(R.string.voice_edit_category), onClick = onEditField) {
+        if (category != null) {
+            CategoryChip(category = category, categories = categories, onClick = null)
+        } else {
+            FieldText(stringResource(R.string.add_needs_category), muted = true)
+        }
+    }
 
-    Spacer(Modifier.height(10.dp))
-    Text(
-        text = stringResource(R.string.voice_heard, summary.transcript),
-        style = MaterialTheme.typography.bodySmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-    )
+    EditableField(label = stringResource(R.string.voice_edit_account), onClick = onEditField) {
+        FieldText(
+            "${accounts.firstOrNull { it.id == summary.accountId }?.name.orEmpty()} · ${dayLabel(summary.date)}",
+            muted = false,
+        )
+    }
+
+    // Tappable with nothing in it, because adding one is the main reason to
+    // reach for this field at all.
+    EditableField(
+        label = if (summary.note.isBlank()) {
+            stringResource(R.string.voice_add_note)
+        } else {
+            stringResource(R.string.voice_edit_note)
+        },
+        onClick = onEditField,
+    ) {
+        FieldText(
+            summary.note.ifBlank { stringResource(R.string.voice_add_note) },
+            muted = summary.note.isBlank(),
+        )
+    }
 
     when (val correction = state.correction) {
-        is CorrectionState.Idle -> if (state.note == SavedNote.Updated) {
-            Note(stringResource(R.string.voice_updated))
-        }
+        is CorrectionState.Idle -> Unit
         is CorrectionState.Listening -> Note(
             correction.partial.ifBlank { stringResource(R.string.voice_listening) },
         )
@@ -312,13 +334,7 @@ private fun SavedBody(
         OutlinedButton(onClick = onRevert, modifier = Modifier.weight(1f)) {
             Text(stringResource(R.string.voice_revert))
         }
-        Spacer(Modifier.width(8.dp))
-        OutlinedButton(onClick = onChange, modifier = Modifier.weight(1f)) {
-            Icon(Icons.Filled.Edit, contentDescription = null, modifier = Modifier.size(16.dp))
-            Spacer(Modifier.width(6.dp))
-            Text(stringResource(R.string.voice_change))
-        }
-        Spacer(Modifier.width(8.dp))
+        Spacer(Modifier.width(12.dp))
         Button(onClick = onDone, modifier = Modifier.weight(1f)) {
             Text(stringResource(R.string.voice_done))
         }
@@ -334,6 +350,54 @@ private fun SavedBody(
         listening = listening != null,
         onHoldStart = onCorrectionHoldStart,
         onStop = onStop,
+    )
+}
+
+/**
+ * One value on the summary, and the whole width of it is the way into the
+ * editor.
+ *
+ * The label is what TalkBack reads and what the row is FOR — it is not drawn,
+ * because the values are self-describing at a glance ("200,00 zł", a category
+ * chip, "Gotówka · Dziś") and a column of captions beside them would be twice
+ * the sheet for nothing. A small pencil marks the row as pressable for
+ * everybody else, which is the part a label cannot do.
+ */
+@Composable
+private fun EditableField(
+    label: String,
+    onClick: () -> Unit,
+    content: @Composable () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .clickable(onClick = onClick, onClickLabel = label)
+            .padding(vertical = 10.dp, horizontal = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(Modifier.weight(1f)) { content() }
+        Spacer(Modifier.width(8.dp))
+        Icon(
+            imageVector = Icons.Filled.Edit,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(16.dp),
+        )
+    }
+}
+
+@Composable
+private fun FieldText(text: String, muted: Boolean) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.bodyMedium,
+        color = if (muted) {
+            MaterialTheme.colorScheme.onSurfaceVariant
+        } else {
+            MaterialTheme.colorScheme.onSurface
+        },
     )
 }
 
@@ -459,19 +523,10 @@ private fun CategoryChip(
 @Composable
 private fun Message(
     title: String,
-    heard: String? = null,
     action: String? = null,
     onAction: () -> Unit = {},
 ) {
     Text(text = title, style = MaterialTheme.typography.titleMedium)
-    if (!heard.isNullOrBlank()) {
-        Spacer(Modifier.height(10.dp))
-        Text(
-            text = stringResource(R.string.voice_heard, heard),
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-    }
     if (action != null) {
         Spacer(Modifier.height(24.dp))
         Button(onClick = onAction, modifier = Modifier.fillMaxWidth()) {

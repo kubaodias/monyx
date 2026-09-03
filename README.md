@@ -87,6 +87,14 @@ one you were just looking at. They are not three questions about three months.
 They are three views of one: what it cost, what it went on, and what it was
 meant to cost.
 
+A transaction is tapped to edit it, on History and in the Overview's recent
+list alike, and the editor holds Delete behind a confirmation. There used to be
+a sheet in front of it whose whole content was two buttons, Edit and Delete —
+the tap that opened a menu now opens the thing the menu led to. The Overview's
+rows were worse than an extra tap: they all navigated to the same unfiltered
+month, so tapping the third and the ninth did the same thing. The editor is also
+where a row says it is still waiting to sync, or that the server refused it.
+
 The arrows are for a neighbouring month. For any other, the title opens a
 picker — a year, twelve months under it, and one button back to the present.
 The present month keeps a ring in the grid even while another is chosen, so it
@@ -261,12 +269,18 @@ button, and that path only ever reads.
 Hold the Add tab in the bottom bar until it buzzes, then say "dodaj 200 na
 transport" or "add 200 to Transport". Let go whenever you like — the phone
 stops listening when the sentence ends, not when the finger does. The row is
-written and a sheet shows exactly what was written — amount, category,
-account, day, and the sentence that was heard — with **Cofnij** and **Popraw**
-next to it. Both work by voice too: hold the microphone on the sheet and say
-"cofnij", "ma być 250", "zmień kategorię na zakupy".
+written and a sheet shows the row it wrote — amount, category, account, day and
+note. Every one of those is a tap into the editor, so the field that is wrong is
+also the way to fix it, and there is no separate "edit" button. **Cofnij** takes
+the row back, with an Undo of its own if that was the mis-tap.
 
-Say nothing and it gives up after five seconds. Anything it could not do — not
+It can be corrected by voice too: hold the microphone on the sheet and say
+"cofnij", "ma być 250", "zmień kategorię na zakupy". A sentence about the
+purchase rather than about one of its fields becomes the note — "te zakupy były
+w lidlu" writes that down and leaves the category alone — and "notatka …"
+anywhere, including in the first breath, is always a note.
+
+Say nothing and it gives up after three seconds. Anything it could not do — not
 understood, nothing heard, no speech pack for the language — says so and then
 takes itself away; there is no message here that has to be dismissed by hand.
 
@@ -279,7 +293,8 @@ argues why, and the absence of a `server/` diff in the change that
 added it is the evidence.
 
 What it cannot finish, it does not write: a sentence with an amount but no
-category opens the keypad with the amount already in it. A tie between two
+category opens the keypad with the amount already in it, and two transactions in
+one breath are refused rather than blended into one wrong row. A tie between two
 category names is a refusal rather than a guess, because a wrong row syncs to
 everybody. A phone with no recognition service simply has no gesture.
 

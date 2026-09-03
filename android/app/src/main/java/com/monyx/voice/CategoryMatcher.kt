@@ -236,6 +236,27 @@ internal object CategoryMatcher {
      * "12,50" is one word to the amount reader and would be two to everything
      * else. A separator left dangling at either end is punctuation and goes.
      */
+    /**
+     * Splits a sentence at an explicit note marker: what to parse, and what to
+     * write down verbatim.
+     *
+     * The tail is taken from the ORIGINAL words, not from the normalised ones —
+     * a note is read by a person, so "bilet miesięczny" has to keep its
+     * diacritics and its capitals. Matching is done on a normalised copy of the
+     * same whitespace split, so the two halves stay aligned without needing the
+     * tokeniser's punctuation rules to agree with anything.
+     *
+     * Nothing after the marker means no note: "dodaj 200 na transport notatka"
+     * is somebody who stopped talking, not a request for an empty one.
+     */
+    fun splitOnNoteMarker(value: String): Pair<String, String?> {
+        val words = value.split(Regex("\\s+")).filter { it.isNotBlank() }
+        val marker = words.indexOfFirst { normalise(it).trim(',', '.', ':', ';') in VoiceWords.noteMarkers }
+        if (marker < 0) return value to null
+        val note = words.drop(marker + 1).joinToString(" ").trim(' ', ',', '.', ':', ';')
+        return words.take(marker).joinToString(" ") to note.takeIf { it.isNotBlank() }
+    }
+
     fun tokenise(value: String): List<String> =
         normalise(value)
             .map { if (it.isLetterOrDigit() || it == ',' || it == '.') it else ' ' }

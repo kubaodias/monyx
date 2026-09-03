@@ -459,5 +459,34 @@ class MonyxRepository(private val dao: MonyxDao) {
          * no empty state to explain it.
          */
         internal fun allAccounts(ids: Set<String>): Int = if (ids.isEmpty()) 1 else 0
+
+        /**
+         * The five fields an editor changes, folded onto a whole row.
+         *
+         * Here rather than in a ViewModel because three screens now edit the same
+         * transaction — History, Overview and the voice summary — and three copies
+         * of this would drift. The one that matters is `occurredOn`: it is derived,
+         * not typed, and every month query buckets on it, so an edit that moved the
+         * date and forgot to recompute it leaves the row in its old month for every
+         * total in the app while showing the new date on its face.
+         *
+         * A whole row, not a patch, because the sync protocol carries whole rows
+         * and there is no partial-update path to get wrong.
+         */
+        fun applyEdit(
+            original: TransactionEntity,
+            amountMinor: Long,
+            categoryId: String?,
+            accountId: String,
+            note: String,
+            occurredAtMs: Long,
+        ): TransactionEntity = original.copy(
+            amountMinor = amountMinor,
+            categoryId = categoryId,
+            accountId = accountId,
+            note = note.ifBlank { null },
+            occurredAt = occurredAtMs,
+            occurredOn = Dates.localDate(occurredAtMs),
+        )
     }
 }

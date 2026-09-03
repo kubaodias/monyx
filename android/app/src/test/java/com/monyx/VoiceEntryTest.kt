@@ -10,7 +10,6 @@ import com.monyx.voice.VoiceAccount
 import com.monyx.voice.VoiceCategory
 import com.monyx.voice.CorrectionState
 import com.monyx.voice.ListenFailure
-import com.monyx.voice.SavedNote
 import com.monyx.voice.VoiceEntryState
 import com.monyx.voice.VoiceEntryViewModel
 import com.monyx.voice.SpokenTransaction
@@ -98,6 +97,7 @@ class VoiceEntryTest {
             categoryId: String?,
             occurredAtMs: Long,
             createdBy: String,
+            note: String?,
         ): String {
             if (failWrites) throw IllegalStateException("disk full")
             written += "$kind:$amountMinor:$categoryId"
@@ -108,6 +108,7 @@ class VoiceEntryTest {
                 amountMinor = amountMinor,
                 accountId = accountId,
                 categoryId = categoryId,
+                note = note,
                 occurredAt = occurredAtMs,
                 occurredOn = "2026-03-14",
                 createdBy = createdBy,
@@ -210,8 +211,7 @@ class VoiceEntryTest {
     @Test
     fun `a write that throws is reported rather than swallowed`() {
         val viewModel = say(ledger(failWrites = true), FakeRecogniser(), "dodaj 200 na transport")
-        val failed = viewModel.state.value as VoiceEntryState.SaveFailed
-        assertEquals("dodaj 200 na transport", failed.transcript)
+        assertEquals(VoiceEntryState.SaveFailed, viewModel.state.value)
     }
 
     @Test
@@ -287,9 +287,11 @@ class VoiceEntryTest {
         var synced = 0
         val viewModel = correct(ledger, FakeRecogniser(), "ma być 250") { synced++ }
 
+        // The changed value on the summary IS the confirmation. There is no
+        // "Poprawiono" any more, and the field it would have described is
+        // better evidence than the word was.
         val saved = viewModel.state.value as VoiceEntryState.Saved
         assertEquals(25000L, saved.summary.amountMinor)
-        assertEquals(SavedNote.Updated, saved.note)
         assertEquals(25000L, ledger.rows.getValue("t-1").amountMinor)
         // Once for the save, once for the correction.
         assertEquals(2, synced)
@@ -325,7 +327,6 @@ class VoiceEntryTest {
 
         viewModel.chooseCategory(ambiguous.candidates.first { it.id == "c-b" })
         assertEquals("c-b", ledger.rows.getValue("t-1").categoryId)
-        assertEquals(SavedNote.Updated, (viewModel.state.value as VoiceEntryState.Saved).note)
     }
 
     @Test
@@ -359,7 +360,37 @@ class VoiceEntryTest {
         // transactions list writes by.
         assertNull(row.note)
         assertNull(viewModel.editing.value)
-        assertEquals(SavedNote.Updated, (viewModel.state.value as VoiceEntryState.Saved).note)
+    }
+
+    /**
+     * The owner's case, end to end: a sentence about the transaction writes a
+     * note and leaves everything it mentions alone.
+     */
+    @Test
+    fun `a spoken note lands on the row and on the summary`() {
+        val ledger = FakeLedger(
+            flowOf(listOf(transport, VoiceCategory("c-groceries", "Zakupy spożywcze", EntryKind.Expense))),
+            flowOf(listOf(cash)),
+        )
+        val viewModel = correct(ledger, FakeRecogniser(), "te zakupy były w lidlu")
+
+        val saved = viewModel.state.value as VoiceEntryState.Saved
+        assertEquals("te zakupy były w lidlu", saved.summary.note)
+        assertEquals("te zakupy były w lidlu", ledger.rows.getValue("t-1").note)
+        // Named a category and changed none: "zakupy" was pointing at the row,
+        // not renaming it.
+        assertEquals(transport.id, ledger.rows.getValue("t-1").categoryId)
+        assertEquals(20000L, ledger.rows.getValue("t-1").amountMinor)
+    }
+
+    @Test
+    fun `a note dictated with the transaction survives to the row`() {
+        val ledger = ledger()
+        val viewModel = say(ledger, FakeRecogniser(), "dodaj 200 na transport, notatka bilet miesięczny")
+
+        val saved = viewModel.state.value as VoiceEntryState.Saved
+        assertEquals("bilet miesięczny", saved.summary.note)
+        assertEquals("bilet miesięczny", ledger.rows.getValue("t-1").note)
     }
 
     // --------------------------------------------- every write can fail

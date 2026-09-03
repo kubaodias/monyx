@@ -22,11 +22,15 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CalendarToday
+import androidx.compose.material.icons.filled.CloudUpload
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.SelectableDates
@@ -42,6 +46,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
@@ -69,9 +74,25 @@ data class TransactionEdit(
 /**
  * Editing an existing transaction: amount, category, account, note and date.
  *
+ * The only editor in the app, reached from three places — a row in History, a
+ * row in the Overview's recent list, and any field on the voice summary. There
+ * used to be a detail sheet in front of it in History whose entire content was
+ * two buttons, Edit and Delete; both are here now, so the tap that used to open
+ * a menu opens the thing the menu led to.
+ *
+ * Delete lives here for that reason, and keeps its confirmation: a destructive
+ * change to a ledger two people share does not go through on one tap, and the
+ * row it removes may be one the other person entered.
+ *
+ * The pending and rejected badges came across with it. They are sync state and
+ * this is now the only screen that shows it — a row the server refused has to
+ * be visible somewhere, or a rejected change is silently dropped after all.
+ *
  * Kind is deliberately NOT editable. Switching an expense to income would move
  * the row to a different category list, and every category already chosen for
  * it would be wrong — delete and re-enter is both clearer and one tap shorter.
+ * The spoken correction grammar DOES change it, because it re-chooses the
+ * category in the same breath.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -81,6 +102,7 @@ fun EditTransactionDialog(
     accounts: List<AccountEntity>,
     onDismiss: () -> Unit,
     onSave: (TransactionEdit) -> Unit,
+    onDelete: (String) -> Unit,
 ) {
     var amountText by remember(original.id) { mutableStateOf(Money.format(original.amountMinor)) }
     var categoryId by remember(original.id) { mutableStateOf(original.categoryId) }
@@ -88,6 +110,7 @@ fun EditTransactionDialog(
     var note by remember(original.id) { mutableStateOf(original.note.orEmpty()) }
     var date by remember(original.id) { mutableStateOf(LocalDate.parse(original.occurredOn)) }
     var showDatePicker by remember { mutableStateOf(false) }
+    var confirmDelete by remember { mutableStateOf(false) }
 
     // Only the list matching this row's kind; an expense cannot be filed under a
     // salary category. Children follow their parent so the row reads in family
@@ -113,9 +136,40 @@ fun EditTransactionDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.transactions_edit)) },
+        title = {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(stringResource(R.string.transactions_edit), modifier = Modifier.weight(1f))
+                IconButton(onClick = { confirmDelete = true }) {
+                    Icon(
+                        imageVector = Icons.Filled.Delete,
+                        contentDescription = stringResource(R.string.transactions_delete),
+                        tint = MaterialTheme.colorScheme.error,
+                    )
+                }
+            }
+        },
         text = {
             Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                // Sync state, and the only place it is visible. Above the fields
+                // rather than below them: "the server refused this" changes how
+                // you read everything under it.
+                if (original.pending == 1) {
+                    StatusRow(
+                        icon = Icons.Filled.CloudUpload,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        text = stringResource(R.string.transactions_pending),
+                    )
+                    Spacer(Modifier.height(10.dp))
+                }
+                if (original.rejected == 1) {
+                    StatusRow(
+                        icon = Icons.Filled.ErrorOutline,
+                        tint = MaterialTheme.colorScheme.error,
+                        text = stringResource(R.string.transactions_rejected),
+                    )
+                    Spacer(Modifier.height(10.dp))
+                }
+
                 OutlinedTextField(
                     value = amountText,
                     onValueChange = { amountText = it },
@@ -222,6 +276,27 @@ fun EditTransactionDialog(
         },
     )
 
+    if (confirmDelete) {
+        AlertDialog(
+            onDismissRequest = { confirmDelete = false },
+            title = { Text(stringResource(R.string.transactions_delete_confirm_title)) },
+            text = { Text(stringResource(R.string.transactions_delete_confirm_message)) },
+            confirmButton = {
+                TextButton(onClick = {
+                    confirmDelete = false
+                    onDelete(original.id)
+                }) {
+                    Text(stringResource(R.string.transactions_delete), color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmDelete = false }) {
+                    Text(stringResource(R.string.settings_cancel))
+                }
+            },
+        )
+    }
+
     if (showDatePicker) {
         val today = Dates.today()
         val state = rememberDatePickerState(
@@ -265,6 +340,15 @@ private fun occurredAtFor(date: LocalDate, originalAt: Long, originalOn: String)
     } else {
         Dates.startOfDayMillis(date) + 12 * 60 * 60 * 1000
     }
+
+@Composable
+private fun StatusRow(icon: ImageVector, tint: Color, text: String) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Icon(imageVector = icon, contentDescription = null, tint = tint, modifier = Modifier.size(16.dp))
+        Spacer(Modifier.width(6.dp))
+        Text(text = text, style = MaterialTheme.typography.bodyMedium, color = tint)
+    }
+}
 
 @Composable
 private fun CategoryPill(

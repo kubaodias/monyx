@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.monyx.data.AccountEntity
 import com.monyx.data.CategoryEntity
 import com.monyx.data.Dates
+import com.monyx.data.MonyxRepository
 import com.monyx.data.TransactionEntity
 import com.monyx.ui.add.EntryKind
 import kotlinx.coroutines.CoroutineScope
@@ -37,11 +38,8 @@ data class VoiceSummary(
     val categoryId: String?,
     val accountId: String,
     val date: LocalDate,
-    val transcript: String,
+    val note: String,
 )
-
-/** A one-shot message over the summary, cleared by the next interaction. */
-enum class SavedNote { Updated }
 
 /** What the microphone on the summary sheet is doing. */
 sealed interface CorrectionState {
@@ -72,11 +70,11 @@ sealed interface VoiceEntryState {
     data class Listening(val partial: String) : VoiceEntryState
 
     /** Heard, and nothing in it was a transaction. */
-    data class NotUnderstood(val transcript: String) : VoiceEntryState
+    data object NotUnderstood : VoiceEntryState
 
     /** Part of it was a transaction. The keypad is already prefilled behind
      *  this; the sheet only says why it is. */
-    data class Incomplete(val transcript: String) : VoiceEntryState
+    data object Incomplete : VoiceEntryState
 
     /** The recogniser itself could not do it: no pack for the language, no
      *  connection and no pack, a microphone another app is holding. */
@@ -86,11 +84,10 @@ sealed interface VoiceEntryState {
      * The write threw. A row that silently failed to appear is the same class
      * of bug as a wrong row that silently did, and the keypad is a swipe away.
      */
-    data class SaveFailed(val transcript: String) : VoiceEntryState
+    data object SaveFailed : VoiceEntryState
 
     data class Saved(
         val summary: VoiceSummary,
-        val note: SavedNote? = null,
         val correction: CorrectionState = CorrectionState.Idle,
     ) : VoiceEntryState
 
@@ -128,12 +125,14 @@ class VoiceEntryViewModel(
     /**
      * How long the microphone waits for somebody to START.
      *
-     * Five seconds is the gap between "the phone is out of the pocket and they
-     * are drawing breath" and "this was a mis-press, or the microphone is not
-     * really working". Nothing is written and nothing is asked for: the sheet
-     * says nothing was heard and takes itself away.
+     * Three seconds is the gap between "the phone is out of the pocket and
+     * they are drawing breath" and "this was a mis-press, or the microphone is
+     * not really working". It started at five, and five was measurably too long
+     * to stand there holding a phone that is doing nothing visible. Nothing is
+     * written and nothing is asked for: the sheet says nothing was heard and
+     * takes itself away.
      */
-    private val silenceMillis: Long = 5_000,
+    private val silenceMillis: Long = 3_000,
     /**
      * How long it waits for somebody to FINISH, once they have begun.
      *
@@ -248,7 +247,7 @@ class VoiceEntryViewModel(
         locale = Locale.forLanguageTag(languageTag)
         correcting = true
         listening = true
-        show(saved.copy(note = null, correction = CorrectionState.Listening("")))
+        show(saved.copy(correction = CorrectionState.Listening("")))
         recogniser.start(languageTag)
         awaitSpeech()
     }
@@ -399,10 +398,10 @@ class VoiceEntryViewModel(
                 // The handoff has already prefilled it by the time this message
                 // closes itself, and closing is only a state change here —
                 // nothing in the auto-dismiss touches the draft behind it.
-                show(VoiceEntryState.Incomplete(parsed.transaction.transcript))
+                show(VoiceEntryState.Incomplete)
                 _handoff.tryEmit(parsed.transaction)
             }
-            is VoiceParse.Unrecognised -> show(VoiceEntryState.NotUnderstood(parsed.transcript))
+            is VoiceParse.Unrecognised -> show(VoiceEntryState.NotUnderstood)
         }
     }
 
@@ -424,13 +423,13 @@ class VoiceEntryViewModel(
      * with `deleted = 0`, resurrecting a transaction the user had just taken
      * back. Serialising the four paths is what makes that unrepresentable.
      */
-    private fun write(transcript: String, block: suspend () -> VoiceEntryState) {
+    private fun write(block: suspend () -> VoiceEntryState) {
         if (writing) return
         writing = true
         work.launch {
             val outcome = runCatching { block() }
             writing = false
-            show(outcome.getOrElse { VoiceEntryState.SaveFailed(transcript) })
+            show(outcome.getOrElse { VoiceEntryState.SaveFailed })
             if (outcome.isSuccess) onSyncRequested()
         }
     }
@@ -439,10 +438,10 @@ class VoiceEntryViewModel(
         val createdBy = memberId
         val accountId = spoken.accountId
         if (createdBy == null || accountId == null) {
-            show(VoiceEntryState.SaveFailed(spoken.transcript))
+            show(VoiceEntryState.SaveFailed)
             return
         }
-        write(spoken.transcript) {
+        write {
             val id = ledger.add(
                 kind = spoken.kind,
                 amountMinor = spoken.amountMinor,
@@ -450,6 +449,7 @@ class VoiceEntryViewModel(
                 categoryId = spoken.categoryId,
                 occurredAtMs = occurredAt(spoken.date),
                 createdBy = createdBy,
+                note = spoken.note,
             )
             VoiceEntryState.Saved(
                 VoiceSummary(
@@ -459,7 +459,7 @@ class VoiceEntryViewModel(
                     categoryId = spoken.categoryId,
                     accountId = accountId,
                     date = spoken.date,
-                    transcript = spoken.transcript,
+                    note = spoken.note.orEmpty(),
                 ),
             )
         }
@@ -473,7 +473,10 @@ class VoiceEntryViewModel(
      */
     fun revert() {
         val saved = _state.value as? VoiceEntryState.Saved ?: return
-        write(saved.summary.transcript) {
+        // Reached from the sheet's own button and from the editor's trash, and
+        // the editor has to close either way.
+        _editing.value = null
+        write {
             ledger.remove(saved.summary.transactionId)
             VoiceEntryState.Reverted(saved.summary)
         }
@@ -481,7 +484,7 @@ class VoiceEntryViewModel(
 
     fun undoRevert() {
         val reverted = _state.value as? VoiceEntryState.Reverted ?: return
-        write(reverted.summary.transcript) {
+        write {
             ledger.restore(reverted.summary.transactionId)
             VoiceEntryState.Saved(reverted.summary)
         }
@@ -502,16 +505,16 @@ class VoiceEntryViewModel(
     ) {
         val saved = _state.value as? VoiceEntryState.Saved ?: return
         _editing.value = null
-        write(saved.summary.transcript) {
+        write {
             val original = readLive(saved.summary.transactionId)
             ledger.update(
-                original.copy(
+                MonyxRepository.applyEdit(
+                    original = original,
                     amountMinor = amountMinor,
                     categoryId = categoryId,
                     accountId = accountId,
-                    note = note.ifBlank { null },
-                    occurredAt = occurredAtMs,
-                    occurredOn = Dates.localDate(occurredAtMs),
+                    note = note,
+                    occurredAtMs = occurredAtMs,
                 ),
             )
             VoiceEntryState.Saved(
@@ -520,8 +523,8 @@ class VoiceEntryViewModel(
                     categoryId = categoryId,
                     accountId = accountId,
                     date = LocalDate.parse(Dates.localDate(occurredAtMs)),
+                    note = note.trim(),
                 ),
-                note = SavedNote.Updated,
             )
         }
     }
@@ -554,13 +557,14 @@ class VoiceEntryViewModel(
     }
 
     private fun apply(saved: VoiceEntryState.Saved, correction: VoiceCorrection) {
-        write(saved.summary.transcript) {
+        write {
             val original = readLive(saved.summary.transactionId)
             val kind = correction.kind ?: saved.summary.kind
             val amountMinor = correction.amountMinor ?: saved.summary.amountMinor
             val categoryId = correction.categoryId ?: saved.summary.categoryId
             val accountId = correction.accountId ?: saved.summary.accountId
             val date = correction.date ?: saved.summary.date
+            val note = correction.note ?: saved.summary.note
             val occurredAtMs = occurredAt(date)
             ledger.update(
                 original.copy(
@@ -568,6 +572,7 @@ class VoiceEntryViewModel(
                     amountMinor = amountMinor,
                     categoryId = categoryId,
                     accountId = accountId,
+                    note = note.ifBlank { null },
                     occurredAt = occurredAtMs,
                     occurredOn = Dates.localDate(occurredAtMs),
                 ),
@@ -579,8 +584,8 @@ class VoiceEntryViewModel(
                     categoryId = categoryId,
                     accountId = accountId,
                     date = date,
+                    note = note,
                 ),
-                note = SavedNote.Updated,
             )
         }
     }
@@ -649,9 +654,9 @@ class VoiceEntryViewModel(
     }
 
     private fun selfClosingAfter(state: VoiceEntryState): Long? = when (state) {
-        is VoiceEntryState.NotUnderstood,
-        is VoiceEntryState.Incomplete,
-        is VoiceEntryState.SaveFailed,
+        VoiceEntryState.NotUnderstood,
+        VoiceEntryState.Incomplete,
+        VoiceEntryState.SaveFailed,
         -> noticeMillis
         // The wordy two get twice as long. "Brak połączenia i brak pakietu mowy
         // offline" is a sentence with two clauses in it, and it is the one
@@ -670,8 +675,8 @@ class VoiceEntryViewModel(
     }
 
     /** Closes the sheet. The row stays exactly where it is — top of the history
-     *  list, editable and deletable there. The summary is a fast path over
-     *  TransactionDetailSheet, not a replacement for it. */
+     *  list, where a tap opens the same editor this sheet's fields open. The
+     *  summary is a fast path to it, not a second one. */
     fun dismiss() {
         correcting = false
         listening = false

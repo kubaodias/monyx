@@ -100,9 +100,10 @@ class AddViewModel(private val repository: MonyxRepository) : ViewModel() {
      * wrote nothing — the second engine behind voice entry is this screen, not
      * a second parser.
      *
-     * The note is left empty on purpose. Putting "dodaj dwieście na transport"
-     * in every note pollutes the ledger and the search index with the phrasing
-     * of the sentence rather than anything about the purchase.
+     * The note comes over only when it was explicitly dictated — "…, notatka
+     * bilet miesięczny". The sentence itself is never the note: putting "dodaj
+     * dwieście na transport" in every row pollutes the ledger and the search
+     * index with the phrasing rather than with anything about the purchase.
      */
     fun prefillFromVoice(spoken: SpokenTransaction) {
         val current = _state.value
@@ -111,6 +112,7 @@ class AddViewModel(private val repository: MonyxRepository) : ViewModel() {
             kind = spoken.kind,
             categoryId = spoken.categoryId,
             accountId = spoken.accountId ?: current.accountId,
+            note = spoken.note.orEmpty(),
             date = spoken.date,
         )
     }

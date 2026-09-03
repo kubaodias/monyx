@@ -5,9 +5,12 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.monyx.data.AccountBalance
+import com.monyx.data.AccountEntity
+import com.monyx.data.CategoryEntity
 import com.monyx.data.CategorySpend
 import com.monyx.data.Dates
 import com.monyx.data.MonyxRepository
+import com.monyx.data.TransactionEntity
 import com.monyx.data.TransactionListItem
 import com.monyx.ui.SelectedMonth
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -17,6 +20,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
 
 /**
  * Everything the Overview screen (Przegląd) shows for one selected month:
@@ -105,6 +109,53 @@ class OverviewViewModel(
             started = SharingStarted.WhileSubscribed(5_000),
             initialValue = emptyState(period.value),
         )
+
+    /** For the editor a recent row opens. Both kinds and every account it
+     *  might already sit on, which is what EditTransactionDialog expects. */
+    val categories: StateFlow<List<CategoryEntity>> = repository.categories()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    val accounts: StateFlow<List<AccountEntity>> = repository.accounts()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    /** The recent list is a projection, not the row. */
+    suspend fun load(id: String): TransactionEntity? = repository.transaction(id)
+
+    /**
+     * The same write History makes, through the same fold, so the two screens
+     * cannot disagree about what an edit is. Sync arrives as a lambda rather
+     * than a Context — nothing in this ViewModel knows WorkManager exists.
+     */
+    fun saveEdit(
+        original: TransactionEntity,
+        amountMinor: Long,
+        categoryId: String?,
+        accountId: String,
+        note: String,
+        occurredAtMs: Long,
+        onSaved: () -> Unit,
+    ) {
+        viewModelScope.launch {
+            repository.updateTransaction(
+                MonyxRepository.applyEdit(
+                    original = original,
+                    amountMinor = amountMinor,
+                    categoryId = categoryId,
+                    accountId = accountId,
+                    note = note,
+                    occurredAtMs = occurredAtMs,
+                ),
+            )
+            onSaved()
+        }
+    }
+
+    fun deleteTransaction(id: String, onDeleted: () -> Unit) {
+        viewModelScope.launch {
+            repository.deleteTransaction(id)
+            onDeleted()
+        }
+    }
 
     fun setPeriod(period: String) {
         selectedMonth.set(period)

@@ -245,6 +245,33 @@ class VoiceParserTest {
         assertEquals(20000L, spoken.amountMinor)
     }
 
+    /**
+     * A note dictated in the same breath as the transaction. The marker takes
+     * everything after it, so a number or a category name inside the note is
+     * text and not an instruction.
+     */
+    @Test
+    fun `a note said with the transaction is carried, not parsed`() {
+        val spoken = complete("dodaj 200 na transport, notatka bilet miesięczny")
+        assertEquals(20000L, spoken.amountMinor)
+        assertEquals(transport.id, spoken.categoryId)
+        assertEquals("bilet miesięczny", spoken.note)
+
+        // Nothing said after the marker is somebody who stopped talking.
+        assertNull(complete("dodaj 200 na transport notatka").note)
+        // And with no marker there is no note: the sentence is not the note.
+        assertNull(complete("dodaj 200 na transport").note)
+    }
+
+    @Test
+    fun `what is inside a note is text, not an instruction`() {
+        val spoken = complete("dodaj 200 na transport, notatka zakupy za 500 wczoraj")
+        assertEquals(20000L, spoken.amountMinor)
+        assertEquals(transport.id, spoken.categoryId)
+        assertEquals(today, spoken.date)
+        assertEquals("zakupy za 500 wczoraj", spoken.note)
+    }
+
     @Test
     fun `yesterday, in both languages`() {
         assertEquals(today.minusDays(1), complete("wczoraj 20 na transport").date)

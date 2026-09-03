@@ -149,6 +149,80 @@ class VoiceCommandTest {
         assertEquals(transport.id, correction.categoryId)
     }
 
+    // ------------------------------------------------------------- notes
+
+    /**
+     * The owner's own sentence, and the reason the note rule exists.
+     *
+     * "te zakupy były w lidlu" contains a category name and is plainly not a
+     * category correction — "zakupy" is only being used to point at the row.
+     * Reading a category out of the middle of it would move the transaction to
+     * Zakupy spożywcze and say nothing about where they actually were.
+     */
+    @Test
+    fun `a sentence about the transaction is a note, not a category`() {
+        val correction = say("te zakupy były w lidlu")
+        assertEquals("te zakupy były w lidlu", correction.note)
+        assertNull(correction.categoryId)
+        assertNull(correction.amountMinor)
+        assertFalse(correction.revert)
+    }
+
+    /** ...and the bare name still is one. */
+    @Test
+    fun `a bare category name is still a category`() {
+        val correction = say("zakupy")
+        assertEquals(groceries.id, correction.categoryId)
+        assertNull(correction.note)
+    }
+
+    @Test
+    fun `an explicit marker takes everything after it, verbatim`() {
+        val correction = say("notatka bilet miesięczny")
+        assertEquals("bilet miesięczny", correction.note)
+        assertNull(correction.amountMinor)
+        assertNull(correction.categoryId)
+        assertNull(correction.date)
+    }
+
+    /**
+     * The marker wins over the undo verbs, which are otherwise the one thing in
+     * this grammar that short-circuits everything. Somebody who says "notatka"
+     * has already told you which half of the sentence is an instruction.
+     */
+    @Test
+    fun `a note is not swallowed by the revert or confirm words inside it`() {
+        val cancelled = say("notatka anulowane zamówienie")
+        assertEquals("anulowane zamówienie", cancelled.note)
+        assertFalse(cancelled.revert)
+
+        val agreed = say("notatka ok było tanio")
+        assertEquals("ok było tanio", agreed.note)
+        assertFalse(agreed.confirm)
+    }
+
+    /** Naming a field is never a note, however much else is said around it. */
+    @Test
+    fun `an utterance that names a field stays a field correction`() {
+        val both = say("250 na zakupy")
+        assertEquals(25000L, both.amountMinor)
+        assertEquals(groceries.id, both.categoryId)
+        assertNull(both.note)
+
+        assertNull(say("zmień kategorię na zakupy").note)
+        assertNull(say("wczoraj").note)
+        assertNull(say("gotówka").note)
+    }
+
+    /** A sentence whose only signal is a negation is somebody saying no, not
+     *  somebody describing a purchase. */
+    @Test
+    fun `a negated sentence is refused rather than written down`() {
+        val correction = say("to nie było anulowane")
+        assertTrue(correction.isEmpty)
+        assertNull(correction.note)
+    }
+
     @Test
     fun `two names that score the same are offered rather than guessed`() {
         val tied = listOf(
@@ -171,6 +245,7 @@ class VoiceCommandTest {
         assertNull(correction.kind)
         assertNull(correction.date)
         assertNull(correction.accountId)
+        assertNull(correction.note)
         assertTrue(correction.ambiguous.isEmpty())
     }
 }

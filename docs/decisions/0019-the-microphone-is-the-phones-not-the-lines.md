@@ -63,9 +63,35 @@ always `<verb?> <number> <preposition?> <category>`, and the target set is one
 household's ten to thirty self-named categories. What a model would buy is
 open-ended phrasing; what the ledger actually needs is that a wrong answer is
 visible, because the ledger is shared and a wrong row syncs to everybody. So the
-residue is handled by **showing what was understood** rather than by
+residue is handled by **showing the row that was written** rather than by
 understanding better, and by refusing rather than guessing:
 
+The summary used to quote the transcript back — *Usłyszano: "dodaj dwieście na
+transport"* — and that was the weaker half of the same idea. The transcript
+tells you what the recogniser heard; the fields tell you what is now in the
+ledger, which is the thing that is either right or wrong, and the two only ever
+differ when the parse went astray, which is exactly when reading the sentence
+back would be least use. Every field is on the sheet and every one of them
+opens the editor on a tap. A word saying "Poprawiono" went with it for the same
+reason: the changed value is better evidence that something changed than a
+label claiming it.
+
+- **A note is what is said ABOUT the row; a name is what is said INSTEAD of
+  one.** "te zakupy były w lidlu" contains a seeded category name and is
+  plainly not a category correction — *zakupy* is only being used to point at
+  the transaction. The rule, and it is small on purpose: an utterance is a note
+  when it carries a demonstrative or a copula from a closed list that is not
+  itself part of the name that matched, AND the only thing it otherwise
+  produced was a category, or nothing. Naming a field — an amount, a date, an
+  account, a kind — is never a note. An explicit "notatka …" outranks all of
+  it, including the undo verbs, and works in the first pass too.
+
+  **The failure mode this accepts:** a note nobody meant to dictate. That is one
+  line of text on a sheet the user is already reading, beside a field that opens
+  an editor on one tap. A wrong category or a wrong amount is neither visible
+  nor cheap — it moves money between columns and syncs to the other phone.
+  Between the two readings, the note is the safer landing, and the rule is
+  written to fall that way.
 - **A tie between two category names is a refusal**, not a coin toss — except
   between a parent and its own child, where the specific one is what somebody
   naming a word the child owns meant.
@@ -189,10 +215,11 @@ setting for driving, and is out of scope.
   had finished, it was a thumb shifting — and the sentence went with it,
   silently. A listen now ends on the recogniser's own endpointing, which is the
   normal path and the one that knows what a finished sentence sounds like; or
-  on the sheet's Stop button; or on one of two clocks. Five seconds waiting for
+  on the sheet's Stop button; or on one of two clocks. Three seconds waiting for
   a voice to start, because nothing beginning means a mis-press or a microphone
-  that is not really working, and there is nothing to write. Fifteen once one
-  has, which is a safety net against a recogniser that never endpoints and not
+  that is not really working, and there is nothing to write — it was five, and
+  five is measurably too long to stand holding a phone that is doing nothing
+  visible. Fifteen once a voice has begun, which is a safety net against a recogniser that never endpoints and not
   a limit on the sentence — the longest thing this grammar can usefully be
   told takes about three. The first cancels, because nothing was said; the
   second stops, because something was.
@@ -220,14 +247,25 @@ setting for driving, and is out of scope.
   `sync/Mapping.kt` already round-trips it, so it costs no migration. Without it
   there is no way to ever measure how often the parser was right. It is not dead
   code; it is the only evidence this feature will ever leave.
+- **The fields ARE the "change it" control.** There is no Popraw button. One
+  said only "something here is wrong" and then made you find it again in a
+  dialog, when the value that is wrong is already on screen and already the
+  thing being looked at — so the amount, the category, the account and date,
+  and the note each open `EditTransactionDialog` on a tap, with the whole row
+  as the target rather than a glyph on it. The note is tappable while empty,
+  because adding one is the main reason to reach for it.
+
+  The dialog opens on all five fields rather than on the one that was tapped.
+  Threading a target field through it would mean reshaping an `AlertDialog` that
+  two other screens depend on, for a convenience.
 - **The summary is a fast path, not the only path.** After it is dismissed the
-  row is the top of the History list, where `TransactionDetailSheet` and
-  `EditTransactionDialog` already delete and edit it. Change reuses that dialog
-  rather than growing a second editor — and the dialog deliberately does not
-  edit the kind, where the spoken correction does. Both are right: the dialog
-  refuses it because switching invalidates the category already chosen, and the
-  spoken grammar allows it because "przychód, wypłata" re-chooses both in one
-  breath.
+  row is the top of the History list, where a tap opens the same editor. That
+  editor deliberately does not change the kind, where the spoken correction
+  does. Both are right: the dialog refuses it because switching invalidates the
+  category already chosen, and the spoken grammar allows it because "przychód,
+  wypłata" re-chooses both in one breath. Deleting from the editor while the
+  summary is open is the same write as Revert, and lands in the same place,
+  with Undo still on offer.
 - **An undo verb said beside a correction changes nothing.** "nie anuluj, zmień
   na transport" — *do not cancel, change it to transport* — and "nie, cofnij
   250" arrive as the same words with the same verb in the same place, because

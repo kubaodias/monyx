@@ -5,7 +5,6 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.monyx.data.AccountEntity
 import com.monyx.data.CategoryEntity
-import com.monyx.data.Dates
 import com.monyx.data.MonyxRepository
 import com.monyx.data.TransactionEntity
 import com.monyx.data.TransactionListItem
@@ -141,12 +140,8 @@ class TransactionsViewModel(
     /** Loads the full row behind a list item, which the list projection does not carry. */
     suspend fun load(id: String): TransactionEntity? = repository.transaction(id)
 
-    /**
-     * An edit is an upsert of the whole row, exactly like a create: the sync
-     * protocol carries full rows, so there is no partial-update path to get
-     * wrong. occurredOn is recomputed because changing the date must move the
-     * row between months, and that column is what every month query buckets on.
-     */
+    /** Through [MonyxRepository.applyEdit], which is where the fold lives now
+     *  that Overview and the voice summary make the same write. */
     fun saveEdit(
         original: TransactionEntity,
         amountMinor: Long,
@@ -157,13 +152,13 @@ class TransactionsViewModel(
     ) {
         viewModelScope.launch {
             repository.updateTransaction(
-                original.copy(
+                MonyxRepository.applyEdit(
+                    original = original,
                     amountMinor = amountMinor,
                     categoryId = categoryId,
                     accountId = accountId,
-                    note = note.ifBlank { null },
-                    occurredAt = occurredAtMs,
-                    occurredOn = Dates.localDate(occurredAtMs),
+                    note = note,
+                    occurredAtMs = occurredAtMs,
                 ),
             )
             SyncWorker.enqueue(appContext)

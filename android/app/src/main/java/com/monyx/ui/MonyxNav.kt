@@ -396,6 +396,7 @@ private fun MainScaffold(
                     onOpenTransactions = { categoryId, period ->
                         openTransactions(categoryId, period)
                     },
+                    onSyncRequested = { SyncWorker.enqueue(app) },
                 )
             }
             composable(Destinations.TRANSACTIONS) {

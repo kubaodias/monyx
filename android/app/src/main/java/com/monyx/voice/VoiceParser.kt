@@ -34,6 +34,13 @@ data class SpokenTransaction(
     val categoryId: String?,
     val accountId: String?,
     val date: LocalDate,
+    /**
+     * Only ever what somebody explicitly asked to write down — "…, notatka
+     * bilet miesięczny". The sentence itself is never the note: putting "dodaj
+     * dwieście na transport" in every row pollutes the ledger and the search
+     * index with the phrasing rather than with anything about the purchase.
+     */
+    val note: String?,
     val transcript: String,
 )
 
@@ -121,7 +128,12 @@ object VoiceParser {
         locale: Locale,
         today: LocalDate,
     ): VoiceParse {
-        val tokens = CategoryMatcher.tokenise(text)
+        // The note comes off first, and everything in it is out of the grammar's
+        // reach from here on. "notatka" is a promise about the rest of the
+        // sentence, so a number or a category name inside the note is text and
+        // not an instruction.
+        val (instruction, dictatedNote) = CategoryMatcher.splitOnNoteMarker(text)
+        val tokens = CategoryMatcher.tokenise(instruction)
         val amount = SpokenAmount.find(tokens, locale)
         val afterAmount = tokens.filterIndexed { index, _ -> amount == null || index !in amount.tokens }
 
@@ -190,6 +202,7 @@ object VoiceParser {
             // correction pass can set it, which is where it is actually used.
             accountId = accounts.firstOrNull()?.id,
             date = spokenDate?.date ?: today,
+            note = dictatedNote,
             transcript = text,
         )
         if (splitUtterance) return VoiceParse.Partial(spoken, VoiceParse.Missing.Both)

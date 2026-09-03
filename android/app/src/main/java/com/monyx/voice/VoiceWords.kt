@@ -161,6 +161,30 @@ internal object VoiceWords {
         if (locale.language == "en") setOf("no", "nope", "nie") else setOf("nie")
 
     /**
+     * "…and write this down with it." Everything after one of these is the
+     * note, whatever it contains — a category name, a number, the word
+     * "cofnij". An explicit marker is the one thing in this grammar that is
+     * never second-guessed, because somebody who says "notatka" has already
+     * told you which half of the sentence is which.
+     */
+    val noteMarkers = setOf("notatka", "notatke", "notatki", "dopisz", "opis", "uwaga", "note", "memo")
+
+    /**
+     * Words that turn a phrase into a sentence ABOUT the transaction.
+     *
+     * A demonstrative or a copula. "zakupy" is a category; "te zakupy były w
+     * lidlu" is somebody saying where they were, and reading a category out of
+     * the middle of that files the row against a name they were only using to
+     * point at it. These are what tell the two apart, and [VoiceCommands] is
+     * the only place that decision is made.
+     */
+    val statementWords = setOf(
+        "te", "ta", "ten", "tamte", "tamten", "tamta",
+        "bylo", "byly", "byl", "byla", "bylem", "bylam", "bylismy", "jest", "sa",
+        "this", "that", "these", "those", "was", "were", "are",
+    )
+
+    /**
      * How much of a word survives before its ending is cut off. Five.
      *
      * It is a compromise between two failures that pull opposite ways, and both
