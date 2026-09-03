@@ -8,7 +8,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.imePadding
@@ -86,6 +85,19 @@ private data class Tab(
     val labelRes: Int,
     val icon: ImageVector,
 )
+
+/**
+ * The height NavigationBar gives its own row, restated because the Add item is
+ * drawn by hand and has to match the four items it stands beside.
+ *
+ * It cannot be fillMaxHeight(). NavigationBar constrains its row with
+ * defaultMinSize, NOT a fixed height, so maxHeight arrives as the whole screen
+ * and a child that fills it drags the bar up with it — the bar becomes the
+ * screen, and the other four icons centre themselves in the middle of it. That
+ * shipped once; the bounds were [441,0][640,2337] against [0,1064][200,1274]
+ * for its neighbours.
+ */
+private val NavigationBarHeight = 80.dp
 
 private val TABS = listOf(
     Tab(Destinations.OVERVIEW, R.string.nav_overview, MonyxMark),
@@ -488,7 +500,7 @@ private fun RowScope.AddTabItem(
     Box(
         modifier = Modifier
             .weight(1f)
-            .fillMaxHeight()
+            .height(NavigationBarHeight)
             .combinedClickable(
                 role = Role.Tab,
                 onLongClickLabel = holdLabel.takeIf { voiceEnabled },
