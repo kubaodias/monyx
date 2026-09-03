@@ -178,6 +178,29 @@ class AmountInputTest {
         assertEquals(9, many.text.filter { it.isDigit() }.length)
     }
 
+    /**
+     * A dictated amount and a typed one have to be the same object from the
+     * moment the keypad opens, or a voice prefill is a second kind of amount
+     * with its own rounding.
+     *
+     * display(locale) is what is pinned, because it is the locale-sensitive
+     * half: `text` uses ',' internally whatever the language is, so a round
+     * trip through toMinor() alone proves less than it looks.
+     */
+    @Test
+    fun `an amount handed over from a dictated sentence is an ordinary amount`() {
+        assertEquals(20000L, AmountInput.ofMinor(20000).toMinor())
+        assertEquals("200", AmountInput.ofMinor(20000).display(Locale.forLanguageTag("pl-PL")))
+
+        val grosze = AmountInput.ofMinor(123450)
+        assertEquals(123450L, grosze.toMinor())
+        assertEquals(
+            "1 234,50",
+            grosze.display(Locale.forLanguageTag("pl-PL")).replace('\u00A0', ' '),
+        )
+        assertEquals("1,234.50", grosze.display(Locale.forLanguageTag("en-GB")))
+    }
+
     @Test
     fun `clear resets everything`() {
         assertEquals(0L, type('9', '9', '9').clear().toMinor())

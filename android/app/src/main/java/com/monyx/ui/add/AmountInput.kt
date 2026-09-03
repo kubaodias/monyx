@@ -28,7 +28,31 @@ class AmountInput private constructor(
     constructor() : this("0", null, null)
 
     companion object {
-        private const val MAX_DIGITS = 9
+        /**
+         * Digits before the separator, so the ceiling is 999 999 999 złoty and
+         * not a nine-digit grosz figure. Internal because the voice parser has
+         * to refuse the same amounts this refuses: a ten-digit number is a
+         * mis-hearing, and a truncated one would be a wrong row that looks
+         * perfectly right.
+         */
+        internal const val MAX_DIGITS = 9
+
+        /**
+         * The value a voice entry could not finish, handed to the keypad to be
+         * finished by hand. The same object the keys build, so a dictated
+         * amount and a typed one are indistinguishable from here on.
+         */
+        fun ofMinor(minor: Long): AmountInput = AmountInput(minorToText(minor), null, null)
+
+        private fun minorToText(minor: Long): String {
+            val whole = minor / 100
+            val fraction = (minor % 100).toInt()
+            return if (fraction == 0) {
+                whole.toString()
+            } else {
+                "$whole,${fraction.toString().padStart(2, '0')}"
+            }
+        }
 
         /**
          * The decimal key's label, and the character display() puts back. Read
@@ -103,12 +127,6 @@ class AmountInput private constructor(
             else -> right
         }.coerceAtLeast(0)
         return AmountInput(minorToText(result), null, null)
-    }
-
-    private fun minorToText(minor: Long): String {
-        val whole = minor / 100
-        val fraction = (minor % 100).toInt()
-        return if (fraction == 0) whole.toString() else "$whole,${fraction.toString().padStart(2, '0')}"
     }
 
     /**

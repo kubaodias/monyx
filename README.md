@@ -94,7 +94,8 @@ always says where now is relative to what is on screen.
 
 Add is the only filled shape in the bottom bar, and it is filled whether or not
 it is the tab you are on. A green glyph among four grey glyphs is still a
-glyph; this is the thing the app exists for.
+glyph; this is the thing the app exists for. Hold it instead of tapping and it
+takes dictation — see [Voice](#voice).
 
 Interface English, category names Polish: the names are rows that sync to every
 device, so they are data the family owns, not translated copy. Switching the
@@ -250,6 +251,39 @@ household and re-enrolling every device by hand.
 
 ## Voice
 
+Two different things share the word, and they do not touch each other. **Adding
+by voice happens on the phone**, on-device, with no network and no Telnyx route
+of any kind. **Asking about the month happens over the line**, through the call
+button, and that path only ever reads.
+
+### Adding by voice — on the phone
+
+Hold the Add tab in the bottom bar, say "dodaj 200 na transport" or "add 200 to
+Transport", let go. The row is written and a sheet shows exactly what was
+written — amount, category, account, day, and the sentence that was heard —
+with **Cofnij** and **Popraw** next to it. Both work by voice too: hold the
+microphone on the sheet and say "cofnij", "ma być 250", "zmień kategorię na
+zakupy".
+
+Nothing leaves the phone. Speech is Android's own `SpeechRecognizer`, asked to
+prefer the on-device pack; the parse is a few hundred lines of Kotlin in
+`android/app/src/main/java/com/monyx/voice/`, pure and unit-tested on the JVM.
+**There is no server route for this, no model, and no new credential** —
+[ADR 0019](docs/decisions/0019-the-microphone-is-the-phones-not-the-lines.md)
+argues why, and the absence of a `server/` diff in the change that
+added it is the evidence.
+
+What it cannot finish, it does not write: a sentence with an amount but no
+category opens the keypad with the amount already in it. A tie between two
+category names is a refusal rather than a guess, because a wrong row syncs to
+everybody. A phone with no recognition service simply has no gesture.
+
+`RECORD_AUDIO` is asked for on the first long press and never before it, which
+is the one deliberate exception to the rule in `NotificationPermission.kt` that
+forbids a permission dialog in the add path. The keypad path is untouched.
+
+### Asking about the month — over the line
+
 The household can be asked about over the phone. The assistant itself — model,
 voice, transcription, instructions, and the number it answers — is configuration
 held on Telnyx AI Assistants and is not in this repository. What is here is the
@@ -278,16 +312,22 @@ Three secrets, none of them in this repository:
 - `VOICE_TOOL_SECRET` — the `x-voice-secret` header on the tool webhook, held on
   the Telnyx side as an integration secret.
 
-Both routes are `SELECT`-only. Adding a transaction by voice would write through
-the sync epoch and needs a `created_by` member without a device; it is not built.
+Both routes are `SELECT`-only, and stayed that way when adding by voice was
+built: that feature never comes near them. What ADR 0018 left open — a
+server-side write, which needs a `created_by` member with no device — is still
+open, and is now unnecessary. See
+[ADR 0019](docs/decisions/0019-the-microphone-is-the-phones-not-the-lines.md).
 
 **The app has a call button** — a floating action button, bottom right, in
 Telnyx green, on every tab but the keypad, where the bottom right is already the
-save button. It fires `ACTION_DIAL` rather than `ACTION_CALL`: dialling fills
-the number in and lets the person press call themselves, where calling would
-need the `CALL_PHONE` permission to place an outgoing call from under their
-thumb, to save one tap. The number comes from `BuildConfig.ASSISTANT_NUMBER`,
-read from an untracked `android/voice.properties`:
+save button. It is a different feature from the one above: it asks about the
+month, and it does not write to it.
+
+It fires `ACTION_DIAL` rather than `ACTION_CALL`: dialling fills the number in
+and lets the person press call themselves, where calling would need the
+`CALL_PHONE` permission to place an outgoing call from under their thumb, to
+save one tap. The number comes from `BuildConfig.ASSISTANT_NUMBER`, read from an
+untracked `android/voice.properties`:
 
 ```properties
 assistantNumber=+00000000000

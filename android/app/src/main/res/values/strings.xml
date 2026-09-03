@@ -233,4 +233,31 @@
     <string name="recurring_needs_account">Add an account first</string>
     <string name="recurring_from_rule">Added by a repeating transaction</string>
     <string name="call_assistant">Call the budget assistant</string>
+
+    <!-- Adding by voice. On the phone, on-device: hold the Add tab, say it,
+         read back what was written. -->
+    <string name="voice_hold_to_talk">Hold to add by voice</string>
+    <string name="voice_listening">Listening…</string>
+    <string name="voice_say_example">Try “Add 200 to Transport”</string>
+    <string name="voice_not_understood">That was not understood</string>
+    <string name="voice_no_service">This phone cannot recognise speech</string>
+    <string name="voice_no_speech">Nothing was heard</string>
+    <string name="voice_language_unavailable">Speech is not available in this language</string>
+    <string name="voice_offline">No connection, and no offline speech pack on this phone</string>
+    <string name="voice_permission_needed">Monyx needs the microphone to add by voice</string>
+    <string name="voice_permission_grant">Allow</string>
+    <string name="voice_heard">Heard: “%1$s”</string>
+    <string name="voice_saved">Saved</string>
+    <string name="voice_revert">Revert</string>
+    <string name="voice_reverted">Reverted</string>
+    <string name="voice_undo_revert">Undo</string>
+    <string name="voice_change">Change</string>
+    <string name="voice_updated">Updated</string>
+    <string name="voice_done">Done</string>
+    <string name="voice_correct_hold">Hold to correct by voice</string>
+    <string name="voice_correction_not_understood">Not understood — nothing changed</string>
+    <string name="voice_correction_which">Which one?</string>
+    <string name="voice_partial_finish">Only part of that was understood — finish it here</string>
+    <string name="voice_stop">Stop listening</string>
+    <string name="voice_save_failed">Could not save that</string>
 </resources>

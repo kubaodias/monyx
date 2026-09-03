@@ -228,4 +228,31 @@
     <string name="recurring_needs_account">Najpierw dodaj konto</string>
     <string name="recurring_from_rule">Dodane przez transakcję cykliczną</string>
     <string name="call_assistant">Zadzwoń do asystentki budżetu</string>
+
+    <!-- Dodawanie głosem. Na telefonie, lokalnie: przytrzymaj zakładkę
+         Dodaj, powiedz, przeczytaj co zostało zapisane. -->
+    <string name="voice_hold_to_talk">Przytrzymaj, aby dodać głosem</string>
+    <string name="voice_listening">Słucham…</string>
+    <string name="voice_say_example">Powiedz „dodaj 200 na transport”</string>
+    <string name="voice_not_understood">Nie udało się tego zrozumieć</string>
+    <string name="voice_no_service">Ten telefon nie rozpoznaje mowy</string>
+    <string name="voice_no_speech">Nic nie usłyszano</string>
+    <string name="voice_language_unavailable">Rozpoznawanie mowy nie działa w tym języku</string>
+    <string name="voice_offline">Brak połączenia i brak pakietu mowy offline</string>
+    <string name="voice_permission_needed">Monyx potrzebuje mikrofonu, aby dodawać głosem</string>
+    <string name="voice_permission_grant">Zezwól</string>
+    <string name="voice_heard">Usłyszano: „%1$s”</string>
+    <string name="voice_saved">Zapisano</string>
+    <string name="voice_revert">Cofnij</string>
+    <string name="voice_reverted">Cofnięto</string>
+    <string name="voice_undo_revert">Przywróć</string>
+    <string name="voice_change">Popraw</string>
+    <string name="voice_updated">Poprawiono</string>
+    <string name="voice_done">Gotowe</string>
+    <string name="voice_correct_hold">Przytrzymaj, aby poprawić głosem</string>
+    <string name="voice_correction_not_understood">Nie zrozumiano — nic nie zmieniono</string>
+    <string name="voice_correction_which">Która kategoria?</string>
+    <string name="voice_partial_finish">Zrozumiano tylko część — dokończ tutaj</string>
+    <string name="voice_stop">Zakończ słuchanie</string>
+    <string name="voice_save_failed">Nie udało się zapisać</string>
 </resources>

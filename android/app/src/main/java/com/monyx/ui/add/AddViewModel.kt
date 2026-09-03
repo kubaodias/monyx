@@ -7,6 +7,7 @@ import com.monyx.data.CategoryEntity
 import com.monyx.data.Dates
 import com.monyx.data.MonyxRepository
 import com.monyx.ui.settings.RuleDraft
+import com.monyx.voice.SpokenTransaction
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -91,6 +92,27 @@ class AddViewModel(private val repository: MonyxRepository) : ViewModel() {
 
     fun setDate(date: LocalDate) {
         _state.value = _state.value.copy(date = date)
+    }
+
+    /**
+     * What a dictated sentence got as far as, handed over to be finished by
+     * hand. The parser could not reach a savable transaction and deliberately
+     * wrote nothing — the second engine behind voice entry is this screen, not
+     * a second parser.
+     *
+     * The note is left empty on purpose. Putting "dodaj dwieście na transport"
+     * in every note pollutes the ledger and the search index with the phrasing
+     * of the sentence rather than anything about the purchase.
+     */
+    fun prefillFromVoice(spoken: SpokenTransaction) {
+        val current = _state.value
+        _state.value = AddUiState(
+            amount = if (spoken.amountMinor > 0) AmountInput.ofMinor(spoken.amountMinor) else AmountInput(),
+            kind = spoken.kind,
+            categoryId = spoken.categoryId,
+            accountId = spoken.accountId ?: current.accountId,
+            date = spoken.date,
+        )
     }
 
     fun clearAmount() {

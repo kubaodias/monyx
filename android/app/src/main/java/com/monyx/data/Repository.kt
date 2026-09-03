@@ -70,6 +70,14 @@ class MonyxRepository(private val dao: MonyxDao) {
         note: String? = null,
         occurredAtMs: Long = System.currentTimeMillis(),
         createdBy: String,
+        /**
+         * How the row got here. The column and its CHECK constraint have
+         * allowed 'voice' since the first migration and Mapping.kt already
+         * round-trips it, so marking a dictated row costs no schema change —
+         * and without the marker there is no way to ever measure how often the
+         * parser was right.
+         */
+        source: String = "manual",
     ): String {
         val id = newId()
         dao.upsertTransactions(
@@ -86,6 +94,7 @@ class MonyxRepository(private val dao: MonyxDao) {
                     // The client computes the local date.
                     occurredOn = Dates.localDate(occurredAtMs),
                     createdBy = createdBy,
+                    source = source,
                     createdAt = System.currentTimeMillis(),
                     pending = 1,
                 ),
@@ -105,7 +114,10 @@ class MonyxRepository(private val dao: MonyxDao) {
      */
     suspend fun deleteTransaction(id: String) {
         val existing = dao.transaction(id) ?: return
-        dao.upsertTransactions(listOf(existing.copy(deleted = 1, pending = 1)))
+        // rejected = 0 with it. A row the server refused and the household then
+        // deleted is not a rejected row any more, and leaving the flag set
+        // leaves it counted in rejectedCount() for as long as the phone lives.
+        dao.upsertTransactions(listOf(existing.copy(deleted = 1, pending = 1, rejected = 0)))
     }
 
     suspend fun addAccount(name: String, initialBalanceMinor: Long, icon: String?, color: String?) {

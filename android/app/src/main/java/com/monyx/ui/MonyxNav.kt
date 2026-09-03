@@ -1,8 +1,14 @@
 package com.monyx.ui
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.imePadding
@@ -33,7 +39,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
@@ -43,6 +55,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
@@ -60,6 +73,13 @@ import com.monyx.ui.settings.SettingsScreen
 import com.monyx.ui.theme.MonyxMark
 import com.monyx.ui.theme.Palette
 import com.monyx.ui.transactions.TransactionsScreen
+import com.monyx.voice.RepositoryVoiceLedger
+import com.monyx.voice.SpeechListener
+import com.monyx.voice.VoiceEntrySheet
+import com.monyx.voice.VoiceEntryState
+import com.monyx.voice.VoiceEntryViewModel
+import com.monyx.voice.holdToTalk
+import com.monyx.voice.rememberRecordAudioPermission
 
 private data class Tab(
     val route: String,
@@ -157,6 +177,51 @@ private fun MainScaffold(
         },
     )
 
+    // Hoisted for the same reason, and one more: the gesture that drives it is
+    // on the bottom bar, which outlives every destination in the graph.
+    //
+    // No Context is handed to it. It cannot enqueue sync and must not learn
+    // how — that arrives as the same lambda AddScreen and TransactionsScreen
+    // are given, from here, where the application already is.
+    val voiceViewModel: VoiceEntryViewModel = viewModel(
+        factory = viewModelFactory {
+            initializer {
+                VoiceEntryViewModel(
+                    ledger = RepositoryVoiceLedger(app.repository),
+                    recogniser = SpeechListener(app),
+                    onSyncRequested = { SyncWorker.enqueue(app) },
+                )
+            }
+        },
+    )
+    val voiceState by voiceViewModel.state.collectAsStateWithLifecycle()
+    val voiceCategories by voiceViewModel.categories.collectAsStateWithLifecycle()
+    val voiceAccounts by voiceViewModel.accounts.collectAsStateWithLifecycle()
+    val voiceEditing by voiceViewModel.editing.collectAsStateWithLifecycle()
+    val editableCategories by voiceViewModel.editableCategories.collectAsStateWithLifecycle()
+    val editableAccounts by voiceViewModel.editableAccounts.collectAsStateWithLifecycle()
+    val microphone = rememberRecordAudioPermission()
+
+    // Granted from the system dialog the long press raised, or from settings.
+    // The sheet is asking for something the app now has, so it has nothing left
+    // to say — closing it is more honest than leaving a stale request on screen.
+    LaunchedEffect(microphone.granted, voiceState) {
+        if (microphone.granted && voiceState is VoiceEntryState.NeedsPermission) {
+            voiceViewModel.dismiss()
+        }
+    }
+
+    // The recogniser is asked for the interface language, and the grammar reads
+    // the same one — so a phone switched to English understands "add 200 to
+    // transport" and nothing has to guess.
+    val languageTag = LocalConfiguration.current.locales[0].toLanguageTag()
+
+    // False on a phone with no recognition service at all, and then the gesture
+    // simply is not there: no explanation, no dead long press. memberId is the
+    // other half — a row needs an author, and the session has not been read for
+    // the first frame or two after launch.
+    val recognitionAvailable = remember { SpeechListener.isAvailable(app) }
+
     // Deep-link state for the budget screen, set by a notification tap.
     var budgetCategoryId by remember { mutableStateOf<String?>(null) }
     var budgetPeriod by remember { mutableStateOf<String?>(null) }
@@ -173,6 +238,19 @@ private fun MainScaffold(
     // is what a bottom bar does by default and is the reported bug: back from a
     // slice landed on the keypad.
     var txOrigin by remember { mutableStateOf<String?>(null) }
+
+    // Every path that selects a tab goes through here, the long press
+    // included. Two copies of the filter reset will diverge, and the way it
+    // shows is a bottom-bar tap that lands on a list still filtered to one
+    // category from a budget row somebody tapped ten minutes ago.
+    fun selectTab(route: String) {
+        if (route == Destinations.TRANSACTIONS) {
+            txCategoryId = null
+            txPeriod = null
+            txOrigin = null
+        }
+        navController.switchTab(route)
+    }
 
     fun openTransactions(categoryId: String?, period: String?) {
         txCategoryId = categoryId
@@ -192,6 +270,19 @@ private fun MainScaffold(
     LaunchedEffect(route) {
         if (route != null && route != Destinations.ADD) {
             addViewModel.discardDraft()
+        }
+    }
+
+    // A sentence the parser could not finish. It writes nothing and hands over
+    // what it did get; the keypad finishes the job by hand.
+    //
+    // The order of these two lines does not matter, and it is worth knowing
+    // why: discardDraft() runs on ARRIVAL at a route that is not Add, so
+    // navigating TO the keypad never throws a prefill away.
+    LaunchedEffect(voiceViewModel) {
+        voiceViewModel.handoff.collect { spoken ->
+            addViewModel.prefillFromVoice(spoken)
+            selectTab(Destinations.ADD)
         }
     }
 
@@ -219,6 +310,29 @@ private fun MainScaffold(
                 TABS.forEach { tab ->
                     val selected = currentRoute?.hierarchy?.any { it.route == tab.route } == true
                     val isAdd = tab.route == Destinations.ADD
+                    if (isAdd) {
+                        AddTabItem(
+                            selected = selected,
+                            voiceEnabled = recognitionAvailable && memberId != null,
+                            onClick = { selectTab(tab.route) },
+                            onHoldStart = {
+                                if (microphone.granted) {
+                                    voiceViewModel.startListening(languageTag, memberId)
+                                } else {
+                                    voiceViewModel.permissionRequired()
+                                    // Raised once, automatically, at the exact
+                                    // moment somebody reached for the feature.
+                                    // After that the sheet asks in words, and
+                                    // its button goes to system settings —
+                                    // a second automatic launch is a dialog
+                                    // Android will not draw.
+                                    if (!microphone.askedBefore) microphone.ask()
+                                }
+                            },
+                            onHoldEnd = voiceViewModel::stopListening,
+                        )
+                        return@forEach
+                    }
                     // The logo, and it stays the logo's own weight of black
                     // whether or not the tab is selected — the mark is an
                     // identity, not a state. onSurface rather than a literal
@@ -227,31 +341,10 @@ private fun MainScaffold(
                     val isMark = tab.route == Destinations.OVERVIEW
                     NavigationBarItem(
                         selected = selected,
-                        onClick = {
-                            // Tapping the tab itself means "all transactions",
-                            // not whatever a budget row filtered to earlier.
-                            if (tab.route == Destinations.TRANSACTIONS) {
-                                txCategoryId = null
-                                txPeriod = null
-                                txOrigin = null
-                            }
-                            navController.switchTab(tab.route)
-                        },
-                        icon = {
-                            if (isAdd) AddIcon() else Icon(tab.icon, contentDescription = null)
-                        },
+                        onClick = { selectTab(tab.route) },
+                        icon = { Icon(tab.icon, contentDescription = null) },
                         label = { Text(stringResource(tab.labelRes)) },
-                        // Add is the one thing the app exists to do, so it is the
-                        // one item that is coloured rather than monochrome.
                         colors = when {
-                            isAdd -> NavigationBarItemDefaults.colors(
-                                selectedTextColor = ADD_ACCENT,
-                                unselectedTextColor = ADD_ACCENT,
-                                // The pill is drawn by AddIcon and is there in
-                                // both states, so the one Material would draw on
-                                // selection would only double it.
-                                indicatorColor = Color.Transparent,
-                            )
                             isMark -> NavigationBarItemDefaults.colors(
                                 selectedIconColor = MaterialTheme.colorScheme.onSurface,
                                 unselectedIconColor = MaterialTheme.colorScheme.onSurface,
@@ -327,6 +420,105 @@ private fun MainScaffold(
             composable(Destinations.SETTINGS) { SettingsScreen() }
         }
     }
+
+    // Beside the Scaffold, not inside a destination: a long press from the
+    // overview should not yank anybody to the keypad, so the sheet is modal
+    // over whatever screen they were already on.
+    VoiceEntrySheet(
+        state = voiceState,
+        categories = voiceCategories,
+        accounts = voiceAccounts,
+        editing = voiceEditing,
+        editableCategories = editableCategories,
+        editableAccounts = editableAccounts,
+        onDismiss = voiceViewModel::dismiss,
+        onStop = voiceViewModel::stopListening,
+        onGrantPermission = microphone.ask,
+        onRevert = voiceViewModel::revert,
+        onUndoRevert = voiceViewModel::undoRevert,
+        onCorrectionHoldStart = { voiceViewModel.startCorrecting(languageTag) },
+        onCorrectionHoldEnd = voiceViewModel::stopListening,
+        onChooseCategory = voiceViewModel::chooseCategory,
+        onBeginEdit = voiceViewModel::beginEdit,
+        onCancelEdit = voiceViewModel::cancelEdit,
+        onEdit = { edit ->
+            voiceViewModel.applyEdit(
+                amountMinor = edit.amountMinor,
+                categoryId = edit.categoryId,
+                accountId = edit.accountId,
+                note = edit.note,
+                occurredAtMs = edit.occurredAtMs,
+            )
+        },
+    )
+}
+
+/**
+ * The Add tab, drawn by hand rather than by NavigationBarItem.
+ *
+ * The gesture is the reason. NavigationBarItem has no long press and cannot be
+ * given one from outside: Material applies its own Modifier.selectable to the
+ * item's root, INSIDE whatever modifier is passed in, so an outer gesture sits
+ * above the node that actually consumes the press. Hanging the gesture on
+ * AddIcon's pill instead would work and would be worse — the pill is 64x32dp
+ * inside a touch target a fifth of the screen wide and the full height of the
+ * bar, so a long press on the label, or on the dead space above and below the
+ * pill, would silently just select the tab. For a one-handed gesture in a shop
+ * that is a target far smaller than the finger believes it is pressing.
+ *
+ * Almost nothing of NavigationBarItem was being used here anyway: this item
+ * already overrode its colours and drew its own indicator. combinedClickable
+ * brings the tap, the ripple, the long press and its TalkBack action with it.
+ *
+ * TalkBack's long-press action fires onLongClick and never a release, so the
+ * listen it starts can only be ended by the sheet's Stop button. That is why
+ * there is one.
+ */
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun RowScope.AddTabItem(
+    selected: Boolean,
+    voiceEnabled: Boolean,
+    onClick: () -> Unit,
+    onHoldStart: () -> Unit,
+    onHoldEnd: () -> Unit,
+) {
+    val haptics = LocalHapticFeedback.current
+    val holdLabel = stringResource(R.string.voice_hold_to_talk)
+    Box(
+        modifier = Modifier
+            .weight(1f)
+            .fillMaxHeight()
+            .combinedClickable(
+                role = Role.Tab,
+                onLongClickLabel = holdLabel.takeIf { voiceEnabled },
+                onLongClick = if (!voiceEnabled) {
+                    null
+                } else {
+                    {
+                        // The one signal that the microphone is live, and it
+                        // has to be felt rather than seen: the phone is half
+                        // out of a pocket and the eyes are on the shelf.
+                        haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                        onHoldStart()
+                    }
+                },
+                onClick = onClick,
+            )
+            .holdToTalk(enabled = voiceEnabled, onRelease = onHoldEnd)
+            .semantics { this.selected = selected },
+        contentAlignment = Alignment.Center,
+    ) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            AddIcon()
+            Spacer(Modifier.height(4.dp))
+            Text(
+                text = stringResource(R.string.nav_add),
+                color = ADD_ACCENT,
+                style = MaterialTheme.typography.labelMedium,
+            )
+        }
+    }
 }
 
 /**
@@ -337,8 +529,8 @@ private fun MainScaffold(
  * it is now the only filled shape down there, which is the difference between
  * "coloured differently" and "visible".
  *
- * 64x32 is Material's own active-indicator size, so the pill lands exactly where
- * the selection indicator would and the item does not resize when tapped.
+ * 64x32 is Material's own active-indicator size, so the pill sits exactly where
+ * the other tabs' selection indicators sit and the row of five reads as one row.
  */
 @Composable
 private fun AddIcon() {

@@ -95,8 +95,12 @@ fun NotificationPermissionGate(modifier: Modifier = Modifier) {
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
-    val showRationale by derivedStateOf {
-        Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && !granted
+    // remember(...), not a bare derivedStateOf. An unremembered derived state is
+    // rebuilt on every recomposition and never gets to cache anything, which is
+    // the whole reason it exists — and lint calls it an error rather than a
+    // warning because the leak is silent.
+    val showRationale by remember {
+        derivedStateOf { Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && !granted }
     }
 
     if (showRationale) {

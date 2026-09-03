@@ -6,6 +6,23 @@
          dropped SILENTLY — the server sees a successful delivery and the phone
          shows nothing. Asked on first visit to the Budget screen. -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- Adding a transaction by voice. Asked on the first long press of the Add
+         tab and never before it: the recogniser runs IN this process, which is
+         what makes hold-to-talk possible at all. The full-screen system dialog
+         (RecognizerIntent) would need no permission of ours and cannot express
+         a hold. -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+
+    <!-- Do not delete this. It is invisible and it is load-bearing: with
+         targetSdk 30 or above, package visibility filtering hides every
+         recognition service from us, and SpeechRecognizer.isRecognitionAvailable
+         then returns false on a phone that plainly does have one. The feature
+         would hide itself, correctly and permanently, for no reason at all. -->
+    <queries>
+        <intent>
+            <action android:name="android.speech.RecognitionService" />
+        </intent>
+    </queries>
 
     <application
         android:name=".MonyxApp"
