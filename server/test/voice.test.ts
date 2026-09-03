@@ -2,9 +2,9 @@
 //
 // Two things are being pinned here. The first is that the digest is arithmetic
 // the phone would agree with — a balance read aloud that disagrees with the app
-// is worse than no assistant. The second is that the PIN is enforced by the
-// function: every path that could hand out a household's month without one is
-// a test, because the model on the other end of this API can be talked to.
+// is worse than no assistant. The second is the allowlist, which since the PIN
+// was dropped is the only thing standing between a caller and the household:
+// every way it could accidentally admit someone is a test.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { FakeDb, expense, seedHousehold } from "./fake-db.ts";
@@ -15,15 +15,12 @@ import {
   collectDigest,
   escapeXml,
   findCaller,
-  MAX_FAILURES_PER_WINDOW,
   newTicketId,
   normalizeMsisdn,
   parseAllowlist,
   previousPeriod,
   putTicket,
-  readFailures,
   readTicket,
-  recordFailure,
   renderDigest,
   secretEquals,
   type VoiceStore,
@@ -76,13 +73,13 @@ test("a nine-digit national number gains its country code, a longer one does not
   assert.equal(normalizeMsisdn("+15551234567"), "15551234567");
 });
 
-test("an allowlist entry missing a household or a PIN is dropped, not defaulted", () => {
+test("an allowlist entry missing a household or a number is dropped, not defaulted", () => {
   const parsed = parseAllowlist(
     JSON.stringify([
-      { msisdn: "+48123456789", household_id: "hh1", name: "A", pin: "1111" },
-      { msisdn: "+48111222333", household_id: "hh1", name: "no pin" },
-      { msisdn: "+48444555666", pin: "2222", name: "no household" },
-      { msisdn: "", household_id: "hh1", pin: "3333" },
+      { msisdn: "+48123456789", household_id: "hh1", name: "A" },
+      { msisdn: "+48444555666", name: "no household" },
+      { msisdn: "", household_id: "hh1" },
+      { household_id: "hh1", name: "no number" },
     ]),
   );
   assert.equal(parsed.length, 1);
@@ -90,14 +87,17 @@ test("an allowlist entry missing a household or a PIN is dropped, not defaulted"
 });
 
 test("a malformed allowlist is empty, not a crash — and empty admits nobody", () => {
+  // Fails CLOSED. With the PIN gone this is the only gate, so a secret that
+  // will not parse has to admit no one rather than everyone.
   assert.deepEqual(parseAllowlist("{not json"), []);
   assert.deepEqual(parseAllowlist('{"msisdn":"+48123456789"}'), []);
   assert.equal(findCaller(parseAllowlist("{not json"), "+48123456789"), null);
+  assert.equal(findCaller(parseAllowlist("[]"), "+48123456789"), null);
 });
 
 test("an unknown caller resolves to nobody", () => {
   const list = parseAllowlist(
-    JSON.stringify([{ msisdn: "+48123456789", household_id: "hh1", name: "A", pin: "1111" }]),
+    JSON.stringify([{ msisdn: "+48123456789", household_id: "hh1", name: "A" }]),
   );
   assert.equal(findCaller(list, "+48999888777"), null);
   assert.equal(findCaller(list, ""), null);
@@ -106,10 +106,10 @@ test("an unknown caller resolves to nobody", () => {
 });
 
 test("secretEquals rejects a length mismatch without throwing", () => {
-  assert.equal(secretEquals("1986", "1986"), true);
-  assert.equal(secretEquals("1986", "19860"), false);
-  assert.equal(secretEquals("", "1986"), false);
-  assert.equal(secretEquals("1986", ""), false);
+  assert.equal(secretEquals("abcd", "abcd"), true);
+  assert.equal(secretEquals("abcd", "abcde"), false);
+  assert.equal(secretEquals("", "abcd"), false);
+  assert.equal(secretEquals("abcd", ""), false);
 });
 
 // ------------------------------------------------------------------- tickets
@@ -117,7 +117,7 @@ test("secretEquals rejects a length mismatch without throwing", () => {
 test("a ticket round-trips, and a forged id is refused before it reaches KV", async () => {
   const store = memoryStore();
   const id = newTicketId();
-  await putTicket(store, id, { msisdn: "48123456789", household_id: "hh1", attempts: 0, digest: null });
+  await putTicket(store, id, { msisdn: "48123456789", household_id: "hh1" });
 
   const read = await readTicket(store, id);
   assert.equal(read?.household_id, "hh1");
@@ -135,21 +135,7 @@ test("a ticket id is long enough not to be guessed", () => {
   assert.notEqual(id, newTicketId());
 });
 
-test("the failure counter accumulates, then rolls over with its window", async () => {
-  const store = memoryStore();
-  const start = 1_756_000_000_000;
-
-  for (let i = 1; i <= MAX_FAILURES_PER_WINDOW; i += 1) {
-    assert.equal(await recordFailure(store, start), i);
-  }
-  assert.equal((await readFailures(store, start)).count, MAX_FAILURES_PER_WINDOW);
-
-  // An hour later the window has moved and the count is clean again.
-  const later = start + 60 * 60 * 1000 + 1;
-  assert.equal((await readFailures(store, later)).count, 0);
-});
-
-test("a KV that cannot be read does not become a way to disable the lockout", async () => {
+test("a ticket over a broken KV reads as absent rather than throwing", async () => {
   const broken: VoiceStore = {
     async get() {
       throw new Error("kv down");
@@ -161,10 +147,8 @@ test("a KV that cannot be read does not become a way to disable the lockout", as
       throw new Error("kv down");
     },
   };
-  // It reads as clean rather than throwing — the per-ticket limit carries —
-  // and recording a failure over a broken store does not take the call down.
-  assert.equal((await readFailures(broken, 1)).count, 0);
-  assert.equal(await recordFailure(broken, 1), 1);
+  // Absent, not admitted: a KV that cannot be read must not become a way past
+  // the ticket check.
   assert.equal(await readTicket(broken, newTicketId()), null);
 });
 

@@ -258,19 +258,21 @@ the function and there is no public SQL API.
 
 | Route | When | Returns |
 |---|---|---|
-| `POST /voice/context?t=…` | call setup | the caller's name and a ticket — **no money** |
-| `POST /voice/digest` | after the PIN | one XML snapshot of the month |
+| `POST /voice/context?t=…` | call setup | one XML snapshot of the month, straight into the prompt |
+| `POST /voice/digest` | mid-call | the same snapshot again |
 
-The split is the security design and is argued in
-[ADR 0018](docs/decisions/0018-the-assistant-gets-a-window-not-a-key.md): caller
-ID is not a credential, so nothing financial is preloaded into the prompt, and
-the PIN is compared in the function rather than by the model.
+**The allowlist is the only gate.** Caller ID is not a credential, so a spoofed
+number reaches the household's finances. That is a deliberate trade and
+[ADR 0018](docs/decisions/0018-the-assistant-gets-a-window-not-a-key.md) argues
+it: a PIN and a preload are mutually exclusive, because a secret placed in a
+prompt cannot be withdrawn from it, and the preload is what makes the first
+question of a call cost nothing.
 
 Three secrets, none of them in this repository:
 
-- `VOICE_ALLOWLIST` — JSON `[{msisdn, household_id, name, pin}]`. Who may call,
-  which household they reach, and the PIN that proves it. A secret rather than a
-  table because phone numbers are personal data.
+- `VOICE_ALLOWLIST` — JSON `[{msisdn, household_id, name}]`. Who may call and
+  which household they reach. A secret rather than a table because phone numbers
+  are personal data. It fails closed: a value that will not parse admits nobody.
 - `VOICE_CONTEXT_TOKEN` — travels in the call-setup URL, which is the only place
   the assistant's webhook field allows a secret.
 - `VOICE_TOOL_SECRET` — the `x-voice-secret` header on the tool webhook, held on
@@ -278,11 +280,6 @@ Three secrets, none of them in this repository:
 
 Both routes are `SELECT`-only. Adding a transaction by voice would write through
 the sync epoch and needs a `created_by` member without a device; it is not built.
-
-**The PIN is keyed on the handset, not spoken.** Inbound DTMF reaches the
-assistant by default, and digits that arrive as tones cannot be misheard, do not
-depend on the transcription language, and are not said out loud in a room with
-other people in it.
 
 **The app has a call button** — a floating action button, bottom right, in
 Telnyx green, on every tab but the keypad, where the bottom right is already the
@@ -308,7 +305,7 @@ curl -s -o /dev/null -w '%{http_code}\n' -X POST "$MONYX_API_URL/voice/context?t
   -H 'content-type: application/json' -d '{}'          # expect 401
 curl -s -X POST "$MONYX_API_URL/voice/digest" \
   -H "x-voice-secret: $VOICE_TOOL_SECRET" -H 'content-type: application/json' \
-  -d '{"ticket":"nope","pin":"0000"}'                   # expect session_expired
+  -d '{"ticket":"nope"}'                                # expect session_expired
 ```
 
 ## Restore runbook

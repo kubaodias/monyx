@@ -1,50 +1,40 @@
 // The voice assistant's read-only window onto a household.
 //
-// Two routes, and the split between them is the whole security design.
+// /voice/context runs at call setup and returns the month itself: the whole
+// digest goes into the system prompt before the assistant speaks, so the first
+// question costs no round trip and every one after it is answered from context.
 //
-// /voice/context runs at call setup, before the assistant says anything. It
-// knows only the caller's number, so it hands back identity — enough for a
-// greeting — and a TICKET. No money crosses this boundary: caller ID is not a
-// credential, and a preload into the system prompt is unrecallable once it is
-// there.
+// The allowlist is the only gate. That is a deliberate choice and a weak one —
+// caller ID is not a credential, and a spoofed ANI reaches the household's
+// finances — but it is the choice that makes the preload possible at all. A
+// secret placed in a prompt cannot be withdrawn from it, so anything gated
+// AFTER the preload can only be guarded by the model's willingness to keep it,
+// which is not a boundary. The two are mutually exclusive; this picks the
+// preload. See ADR 0018.
 //
-// /voice/digest exchanges that ticket plus a PIN for the whole month at once.
-// The PIN is checked HERE, in the function, never by the model: a system prompt
-// is not an authorization boundary, it is a suggestion the caller can argue
-// with. Everything the assistant is allowed to know arrives in one response, so
-// every question after the first is answered from context with no round trip.
+// /voice/digest re-reads the same digest mid-call, for a caller who asks
+// whether something has just landed, and covers the case where the call-setup
+// webhook timed out and the prompt has no digest in it.
 //
 // Read-only by construction: this module issues SELECTs and nothing else.
 import { randomBytes, timingSafeEqual } from "node:crypto";
 import { budgetStatuses } from "./budgets.ts";
 import type { HouseholdDb } from "./db.ts";
 
-/** How long a ticket outlives the call setup that minted it. */
+/**
+ * How long a ticket outlives the call setup that minted it. It only ever buys
+ * a re-read of what the prompt already holds, so it outliving the call is not
+ * interesting — the call itself is capped well below this.
+ */
 export const TICKET_TTL_SECS = 30 * 60;
 
-/** PIN attempts on one ticket. A caller who fumbles redials; a robot cannot. */
-export const MAX_ATTEMPTS = 3;
-
-/**
- * The backstop that makes a four-digit PIN defensible.
- *
- * Ten thousand combinations at three tries a ticket is 3 334 tickets — a
- * weekend's work if minting tickets were free. It is not: the caller must be on
- * the allowlist AND hold the context token. This counter is the layer that
- * holds even if both of those are wrong, and it is global rather than
- * per-ticket for exactly that reason.
- */
-export const MAX_FAILURES_PER_WINDOW = 10;
-export const FAILURE_WINDOW_MS = 60 * 60 * 1000;
-
 const TICKET_PREFIX = "voice/ticket-";
-const FAILURES_KEY = "voice/failures";
 
 /** Recent transactions read aloud; more than this is a list, not an answer. */
 const RECENT_LIMIT = 10;
 
 /**
- * Who may call, which household they reach, and the PIN that proves it.
+ * Who may call and which household they reach.
  *
  * Held as a secret rather than a table: it is a handful of phone numbers, and
  * a phone number is personal data that has no business in the repository or in
@@ -55,15 +45,11 @@ export interface Caller {
   msisdn: string;
   household_id: string;
   name: string;
-  pin: string;
 }
 
 export interface Ticket {
   msisdn: string;
   household_id: string;
-  attempts: number;
-  /** The digest computed at call setup, if it was ready in time. */
-  digest: string | null;
 }
 
 /** Storage this module needs. Injected so the tests never touch the runtime. */
@@ -106,15 +92,12 @@ export function parseAllowlist(raw: string): Caller[] {
     const row = entry as Record<string, unknown>;
     const msisdn = normalizeMsisdn(row["msisdn"]);
     const household = row["household_id"];
-    const pin = row["pin"];
     if (msisdn.length === 0) continue;
     if (typeof household !== "string" || household.length === 0) continue;
-    if (typeof pin !== "string" || pin.length === 0) continue;
     out.push({
       msisdn,
       household_id: household,
       name: typeof row["name"] === "string" ? row["name"] : "",
-      pin,
     });
   }
   return out;
@@ -170,59 +153,10 @@ export async function readTicket(store: VoiceStore, id: unknown): Promise<Ticket
     return {
       msisdn: typeof parsed.msisdn === "string" ? parsed.msisdn : "",
       household_id: parsed.household_id,
-      attempts: Number.isFinite(parsed.attempts) ? parsed.attempts : 0,
-      digest: typeof parsed.digest === "string" ? parsed.digest : null,
     };
   } catch {
     return null;
   }
-}
-
-export async function burnTicket(store: VoiceStore, id: string): Promise<void> {
-  try {
-    await store.delete(ticketKey(id));
-  } catch {
-    // A ticket that outlives its burn still expires on its own.
-  }
-}
-
-interface Failures {
-  count: number;
-  window_start: number;
-}
-
-export async function readFailures(store: VoiceStore, nowMs: number): Promise<Failures> {
-  let raw: string | null = null;
-  try {
-    raw = await store.get(FAILURES_KEY);
-  } catch {
-    // A KV that cannot be read must not become a way to disable the lockout,
-    // but it must not lock a real caller out either. Treat it as clean and let
-    // the per-ticket limit carry.
-    return { count: 0, window_start: nowMs };
-  }
-  if (!raw) return { count: 0, window_start: nowMs };
-  try {
-    const parsed = JSON.parse(raw) as Failures;
-    const start = Number.isFinite(parsed?.window_start) ? parsed.window_start : nowMs;
-    if (nowMs - start >= FAILURE_WINDOW_MS) return { count: 0, window_start: nowMs };
-    return { count: Number.isFinite(parsed?.count) ? parsed.count : 0, window_start: start };
-  } catch {
-    return { count: 0, window_start: nowMs };
-  }
-}
-
-export async function recordFailure(store: VoiceStore, nowMs: number): Promise<number> {
-  const current = await readFailures(store, nowMs);
-  const next: Failures = { count: current.count + 1, window_start: current.window_start };
-  try {
-    await store.put(FAILURES_KEY, JSON.stringify(next), {
-      expirationTtl: Math.ceil(FAILURE_WINDOW_MS / 1000),
-    });
-  } catch {
-    // Best effort; the per-ticket limit still holds.
-  }
-  return next.count;
 }
 
 // --------------------------------------------------------------------- digest

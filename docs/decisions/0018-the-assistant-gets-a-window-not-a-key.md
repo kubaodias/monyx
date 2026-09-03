@@ -1,6 +1,6 @@
 # 0018 — The assistant gets a window, not a key
 
-**Date:** 2026-09-03 · **Status:** accepted
+**Date:** 2026-09-03 · **Status:** accepted · **Amended:** 2026-09-03, the PIN removed
 
 ## Context
 
@@ -19,34 +19,47 @@ to be calling from.
 
 ## Decision
 
-**Two routes, and the split between them is the security design.**
+**The allowlist is the only gate, and the month is preloaded.**
 
-`POST /voice/context` runs at call setup, before the assistant speaks. It knows
-only the caller's number, so it returns only identity — a name to greet with —
-and a **ticket**. `POST /voice/digest` exchanges that ticket plus a **PIN** for
-the household's month.
+`POST /voice/context` runs at call setup and returns the household's month
+whole, into the system prompt, before the assistant speaks. `POST /voice/digest`
+re-reads the same digest mid-call. An unknown caller gets neither.
 
-**No financial data crosses the first boundary.** The obvious design preloads
-the digest into the system prompt at call setup, and it is a mistake: caller ID
-is not a credential, and anything placed in a prompt cannot be withdrawn from
-it later. A PIN checked after the numbers are already in context protects
-nothing.
+### The PIN, and why it is gone
 
-**The PIN is compared in the function, never in the instructions.** A model told
-to withhold something it has already been given will eventually be talked out of
-it. A model that was never given it cannot be. This is the same reason the
-server returns codes and the client owns every user-facing string: the boundary
-has to be a mechanism, not a wording.
+The first version of this decision required a four-digit PIN, compared in the
+function, before any figure was released. That was the right shape for the
+threat — and it was **removed on request** on the same day it shipped, which is
+the owner's call to make about their own household's numbers.
+
+What matters is that the two designs are **mutually exclusive**, and the reason
+is worth keeping written down:
+
+- A secret placed in a system prompt cannot be withdrawn from it. Anything gated
+  *after* a preload is guarded only by the model's willingness to keep it, and a
+  model told to withhold what it has already been given will eventually be
+  talked out of it. That is a wording, not a boundary.
+- So a PIN that means anything forces the digest to arrive *after* it — which
+  costs a round trip at the start of every call, and makes the assistant ask for
+  four digits before it will answer a question about groceries.
+
+Dropping the PIN therefore buys back the preload: the first question now costs
+nothing, because the answer was in the prompt before the phone finished ringing.
+It is a real trade, not a simplification. **Caller ID is not a credential** — a
+spoofed ANI now reaches the household's finances, and nothing in this codebase
+would notice. The mitigations that remain are the allowlist, the context token
+on the webhook URL, and the fact that the routes are read-only.
+
+**If it comes back, it comes back as a second factor before the preload** — a
+PIN collected by the platform at call setup, not a value the model holds. That
+is the only shape that gets both.
 
 **One digest, not a tool per question.** A voice call charges for silence, and a
 household's month is a few kilobytes — every account with its balance, the
 month's income and spend against the plan and the previous month, every budget
 with its percentage, spending per root category, and the last ten transactions.
-It arrives in one response and every follow-up is answered from context. The
-digest is computed during call setup and parked in the ticket, so redeeming it
-costs one KV read; when that precompute fails, `/voice/digest` rebuilds it,
-because the ticket is what the call cannot proceed without and the cache is only
-an optimisation.
+It arrives in one response — the call-setup one — and every question of the call
+is answered from what is already in the prompt.
 
 **XML, not prose and not JSON.** Prose invites the model to read a table down
 the phone, which is unlistenable. Tags are unambiguous about which number
@@ -60,25 +73,14 @@ Adding a transaction by voice is the feature worth having, and it writes through
 the sync epoch and needs a `created_by` member without a device — a design
 question, not an increment.
 
-**Three defences on a four-digit PIN, because four digits is not many.** Three
-attempts per ticket; an allowlist that decides whether a ticket is minted at
-all; and a global cap of ten failures an hour across every ticket. The third is
-the one that matters: the first two make minting tickets expensive, and the
-counter holds even if both are wrong.
+**The allowlist fails closed.** A secret that will not parse, or parses to
+nothing, admits no one rather than everyone — it is now the only gate, so the
+failure mode of its own configuration is part of the design and has a test.
 
-**The PIN is keyed, not spoken.** Inbound DTMF reaches the assistant by default,
-so the caller presses four digits rather than saying them. Tones cannot be
-misheard, do not depend on the transcription model's Polish, and are not said
-out loud in a room with other people in it. A spoken PIN is still accepted,
-because a caller driving cannot look at the keypad — the server strips
-everything that is not a digit either way, so `1986#` and "one nine eight six"
-arrive as the same four characters.
-
-**The allowlist is a secret, not a table.** It maps a caller to a household and
-carries that caller's PIN. Phone numbers are personal data, and a secret keeps
-them out of the repository, out of the database, and out of the backups that get
-copied around — which is also why no number, PIN or persona appears in this
-file.
+**The allowlist is a secret, not a table.** It maps a caller to a household.
+Phone numbers are personal data, and a secret keeps them out of the repository,
+out of the database, and out of the backups that get copied around — which is
+also why no number or persona appears in this file.
 
 **The call-setup token travels in the URL.** The assistant's webhook field is a
 URL and there is nothing else to put a secret in. The tool webhook does support
@@ -89,12 +91,17 @@ headers, and uses one.
 - Signature verification is the follow-up. Telnyx signs these webhooks
   (Ed25519), and `index.ts` has kept the raw request body intact since M1 for
   exactly that — the router deliberately does not parse a central body. It is
-  not implemented yet because Ed25519 support in the edge runtime is unverified,
-  and the URL token plus the failure counter is adequate for a proof of concept.
-  Until then, anyone holding the URL can mint tickets; nobody can redeem one.
-- The PIN costs the caller a turn. It is asked for before any number is fetched,
-  so the first answer of a call is one round trip behind — and every answer
-  after it is free.
+  not implemented yet because Ed25519 support in the edge runtime is unverified.
+  It matters more since the PIN went: the URL token is now one of only two things
+  standing in front of the data, so anyone holding that URL can read the month by
+  claiming to call from an allowlisted number.
+- The ticket survives the PIN's removal. It is no longer a capability worth
+  anything on its own, but it is what lets her re-read mid-call, and what the
+  tool needs on a call where the setup webhook missed its timeout and the prompt
+  has no digest in it.
+- The allowlist is re-checked on every mid-call re-read rather than trusted from
+  the ticket, so a number removed from it stops working on the next question
+  rather than the next call.
 - An unknown caller is told nothing: not the household's name, not that one
   exists. The assistant's own instructions handle the goodbye.
 - Reordering, renaming or recolouring never reaches this path; the digest is

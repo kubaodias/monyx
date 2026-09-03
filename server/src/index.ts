@@ -18,17 +18,12 @@ import { sendBudgetAlert, type DeviceToken } from "./fcm.ts";
 import { DEFAULT_PULL_LIMIT, pull, push } from "./sync.ts";
 import { currentPeriod, localDate, periodOf } from "./schema.ts";
 import {
-  burnTicket,
   collectDigest,
   findCaller,
-  MAX_ATTEMPTS,
-  MAX_FAILURES_PER_WINDOW,
   newTicketId,
   parseAllowlist,
   putTicket,
-  readFailures,
   readTicket,
-  recordFailure,
   renderDigest,
   secretEquals,
   type VoiceStore,
@@ -220,13 +215,11 @@ async function handleCron(req: Request, nowMs: number): Promise<Response> {
 // ---------------------------------------------------------------- voice
 
 /**
- * Call setup. Telnyx asks who is on the line before the assistant speaks, and
- * this is the only thing it is told: a name to greet, and a ticket to redeem.
+ * Call setup, and the whole point of it: the month goes into the prompt before
+ * the assistant says a word, so the first question costs no round trip.
  *
- * The digest is computed here and parked in the ticket so that redeeming it
- * later costs one KV read instead of six queries — but a failure to compute is
- * NOT fatal. The ticket is what the call cannot proceed without; the cached
- * digest is an optimisation, and /voice/digest rebuilds it when it is missing.
+ * The allowlist is the only gate — see the header of voice.ts and ADR 0018 for
+ * why that is deliberate and what it costs.
  */
 async function handleVoiceContext(req: Request, url: URL, nowMs: number): Promise<Response> {
   let token: string;
@@ -256,21 +249,17 @@ async function handleVoiceContext(req: Request, url: URL, nowMs: number): Promis
   if (!caller) return json({ dynamic_variables: { caller_known: "no" } });
 
   const period = currentPeriod(nowMs);
-  let digest: string | null = null;
-  try {
-    digest = renderDigest(
-      await collectDigest(forHousehold(caller.household_id), period, localDate(nowMs)),
-    );
-  } catch (error) {
-    console.error("voice digest precompute failed", error);
-  }
+  const digest = renderDigest(
+    await collectDigest(forHousehold(caller.household_id), period, localDate(nowMs)),
+  );
 
+  // Minted even though the digest is already in hand: it is what lets her
+  // re-read mid-call, and what the tool needs if this response arrived too
+  // late for the platform's timeout.
   const ticket = newTicketId();
   await putTicket(env.KV as VoiceStore, ticket, {
     msisdn: caller.msisdn,
     household_id: caller.household_id,
-    attempts: 0,
-    digest,
   });
 
   return json({
@@ -279,16 +268,17 @@ async function handleVoiceContext(req: Request, url: URL, nowMs: number): Promis
       caller_name: caller.name,
       budget_ticket: ticket,
       period,
+      budget: digest,
     },
   });
 }
 
 /**
- * Ticket plus PIN, in exchange for the month.
+ * The same month again, mid-call.
  *
- * The PIN is compared here rather than in the assistant's instructions. A model
- * told to withhold something it has already been given will eventually be
- * talked out of it; a model that was never given it cannot be.
+ * Not the main path any more — the prompt already holds this. It exists for a
+ * caller who asks whether something has just landed, and for the call where
+ * the setup webhook missed its timeout and the prompt has no digest in it.
  */
 async function handleVoiceDigest(req: Request, nowMs: number): Promise<Response> {
   let shared: string;
@@ -306,50 +296,22 @@ async function handleVoiceDigest(req: Request, nowMs: number): Promise<Response>
   const body = await readJson(req);
   if (!body) return fail(400, "bad_json");
 
-  const store = env.KV as VoiceStore;
-
-  // Checked before the ticket is even read: the lockout exists to make the
-  // four-digit PIN unguessable, so it has to bite before any per-ticket state
-  // can be reset by minting a fresh one.
-  const failures = await readFailures(store, nowMs);
-  if (failures.count >= MAX_FAILURES_PER_WINDOW) return fail(429, "locked");
-
   // The ticket rides in a header, where the PLATFORM substitutes it from the
-  // dynamic variable. Asking the model to copy a 32-character token into a body
-  // parameter works right up until it does not, and the failure is a caller who
-  // gave the correct PIN being told to try again. The body is accepted too, so
-  // the tool can be tested with curl.
+  // dynamic variable. The body is accepted too, so the tool can be tested with
+  // curl.
   const ticketId = req.headers.get("x-voice-ticket") ?? body["ticket"];
-  const ticket = await readTicket(store, ticketId);
-  if (!ticket || typeof ticketId !== "string") return fail(401, "session_expired");
+  const ticket = await readTicket(env.KV as VoiceStore, ticketId);
+  if (!ticket) return fail(401, "session_expired");
 
+  // Re-checked rather than trusted from the ticket: a number removed from the
+  // allowlist mid-call stops working on the next question, not the next call.
   const caller = findCaller(parseAllowlist(allowlistRaw), ticket.msisdn);
   if (!caller) return fail(403, "forbidden");
 
-  const pin = typeof body["pin"] === "string" ? body["pin"].replace(/\D/g, "") : "";
-  if (!secretEquals(pin, caller.pin)) {
-    const attempts = ticket.attempts + 1;
-    await recordFailure(store, nowMs);
-    if (attempts >= MAX_ATTEMPTS) {
-      await burnTicket(store, ticketId);
-      return json({ error: "pin_attempts_exhausted", attempts_left: 0 }, 401);
-    }
-    await putTicket(store, ticketId, { ...ticket, attempts });
-    return json({ error: "wrong_pin", attempts_left: MAX_ATTEMPTS - attempts }, 401);
-  }
-
   const period = currentPeriod(nowMs);
-  let digest = ticket.digest;
-  if (!digest) {
-    digest = renderDigest(
-      await collectDigest(forHousehold(ticket.household_id), period, localDate(nowMs)),
-    );
-  }
-
-  // A fumbled PIN followed by a correct one is a person, not an attack.
-  if (ticket.attempts > 0) {
-    await putTicket(store, ticketId, { ...ticket, attempts: 0, digest });
-  }
+  const digest = renderDigest(
+    await collectDigest(forHousehold(ticket.household_id), period, localDate(nowMs)),
+  );
 
   return json({ ok: true, period, budget: digest });
 }
