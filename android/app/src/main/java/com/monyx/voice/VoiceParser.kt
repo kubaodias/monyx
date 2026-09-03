@@ -246,31 +246,88 @@ object VoiceParser {
      * amount, the date, the category and the keywords have each claimed their
      * words, what is left over IS the note.
      *
-     * Two trims make it read like something a person wrote rather than like
-     * debris:
+     * Leading and trailing fillers go, because "dodaj 200 na transport" leaves
+     * "dodaj" and "na" behind and a note reading "Dodaj na" would be worse than
+     * no feature at all. That is the case this must never get wrong. Everything
+     * between is kept, gaps included: those words are already known not to be
+     * an instruction, and a phrase reads worse with holes in it than with a
+     * stray "i".
      *
-     *  - Leading fillers go, because "dodaj 200 na transport" leaves "dodaj"
-     *    and "na" and a note reading "Dodaj na" would be worse than no feature
-     *    at all. That is the case this must never get wrong.
-     *  - EXCEPT one preposition sitting immediately in front of the first real
-     *    word, which is kept, because in both languages it belongs to the
-     *    phrase: "W Biedronce" is what somebody would have typed, "Biedronce"
-     *    is a word left on its own in the locative case.
-     *
-     * Trailing fillers go too. Everything between is kept, gaps included: the
-     * words are already known not to be an instruction, and a phrase reads
-     * worse with holes in it than with a stray "i".
+     * A preposition of place goes with them, and takes the case ending of the
+     * word after it — "w Biedronce" is written down as "Biedronka", because a
+     * note is a label on a row and not a sentence about a trip. Only that one
+     * governed word is touched; "w Biedronce przy dworcu" keeps its second
+     * half exactly as it was said. See [nominative] for what that costs.
      */
     private fun leftoverNote(words: List<CategoryMatcher.Word>, consumed: BooleanArray): String? {
         val spare = words.indices.filterNot { consumed[it] }
         val firstReal = spare.firstOrNull { words[it].token !in VoiceWords.filler } ?: return null
-        val start = (firstReal - 1)
-            .takeIf { it >= 0 && !consumed[it] && words[it].token in VoiceWords.filler }
-            ?: firstReal
-        val tail = spare.filter { it >= start }
+
+        // Was this word governed by a preposition of place? Walk back over the
+        // little words immediately in front of it — "w", or "at the" — and stop
+        // at the first thing the grammar already claimed.
+        var back = firstReal - 1
+        var governed = false
+        while (back >= 0 && !consumed[back] && words[back].token in VoiceWords.filler + VoiceWords.placePrepositions) {
+            if (words[back].token in VoiceWords.placePrepositions) governed = true
+            back--
+        }
+
+        val tail = spare.filter { it >= firstReal }
             .dropLastWhile { words[it].token in VoiceWords.filler }
-        return CategoryMatcher.asNote(tail.joinToString(" ") { words[it].source })
+        if (tail.isEmpty()) return null
+
+        val head = words[tail.first()]
+        val rest = tail.drop(1).map { words[it].source }
+        val name = if (governed) nominative(head.source) else head.source
+        return CategoryMatcher.asNote((listOf(name) + rest).joinToString(" "))
     }
+
+    /**
+     * Polish locative, undone. A table of endings, not morphology, and it will
+     * sometimes be wrong.
+     *
+     * "w Biedronce" is where somebody was; "Biedronka" is what they would have
+     * written down. The gap between those two is a case ending, and undoing a
+     * case ending properly needs a dictionary and a gender — neither of which
+     * is going anywhere near this app. What is here is the handful of endings
+     * that actually turn up on the front of a shop, applied to one word.
+     *
+     * So it has a known failure: a name whose nominative genuinely ends in one
+     * of these strings gets cut, and "-cie" is ambiguous in the language itself
+     * (*markecie* is from "market", *gazecie* is from "gazeta"); this picks the
+     * consonant, which is what shop names are. That is acceptable here and
+     * would not be anywhere else in this app, for one reason: a note is free
+     * text on a row whose numbers it cannot touch, it is on screen the moment
+     * it is written, and one tap opens the editor. It is a cosmetic guess, made
+     * where a wrong guess is visible and costs a tap. Anything it does not
+     * recognise it leaves exactly as it was heard — wrong-but-unchanged beats
+     * wrong-and-mangled, which is the same instinct as refusing a category.
+     */
+    private fun nominative(word: String): String {
+        // Five characters, because the shortest chain names in the locative are
+        // exactly that long ("Lidlu", "Żabce"), and below it the odds swing
+        // hard the other way: a four-letter word ending in -u is far likelier
+        // to be an ordinary Polish word than a shop, and "menu" becoming "men"
+        // is the kind of wrong somebody notices.
+        if (word.length < 5) return word
+        val lower = word.lowercase()
+        for ((ending, nominative) in LOCATIVE) {
+            if (lower.endsWith(ending)) return word.dropLast(ending.length) + nominative
+        }
+        return word
+    }
+
+    /** Longest ending first: every one of "-dzie", "-nie", "-mie" and "-cie"
+     *  would also be caught by a shorter suffix if it were tested first. */
+    private val LOCATIVE = listOf(
+        "dzie" to "d",   // Kauflandzie -> Kaufland
+        "nie" to "n",    // Rossmannie  -> Rossmann
+        "mie" to "ma",   // Castoramie  -> Castorama
+        "cie" to "t",    // markecie    -> market
+        "ce" to "ka",    // Biedronce   -> Biedronka, Żabce -> Żabka
+        "u" to "",       // Lidlu       -> Lidl, Empiku -> Empik
+    )
 
     /** Expense is the default, the same as [com.monyx.ui.add.AddUiState]. Income
      *  has to be said. Explicit expense words are recognised as confirmation and

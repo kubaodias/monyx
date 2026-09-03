@@ -161,6 +161,21 @@ internal object VoiceWords {
         if (locale.language == "en") setOf("no", "nope", "nie") else setOf("nie")
 
     /**
+     * The prepositions that put a place after them.
+     *
+     * They are what turns the tail of "150 zł na zakupy w Biedronce" into an
+     * answer to *where*, and they are the signal that the word after them is a
+     * shop name standing in a grammatical case rather than a word somebody
+     * meant to write down. Every one of them is dropped from a note; see
+     * VoiceParser, which also undoes what "w" did to the noun.
+     *
+     * "from" is here and not in [filler] because it is only ever a place word;
+     * the rest already are fillers and are listed again so the rule can be read
+     * in one place.
+     */
+    val placePrepositions = setOf("w", "we", "na", "przy", "u", "at", "in", "from")
+
+    /**
      * "…and write this down with it." Everything after one of these is the
      * note, whatever it contains — a category name, a number, the word
      * "cofnij". An explicit marker is the one thing in this grammar that is

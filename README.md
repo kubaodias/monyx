@@ -283,10 +283,12 @@ also the way to fix it, and there is no separate "edit" button. **Anuluj** takes
 the row back, with an Undo of its own if that was the mis-tap.
 
 "150 zł na zakupy w Biedronce" saves 150,00 against Zakupy spożywcze with the
-note *W Biedronce*: once the amount, the date and the category have claimed
-their words, whatever is left over is the note. It is bookkeeping rather than a
-list of shops — and "dodaj 200 na transport" has only filler left over, so it
-gets none.
+note *Biedronka*: once the amount, the date and the category have claimed their
+words, whatever is left over is the note. It is bookkeeping rather than a list
+of shops — and "dodaj 200 na transport" has only filler left over, so it gets
+none. A preposition of place is dropped along with the case ending it put on the
+word after it, from a small table of the endings shops actually have; anything
+the table does not know is written down exactly as it was heard.
 
 It can be corrected by voice too: hold the microphone on the sheet and say
 "anuluj", "ma być 250", "zmień kategorię na zakupy". A sentence about the

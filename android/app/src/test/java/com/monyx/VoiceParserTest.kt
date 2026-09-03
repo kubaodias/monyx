@@ -273,10 +273,75 @@ class VoiceParserTest {
         val spoken = complete("150 zł na zakupy w Biedronce")
         assertEquals(15000L, spoken.amountMinor)
         assertEquals(groceries.id, spoken.categoryId)
-        // "W", not just "Biedronce": one preposition in front of the first real
-        // word belongs to the phrase, and the capital is applied where the note
-        // is built rather than where it is drawn.
-        assertEquals("W Biedronce", spoken.note)
+        // The name of the place, in the form somebody would write it down: the
+        // preposition goes and the case ending it put on the noun goes with it.
+        assertEquals("Biedronka", spoken.note)
+    }
+
+    /**
+     * A table of endings, not morphology. These are the ones that actually turn
+     * up on the front of a shop.
+     */
+    @Test
+    fun `a place said in the locative is written down in the nominative`() {
+        for ((said, written) in listOf(
+            "w Lidlu" to "Lidl",
+            "w Żabce" to "Żabka",
+            "w Kauflandzie" to "Kaufland",
+            "w Empiku" to "Empik",
+            "w Rossmannie" to "Rossmann",
+            "w Castoramie" to "Castorama",
+            "w markecie" to "Market",
+        )) {
+            assertEquals(said, written, complete("150 zł na zakupy $said").note)
+        }
+    }
+
+    /** Nothing in the table matches, so nothing is done to it. The preposition
+     *  still goes — wrong-but-unchanged beats wrong-and-mangled. */
+    @Test
+    fun `a place the table does not recognise is left exactly as it was heard`() {
+        assertEquals("Auchan", complete("150 zł na zakupy w Auchan").note)
+    }
+
+    /** Only the word the preposition governed. The rest of the phrase is what
+     *  somebody said and stays that way. */
+    @Test
+    fun `only the governed word is un-inflected`() {
+        assertEquals("Biedronka przy dworcu", complete("150 zł na zakupy w Biedronce przy dworcu").note)
+    }
+
+    /**
+     * The length guard. Below five characters a word ending in -u is far more
+     * likely to be an ordinary Polish word than a shop, and "menu" turning into
+     * "men" is the kind of wrong somebody notices.
+     */
+    @Test
+    fun `a short word is never truncated`() {
+        assertEquals("Menu", complete("150 zł na zakupy w menu").note)
+        assertEquals("Pubu", complete("150 zł na zakupy w pubu").note)
+    }
+
+    /** English has no case ending to undo, so the preposition and its article
+     *  are the whole job. */
+    @Test
+    fun `an English place loses its preposition and nothing else`() {
+        val english = listOf(VoiceCategory("c-gro-en", "Groceries", EntryKind.Expense))
+        assertEquals(
+            "Market",
+            (parse("150 on groceries at the market", locale = en, categories = english)
+                as VoiceParse.Complete).transaction.note,
+        )
+    }
+
+    /**
+     * An explicit marker means "write down exactly this", and second-guessing
+     * it is the one thing the marker exists to prevent. So a dictated note
+     * keeps its preposition and its case ending, capital aside.
+     */
+    @Test
+    fun `a dictated note is never un-inflected`() {
+        assertEquals("W Biedronce", complete("150 zł na zakupy, notatka w Biedronce").note)
     }
 
     /**
@@ -297,7 +362,7 @@ class VoiceParserTest {
     fun `the leftover note survives a date at the end of the sentence`() {
         val spoken = complete("wczoraj 150 zł na zakupy w Biedronce")
         assertEquals(today.minusDays(1), spoken.date)
-        assertEquals("W Biedronce", spoken.note)
+        assertEquals("Biedronka", spoken.note)
     }
 
     @Test

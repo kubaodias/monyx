@@ -87,10 +87,32 @@ label claiming it.
   200 na transport" also has words left over — "dodaj" and "na". A note reading
   *Dodaj na* would be worse than not having the feature, so leading fillers are
   dropped, and there is a test whose whole job is that five ordinary sentences
-  produce no note at all. One preposition survives the trim, the one sitting
-  immediately in front of the first real word, because it belongs to the phrase:
-  "W Biedronce" is what somebody would have typed, where "Biedronce" is a word
-  left on its own in the locative case.
+  produce no note at all.
+- **A note names the place; it does not repeat the sentence.** A preposition of
+  place goes with the fillers, and the case ending it put on the word after it
+  goes too: "w Biedronce" is written down as **Biedronka**. A note is a label on
+  a row, not a sentence about a trip, and the label somebody would have typed is
+  the name of the shop in the form it is written on the shop.
+
+  Undoing a Polish case ending properly needs a dictionary and a gender, and
+  neither is going near this app. What is there instead is a table of the six
+  endings that turn up on the front of a shop, applied to exactly one word — the
+  one the preposition governed — with a five-character floor under it, because
+  the shortest chain names in the locative are five ("Lidlu", "Żabce") and below
+  that a word ending in `-u` is far likelier to be ordinary Polish than a shop.
+  Anything the table does not recognise is left exactly as it was heard.
+
+  **It will sometimes be wrong**, and it is worth being plain about why that is
+  allowed here when a guess at a category is not. `-cie` is ambiguous in the
+  language itself — *markecie* is from "market", *gazecie* is from "gazeta" —
+  and this picks the consonant because shop names are consonants. A name whose
+  nominative genuinely ends in one of these strings gets cut. All of that lands
+  on a field that is free text, that touches no total, that is on screen the
+  moment it is written, and that one tap opens an editor on. A wrong category
+  moves money between columns and syncs to the other phone; a wrong note is a
+  cosmetic guess made where a wrong guess is visible and costs a tap. English
+  gets the preposition and its article stripped and nothing else, having no
+  case endings to undo.
 - **A note is what is said ABOUT the row; a name is what is said INSTEAD of
   one.** "te zakupy były w lidlu" contains a seeded category name and is
   plainly not a category correction — *zakupy* is only being used to point at
