@@ -279,6 +279,76 @@ class VoiceEntryTest {
         assertEquals("c-t", saved.summary.categoryId)
     }
 
+    /**
+     * Stop, having said nothing, closes without a word.
+     *
+     * The person pressed the button that ends the listen. Answering them with
+     * "nothing was heard" tells them what they just did, and then asks them to
+     * watch it fade. The silence cap firing on its own is the opposite case —
+     * they were waiting on the microphone and are owed the explanation — and
+     * the test below pins that the two did not collapse into one behaviour.
+     */
+    @Test
+    fun `stopping by hand with nothing said closes without a message`() {
+        val recogniser = FakeRecogniser()
+        val viewModel = viewModel(ledger(), recogniser)
+        viewModel.startListening("pl-PL", "m-1")
+
+        viewModel.stopListening()
+        recogniser.heard.value = ListenState.Failed(ListenFailure.NoSpeech)
+
+        assertEquals(VoiceEntryState.Hidden, viewModel.state.value)
+    }
+
+    /** The microphone giving up by itself still says so. */
+    @Test
+    fun `the silence cap still explains itself`() {
+        val recogniser = FakeRecogniser()
+        val viewModel = viewModel(ledger(), recogniser)
+        viewModel.startListening("pl-PL", "m-1")
+
+        recogniser.heard.value = ListenState.Failed(ListenFailure.NoSpeech)
+
+        val failed = viewModel.state.value as VoiceEntryState.Failed
+        assertEquals(ListenFailure.NoSpeech, failed.reason)
+    }
+
+    /**
+     * Only silence is swallowed. A network failure is news whoever ended the
+     * listen — the person cannot infer it from having pressed Stop.
+     */
+    @Test
+    fun `stopping by hand does not swallow a real failure`() {
+        val recogniser = FakeRecogniser()
+        val viewModel = viewModel(ledger(), recogniser)
+        viewModel.startListening("pl-PL", "m-1")
+
+        viewModel.stopListening()
+        recogniser.heard.value = ListenState.Failed(ListenFailure.Network)
+
+        val failed = viewModel.state.value as VoiceEntryState.Failed
+        assertEquals(ListenFailure.Network, failed.reason)
+    }
+
+    /**
+     * Stopping a CORRECTION that heard nothing falls back to the row, not to
+     * nothing. The summary is what the sheet is for; closing it would throw
+     * away the Revert the person may still want.
+     */
+    @Test
+    fun `stopping a correction by hand leaves the summary on screen`() {
+        val recogniser = FakeRecogniser()
+        val viewModel = say(ledger(), recogniser, "dodaj 200 na transport")
+        viewModel.startCorrecting("pl-PL")
+
+        viewModel.stopListening()
+        recogniser.heard.value = ListenState.Failed(ListenFailure.NoSpeech)
+
+        val saved = viewModel.state.value as VoiceEntryState.Saved
+        assertEquals(CorrectionState.Idle, saved.correction)
+        assertEquals(20000L, saved.summary.amountMinor)
+    }
+
     // ------------------------------------------------------- corrections
 
     @Test

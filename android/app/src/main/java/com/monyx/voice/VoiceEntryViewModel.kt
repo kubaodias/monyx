@@ -206,6 +206,20 @@ class VoiceEntryViewModel(
     private var listening = false
 
     /**
+     * Whether the listen that is ending was ended by the Stop control.
+     *
+     * It changes one thing only: a listen a person deliberately stopped, that
+     * heard nothing, closes without a word. "Nic nie usłyszano" is worth saying
+     * when the microphone gave up on its own after three seconds — the person
+     * was waiting on it and is owed an explanation. It is worth nothing at all
+     * when they pressed Stop, because they are being told what they just did.
+     *
+     * Only silence is swallowed this way. A network failure or a missing
+     * language pack is news whoever ended the listen, and still gets said.
+     */
+    private var stoppedByHand = false
+
+    /**
      * A write is in flight. "Ignore a hold while listening" does not cover the
      * gap between the transcript arriving and Room returning, which is exactly
      * where a second hold would produce two rows for one sentence.
@@ -233,6 +247,7 @@ class VoiceEntryViewModel(
         locale = Locale.forLanguageTag(languageTag)
         correcting = false
         listening = true
+        stoppedByHand = false
         _editing.value = null
         show(VoiceEntryState.Listening(""))
         recogniser.start(languageTag)
@@ -247,6 +262,7 @@ class VoiceEntryViewModel(
         locale = Locale.forLanguageTag(languageTag)
         correcting = true
         listening = true
+        stoppedByHand = false
         show(saved.copy(correction = CorrectionState.Listening("")))
         recogniser.start(languageTag)
         awaitSpeech()
@@ -263,6 +279,7 @@ class VoiceEntryViewModel(
      */
     fun stopListening() {
         if (!listening) return
+        stoppedByHand = true
         recogniser.stop()
     }
 
@@ -361,6 +378,21 @@ class VoiceEntryViewModel(
             return
         }
         val current = _state.value
+        // Stopped by hand, and nothing was said: close without a word. See
+        // [stoppedByHand]. A correction falls back to the row it was correcting
+        // rather than to nothing, because that row is what the sheet is for.
+        if (reason == ListenFailure.NoSpeech && stoppedByHand) {
+            stoppedByHand = false
+            correcting = false
+            show(
+                if (current is VoiceEntryState.Saved) {
+                    current.copy(correction = CorrectionState.Idle)
+                } else {
+                    VoiceEntryState.Hidden
+                },
+            )
+            return
+        }
         // A correction that could not be heard and a correction that made no
         // sense say the same thing to the person holding the phone: nothing
         // changed. The row is still on screen behind the message.
@@ -376,6 +408,7 @@ class VoiceEntryViewModel(
 
     private fun onTranscript(best: String, alternatives: List<String>) {
         listening = false
+        stoppedByHand = false
         stopClocks()
         if (correcting) {
             correcting = false
