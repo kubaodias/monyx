@@ -23,6 +23,25 @@ name = "FCM_SERVICE_ACCOUNT"
 binding = "CRON_SECRET"
 name = "CRON_SECRET"
 
+# Who may reach the household by phone, which household they reach, and the PIN
+# that proves it: a JSON array of {msisdn, household_id, name, pin}. A secret
+# rather than a table, because phone numbers are personal data and this keeps
+# them out of both the repository and the database backups.
+[[secrets]]
+binding = "VOICE_ALLOWLIST"
+name = "VOICE_ALLOWLIST"
+
+# Authenticates the assistant's call-setup webhook. It travels in the URL
+# because the assistant config has a URL field and no headers.
+[[secrets]]
+binding = "VOICE_CONTEXT_TOKEN"
+name = "VOICE_CONTEXT_TOKEN"
+
+# Authenticates the assistant's webhook TOOL, which does have headers.
+[[secrets]]
+binding = "VOICE_TOOL_SECRET"
+name = "VOICE_TOOL_SECRET"
+
 # Second layer on enrolment; 10-character invite codes are the real defence.
 [[ratelimits]]
 name = "ENROLL_LIMIT"

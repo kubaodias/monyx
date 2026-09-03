@@ -16,7 +16,23 @@ import {
 import { allHouseholds, forHousehold, type HouseholdDb } from "./db.ts";
 import { sendBudgetAlert, type DeviceToken } from "./fcm.ts";
 import { DEFAULT_PULL_LIMIT, pull, push } from "./sync.ts";
-import { periodOf } from "./schema.ts";
+import { currentPeriod, localDate, periodOf } from "./schema.ts";
+import {
+  burnTicket,
+  collectDigest,
+  findCaller,
+  MAX_ATTEMPTS,
+  MAX_FAILURES_PER_WINDOW,
+  newTicketId,
+  parseAllowlist,
+  putTicket,
+  readFailures,
+  readTicket,
+  recordFailure,
+  renderDigest,
+  secretEquals,
+  type VoiceStore,
+} from "./voice.ts";
 
 const BACKUP_KEY = "backup/last";
 
@@ -201,6 +217,143 @@ async function handleCron(req: Request, nowMs: number): Promise<Response> {
   return json({ ok: true, households: households.length, alerts: delivered, period });
 }
 
+// ---------------------------------------------------------------- voice
+
+/**
+ * Call setup. Telnyx asks who is on the line before the assistant speaks, and
+ * this is the only thing it is told: a name to greet, and a ticket to redeem.
+ *
+ * The digest is computed here and parked in the ticket so that redeeming it
+ * later costs one KV read instead of six queries — but a failure to compute is
+ * NOT fatal. The ticket is what the call cannot proceed without; the cached
+ * digest is an optimisation, and /voice/digest rebuilds it when it is missing.
+ */
+async function handleVoiceContext(req: Request, url: URL, nowMs: number): Promise<Response> {
+  let token: string;
+  let allowlistRaw: string;
+  try {
+    token = await env.SECRETS.get("VOICE_CONTEXT_TOKEN");
+    allowlistRaw = await env.SECRETS.get("VOICE_ALLOWLIST");
+  } catch {
+    return fail(500, "voice_not_configured");
+  }
+  // The secret rides in the URL because the assistant's webhook field is a URL
+  // and nothing else — there are no headers to put it in.
+  if (!secretEquals(url.searchParams.get("t") ?? "", token)) return fail(401, "unauthorized");
+
+  const body = await readJson(req);
+  if (!body) return fail(400, "bad_json");
+
+  const data = body["data"];
+  const payload =
+    typeof data === "object" && data !== null
+      ? ((data as Record<string, unknown>)["payload"] as Record<string, unknown> | undefined)
+      : undefined;
+
+  const caller = findCaller(parseAllowlist(allowlistRaw), payload?.["telnyx_end_user_target"]);
+  // An unknown caller is told nothing — not the household's name, not that one
+  // exists. The assistant's own instructions handle the goodbye.
+  if (!caller) return json({ dynamic_variables: { caller_known: "no" } });
+
+  const period = currentPeriod(nowMs);
+  let digest: string | null = null;
+  try {
+    digest = renderDigest(
+      await collectDigest(forHousehold(caller.household_id), period, localDate(nowMs)),
+    );
+  } catch (error) {
+    console.error("voice digest precompute failed", error);
+  }
+
+  const ticket = newTicketId();
+  await putTicket(env.KV as VoiceStore, ticket, {
+    msisdn: caller.msisdn,
+    household_id: caller.household_id,
+    attempts: 0,
+    digest,
+  });
+
+  return json({
+    dynamic_variables: {
+      caller_known: "yes",
+      caller_name: caller.name,
+      budget_ticket: ticket,
+      period,
+    },
+  });
+}
+
+/**
+ * Ticket plus PIN, in exchange for the month.
+ *
+ * The PIN is compared here rather than in the assistant's instructions. A model
+ * told to withhold something it has already been given will eventually be
+ * talked out of it; a model that was never given it cannot be.
+ */
+async function handleVoiceDigest(req: Request, nowMs: number): Promise<Response> {
+  let shared: string;
+  let allowlistRaw: string;
+  try {
+    shared = await env.SECRETS.get("VOICE_TOOL_SECRET");
+    allowlistRaw = await env.SECRETS.get("VOICE_ALLOWLIST");
+  } catch {
+    return fail(500, "voice_not_configured");
+  }
+  if (!secretEquals(req.headers.get("x-voice-secret") ?? "", shared)) {
+    return fail(401, "unauthorized");
+  }
+
+  const body = await readJson(req);
+  if (!body) return fail(400, "bad_json");
+
+  const store = env.KV as VoiceStore;
+
+  // Checked before the ticket is even read: the lockout exists to make the
+  // four-digit PIN unguessable, so it has to bite before any per-ticket state
+  // can be reset by minting a fresh one.
+  const failures = await readFailures(store, nowMs);
+  if (failures.count >= MAX_FAILURES_PER_WINDOW) return fail(429, "locked");
+
+  // The ticket rides in a header, where the PLATFORM substitutes it from the
+  // dynamic variable. Asking the model to copy a 32-character token into a body
+  // parameter works right up until it does not, and the failure is a caller who
+  // gave the correct PIN being told to try again. The body is accepted too, so
+  // the tool can be tested with curl.
+  const ticketId = req.headers.get("x-voice-ticket") ?? body["ticket"];
+  const ticket = await readTicket(store, ticketId);
+  if (!ticket || typeof ticketId !== "string") return fail(401, "session_expired");
+
+  const caller = findCaller(parseAllowlist(allowlistRaw), ticket.msisdn);
+  if (!caller) return fail(403, "forbidden");
+
+  const pin = typeof body["pin"] === "string" ? body["pin"].replace(/\D/g, "") : "";
+  if (!secretEquals(pin, caller.pin)) {
+    const attempts = ticket.attempts + 1;
+    await recordFailure(store, nowMs);
+    if (attempts >= MAX_ATTEMPTS) {
+      await burnTicket(store, ticketId);
+      return json({ error: "pin_attempts_exhausted", attempts_left: 0 }, 401);
+    }
+    await putTicket(store, ticketId, { ...ticket, attempts });
+    return json({ error: "wrong_pin", attempts_left: MAX_ATTEMPTS - attempts }, 401);
+  }
+
+  const period = currentPeriod(nowMs);
+  let digest = ticket.digest;
+  if (!digest) {
+    digest = renderDigest(
+      await collectDigest(forHousehold(ticket.household_id), period, localDate(nowMs)),
+    );
+  }
+
+  // A fumbled PIN followed by a correct one is a person, not an attack.
+  if (ticket.attempts > 0) {
+    await putTicket(store, ticketId, { ...ticket, attempts: 0, digest });
+  }
+
+  return json({ ok: true, period, budget: digest });
+}
+
 function dedupe(retries: PendingAlert[], fresh: PendingAlert[]): PendingAlert[] {
   const seen = new Set(fresh.map((a) => `${a.category_id}|${a.period}|${a.threshold}`));
   return retries.filter((a) => !seen.has(`${a.category_id}|${a.period}|${a.threshold}`));
@@ -229,6 +382,14 @@ export default {
       }
       if (path === "/cron/daily" && req.method === "POST") {
         return await handleCron(req, nowMs);
+      }
+      // No device session: the caller is a phone line, not an enrolled phone.
+      // Both routes carry their own shared secret, and neither writes.
+      if (path === "/voice/context" && req.method === "POST") {
+        return await handleVoiceContext(req, url, nowMs);
+      }
+      if (path === "/voice/digest" && req.method === "POST") {
+        return await handleVoiceDigest(req, nowMs);
       }
 
       const session = await authenticate(req.headers.get("authorization"));

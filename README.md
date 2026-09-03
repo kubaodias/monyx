@@ -248,6 +248,47 @@ on the server, so if the database is lost no phone can authenticate to re-upload
 its replica. The data survives locally, but recovery means seeding a fresh
 household and re-enrolling every device by hand.
 
+## Voice
+
+The household can be asked about over the phone. The assistant itself — model,
+voice, transcription, instructions, and the number it answers — is configuration
+held on Telnyx AI Assistants and is not in this repository. What is here is the
+only part it cannot do alone: two read-only routes, because `env.DB` is bound to
+the function and there is no public SQL API.
+
+| Route | When | Returns |
+|---|---|---|
+| `POST /voice/context?t=…` | call setup | the caller's name and a ticket — **no money** |
+| `POST /voice/digest` | after the PIN | one XML snapshot of the month |
+
+The split is the security design and is argued in
+[ADR 0018](docs/decisions/0018-the-assistant-gets-a-window-not-a-key.md): caller
+ID is not a credential, so nothing financial is preloaded into the prompt, and
+the PIN is compared in the function rather than by the model.
+
+Three secrets, none of them in this repository:
+
+- `VOICE_ALLOWLIST` — JSON `[{msisdn, household_id, name, pin}]`. Who may call,
+  which household they reach, and the PIN that proves it. A secret rather than a
+  table because phone numbers are personal data.
+- `VOICE_CONTEXT_TOKEN` — travels in the call-setup URL, which is the only place
+  the assistant's webhook field allows a secret.
+- `VOICE_TOOL_SECRET` — the `x-voice-secret` header on the tool webhook, held on
+  the Telnyx side as an integration secret.
+
+Both routes are `SELECT`-only. Adding a transaction by voice would write through
+the sync epoch and needs a `created_by` member without a device; it is not built.
+
+To check the routes are alive without placing a call:
+
+```sh
+curl -s -o /dev/null -w '%{http_code}\n' -X POST "$MONYX_API_URL/voice/context?t=wrong" \
+  -H 'content-type: application/json' -d '{}'          # expect 401
+curl -s -X POST "$MONYX_API_URL/voice/digest" \
+  -H "x-voice-secret: $VOICE_TOOL_SECRET" -H 'content-type: application/json' \
+  -d '{"ticket":"nope","pin":"0000"}'                   # expect session_expired
+```
+
 ## Restore runbook
 
 The middle step is why `epoch` exists. Skipping it is worse than not restoring
