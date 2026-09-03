@@ -20,7 +20,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Undo
-import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -259,11 +258,11 @@ private fun SavedBody(
     val category = categories.firstOrNull { it.id == summary.categoryId }
     val listening = state.correction as? CorrectionState.Listening
 
-    Header(stringResource(R.string.voice_saved))
-
     // Every field on this sheet opens the editor, and the whole row is the
-    // target rather than the glyph on it — a thumb in a shop is not aiming at a
-    // 16dp icon. This is the entire "change it" affordance now: a Popraw button
+    // target. There is no heading above them and no pencil beside them: the
+    // sheet only ever appears because something was just written, so "Zapisano"
+    // said nothing the figures underneath it were not already saying, and five
+    // pencils down the right-hand side turned a summary into a form. This is the entire "change it" affordance now: a Popraw button
     // beside Cofnij and Gotowe said only "something here is wrong" and then
     // made you find it again in a dialog, where the value that is wrong is
     // already on screen and already the thing being looked at.
@@ -357,11 +356,15 @@ private fun SavedBody(
  * One value on the summary, and the whole width of it is the way into the
  * editor.
  *
- * The label is what TalkBack reads and what the row is FOR — it is not drawn,
- * because the values are self-describing at a glance ("200,00 zł", a category
- * chip, "Gotówka · Dziś") and a column of captions beside them would be twice
- * the sheet for nothing. A small pencil marks the row as pressable for
- * everybody else, which is the part a label cannot do.
+ * Nothing marks it as pressable, which is deliberate: a summary of four lines
+ * with a pencil on every one of them reads as a form to fill in rather than as
+ * a receipt to glance at, and the receipt is what this is. The affordance is
+ * that everything on the sheet behaves the same way.
+ *
+ * The label is not drawn either — the values say what they are at a glance
+ * ("200,00 zł", a category chip, "Gotówka · Dziś"). It is carried as
+ * `onClickLabel`, so it is still exactly what TalkBack announces the row's
+ * action as, and losing the glyph costs the screen reader nothing.
  */
 @Composable
 private fun EditableField(
@@ -378,13 +381,6 @@ private fun EditableField(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(Modifier.weight(1f)) { content() }
-        Spacer(Modifier.width(8.dp))
-        Icon(
-            imageVector = Icons.Filled.Edit,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.size(16.dp),
-        )
     }
 }
 

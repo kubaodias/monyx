@@ -95,6 +95,14 @@ rows were worse than an extra tap: they all navigated to the same unfiltered
 month, so tapping the third and the ninth did the same thing. The editor is also
 where a row says it is still waiting to sync, or that the server refused it.
 
+Its category row shows one level at a time: the parents, and then one family
+once a parent with children is tapped, with the parent itself leading its own
+family because "Dom" is somewhere people file to and not only a heading. It
+opens on the family the row is already in. The date is a calendar with no
+floor and no ceiling — the future included, because the standing order leaving
+on Friday has not happened yet either — and no text field to type 03.09.2026
+into.
+
 The arrows are for a neighbouring month. For any other, the title opens a
 picker — a year, twelve months under it, and one button back to the present.
 The present month keeps a ring in the grid even while another is chosen, so it
@@ -271,11 +279,17 @@ transport" or "add 200 to Transport". Let go whenever you like — the phone
 stops listening when the sentence ends, not when the finger does. The row is
 written and a sheet shows the row it wrote — amount, category, account, day and
 note. Every one of those is a tap into the editor, so the field that is wrong is
-also the way to fix it, and there is no separate "edit" button. **Cofnij** takes
+also the way to fix it, and there is no separate "edit" button. **Anuluj** takes
 the row back, with an Undo of its own if that was the mis-tap.
 
+"150 zł na zakupy w Biedronce" saves 150,00 against Zakupy spożywcze with the
+note *W Biedronce*: once the amount, the date and the category have claimed
+their words, whatever is left over is the note. It is bookkeeping rather than a
+list of shops — and "dodaj 200 na transport" has only filler left over, so it
+gets none.
+
 It can be corrected by voice too: hold the microphone on the sheet and say
-"cofnij", "ma być 250", "zmień kategorię na zakupy". A sentence about the
+"anuluj", "ma być 250", "zmień kategorię na zakupy". A sentence about the
 purchase rather than about one of its fields becomes the note — "te zakupy były
 w lidlu" writes that down and leaves the category alone — and "notatka …"
 anywhere, including in the first breath, is always a note.

@@ -162,7 +162,7 @@ class VoiceCommandTest {
     @Test
     fun `a sentence about the transaction is a note, not a category`() {
         val correction = say("te zakupy były w lidlu")
-        assertEquals("te zakupy były w lidlu", correction.note)
+        assertEquals("Te zakupy były w lidlu", correction.note)
         assertNull(correction.categoryId)
         assertNull(correction.amountMinor)
         assertFalse(correction.revert)
@@ -179,7 +179,7 @@ class VoiceCommandTest {
     @Test
     fun `an explicit marker takes everything after it, verbatim`() {
         val correction = say("notatka bilet miesięczny")
-        assertEquals("bilet miesięczny", correction.note)
+        assertEquals("Bilet miesięczny", correction.note)
         assertNull(correction.amountMinor)
         assertNull(correction.categoryId)
         assertNull(correction.date)
@@ -193,11 +193,11 @@ class VoiceCommandTest {
     @Test
     fun `a note is not swallowed by the revert or confirm words inside it`() {
         val cancelled = say("notatka anulowane zamówienie")
-        assertEquals("anulowane zamówienie", cancelled.note)
+        assertEquals("Anulowane zamówienie", cancelled.note)
         assertFalse(cancelled.revert)
 
         val agreed = say("notatka ok było tanio")
-        assertEquals("ok było tanio", agreed.note)
+        assertEquals("Ok było tanio", agreed.note)
         assertFalse(agreed.confirm)
     }
 

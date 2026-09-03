@@ -1,6 +1,7 @@
 package com.monyx.voice
 
 import java.text.Normalizer
+import java.util.Locale
 
 /**
  * A spoken phrase against one household's own category names.
@@ -43,6 +44,16 @@ internal object CategoryMatcher {
              * were said and neither was heard whole.
              */
             val contenders: Int,
+            /**
+             * Which of the phrase's words the name actually accounted for,
+             * as indices into `phraseTokens`.
+             *
+             * The bookkeeping [SpokenAmount] has always done, for the same
+             * reason: what is left over once the amount, the date and the name
+             * are all spoken for is the note. Without it "150 zł na zakupy w
+             * Biedronce" has no way to know that "Biedronce" was never used.
+             */
+            val matched: Set<Int>,
         ) : Outcome
 
         data class Tie(val candidates: List<VoiceCategory>) : Outcome
@@ -65,36 +76,37 @@ internal object CategoryMatcher {
      *   taken out, filler words included — tiers 1 and 2 need them, because
      *   "Other income" is a category name whose second word is also an income
      *   keyword and stripping it would make the category unsayable.
-     * @param contentTokens the same list with filler and kind keywords removed.
-     *   Tiers 3 and 4 use this one, which is what stops a bare "income" being
-     *   read as a request for "Other income".
+     * @param contentIndices which of those are content, as indices: the same
+     *   list with filler and kind keywords dropped. Tiers 3 and 4 read only
+     *   these, which is what stops a bare "income" being taken as a request for
+     *   "Other income". Indices rather than the words themselves so a match can
+     *   report the span it used.
      */
     fun match(
         phraseTokens: List<String>,
-        contentTokens: List<String>,
+        contentIndices: List<Int>,
         candidates: List<VoiceCategory>,
         minScore: Int = MIN_SCORE,
     ): Outcome {
         if (candidates.isEmpty()) return Outcome.None
         val scored = candidates
-            .map { it to score(it, phraseTokens, contentTokens) }
+            .map { it to score(it, phraseTokens, contentIndices) }
             .filter { it.second.score >= minScore }
             .sortedByDescending { it.second.score }
         val best = scored.firstOrNull() ?: return Outcome.None
         val tied = scored.takeWhile { it.second.score == best.second.score }
-        if (tied.size == 1) return Outcome.One(best.first, best.second.wholeName, scored.size)
+        if (tied.size == 1) return best.one(scored.size)
 
         // A child beats its own parent on a draw. Both levels are real
         // destinations in the grid, and the more specific one is what somebody
         // naming a word the child owns meant. A draw between unrelated names is
         // still a refusal.
         val child = tied.firstOrNull { (candidate, _) -> tied.any { it.first.id == candidate.parentId } }
-        return if (child != null) {
-            Outcome.One(child.first, child.second.wholeName, scored.size)
-        } else {
-            Outcome.Tie(tied.map { it.first })
-        }
+        return child?.one(scored.size) ?: Outcome.Tie(tied.map { it.first })
     }
+
+    private fun Pair<VoiceCategory, Scored>.one(contenders: Int) =
+        Outcome.One(first, second.wholeName, contenders, second.matched)
 
     /**
      * The four tiers, as scores, and the gaps between them are the point.
@@ -115,31 +127,40 @@ internal object CategoryMatcher {
     /** How much of the name was said, alongside how well. The two are separate
      *  answers: the score picks a category, and [Scored.wholeName] decides
      *  whether that category is allowed to speak for the KIND as well. */
-    private data class Scored(val score: Int, val wholeName: Boolean)
+    private data class Scored(val score: Int, val wholeName: Boolean, val matched: Set<Int>)
 
-    private val NOTHING = Scored(0, wholeName = false)
+    private val NOTHING = Scored(0, wholeName = false, matched = emptySet())
 
     private fun score(
         category: VoiceCategory,
         phraseTokens: List<String>,
-        contentTokens: List<String>,
+        contentIndices: List<Int>,
     ): Scored {
         val nameTokens = tokenise(category.name)
         if (nameTokens.isEmpty()) return NOTHING
 
-        if (phraseTokens == nameTokens) return Scored(EXACT, wholeName = true)
+        if (phraseTokens == nameTokens) {
+            return Scored(EXACT, wholeName = true, matched = phraseTokens.indices.toSet())
+        }
         // The whole name, in order, somewhere in the sentence. Within the tier,
         // scored by length so a longer name outranks a shorter one it contains.
-        if (containsRun(phraseTokens, nameTokens)) {
-            return Scored(NAMED + nameTokens.sumOf { it.length }, wholeName = true)
+        runStart(phraseTokens, nameTokens)?.let { start ->
+            return Scored(
+                score = NAMED + nameTokens.sumOf { it.length },
+                wholeName = true,
+                matched = (start until start + nameTokens.size).toSet(),
+            )
         }
 
         // Stems, which is Polish inflection bought cheaply: "spożywcze" and
         // "spożywczy" share five letters, so do "zakupy" and "zakupów", and
         // English plurals come along free.
         val nameStems = nameTokens.map(VoiceWords::stem).toSet()
-        val spoken = contentTokens.map(VoiceWords::stem).toSet()
-        val hits = nameStems.count { nameStem -> spoken.any { stemsMatch(nameStem, it) } }
+        val hitBy = { spokenStem: String -> nameStems.any { stemsMatch(it, spokenStem) } }
+        val used = contentIndices.filter { hitBy(VoiceWords.stem(phraseTokens[it])) }.toSet()
+        val hits = nameStems.count { nameStem ->
+            used.any { stemsMatch(nameStem, VoiceWords.stem(phraseTokens[it])) }
+        }
         if (hits > 0) {
             // Within the tier: more words of the name matched is better, and
             // covering ALL of a short name beats covering half of a long one.
@@ -147,14 +168,19 @@ internal object CategoryMatcher {
             return Scored(
                 score = STEM + hits * 8 + hits * 10 / nameStems.size,
                 wholeName = hits == nameStems.size,
+                matched = used,
             )
         }
 
         // One typo, in a word long enough for one typo to still leave a word.
+        val close = contentIndices.filter { index ->
+            val spoken = phraseTokens[index]
+            spoken.length >= 4 && nameTokens.any { it.length >= 4 && withinOneEdit(it, spoken) }
+        }.toSet()
         val near = nameTokens.count { name ->
-            name.length >= 4 && contentTokens.any { it.length >= 4 && withinOneEdit(name, it) }
+            name.length >= 4 && close.any { withinOneEdit(name, phraseTokens[it]) }
         }
-        return if (near > 0) Scored(NEAR + near, wholeName = false) else NOTHING
+        return if (near > 0) Scored(NEAR + near, wholeName = false, matched = close) else NOTHING
     }
 
     /**
@@ -176,14 +202,15 @@ internal object CategoryMatcher {
             spokenStem.startsWith(nameStem)
         }
 
-    /** Does [name] appear as a contiguous run of [tokens]? Whole words only —
-     *  a substring test matches "dom" inside "domowe" and files the wrong row. */
-    private fun containsRun(tokens: List<String>, name: List<String>): Boolean {
-        if (name.isEmpty() || name.size > tokens.size) return false
+    /** Where [name] appears as a contiguous run of [tokens], or null. Whole
+     *  words only — a substring test matches "dom" inside "domowe" and files
+     *  the wrong row. */
+    private fun runStart(tokens: List<String>, name: List<String>): Int? {
+        if (name.isEmpty() || name.size > tokens.size) return null
         for (start in 0..tokens.size - name.size) {
-            if (tokens.subList(start, start + name.size) == name) return true
+            if (tokens.subList(start, start + name.size) == name) return start
         }
-        return false
+        return null
     }
 
     /** Levenshtein, bounded at one and abandoned early. Two words that differ by
@@ -240,27 +267,60 @@ internal object CategoryMatcher {
      * Splits a sentence at an explicit note marker: what to parse, and what to
      * write down verbatim.
      *
-     * The tail is taken from the ORIGINAL words, not from the normalised ones —
-     * a note is read by a person, so "bilet miesięczny" has to keep its
-     * diacritics and its capitals. Matching is done on a normalised copy of the
-     * same whitespace split, so the two halves stay aligned without needing the
-     * tokeniser's punctuation rules to agree with anything.
-     *
      * Nothing after the marker means no note: "dodaj 200 na transport notatka"
      * is somebody who stopped talking, not a request for an empty one.
      */
     fun splitOnNoteMarker(value: String): Pair<String, String?> {
-        val words = value.split(Regex("\\s+")).filter { it.isNotBlank() }
-        val marker = words.indexOfFirst { normalise(it).trim(',', '.', ':', ';') in VoiceWords.noteMarkers }
+        val spoken = words(value)
+        val marker = spoken.indexOfFirst { it.token in VoiceWords.noteMarkers }
         if (marker < 0) return value to null
-        val note = words.drop(marker + 1).joinToString(" ").trim(' ', ',', '.', ':', ';')
-        return words.take(marker).joinToString(" ") to note.takeIf { it.isNotBlank() }
+        val note = spoken.drop(marker + 1).joinToString(" ") { it.source }
+        return spoken.take(marker).joinToString(" ") { it.source } to asNote(note)
     }
 
-    fun tokenise(value: String): List<String> =
-        normalise(value)
-            .map { if (it.isLetterOrDigit() || it == ',' || it == '.') it else ' ' }
-            .joinToString("")
-            .split(' ')
-            .mapNotNull { token -> token.trim(',', '.').takeIf { it.isNotEmpty() } }
+    /**
+     * A note as it will be read, which is by a person and not by this file.
+     *
+     * One capital at the front, applied here rather than at each render so
+     * every route to a note — dictated after "notatka", left over at the end of
+     * a sentence, or a whole sentence taken as one — arrives in the same shape,
+     * and so the value in Room matches the value on screen.
+     */
+    fun asNote(value: String): String? = value
+        .trim(' ', ',', '.', ':', ';')
+        .takeIf { it.isNotEmpty() }
+        ?.replaceFirstChar { it.titlecase(Locale.ROOT) }
+
+    /**
+     * One word, twice: as it was said and as this file compares it.
+     *
+     * A note is quoted back to the household, so it has to keep the diacritics
+     * and the capitals that [normalise] exists to throw away — "w Biedronce",
+     * not "w biedronce". Splitting once and carrying both is what keeps the two
+     * halves aligned; normalising the whole string first and trying to map back
+     * afterwards is the version of this that goes wrong on the first
+     * apostrophe.
+     */
+    data class Word(val source: String, val token: String)
+
+    fun words(value: String): List<Word> {
+        val out = mutableListOf<Word>()
+        val current = StringBuilder()
+        fun flush() {
+            val raw = current.toString().trim(',', '.')
+            current.setLength(0)
+            if (raw.isEmpty()) return
+            val token = normalise(raw)
+            if (token.isNotEmpty()) out += Word(raw, token)
+        }
+        for (ch in value) {
+            // The separators survive inside a token because "12,50" is one word
+            // to the amount reader and would be two to everything else.
+            if (ch.isLetterOrDigit() || ch == ',' || ch == '.') current.append(ch) else flush()
+        }
+        flush()
+        return out
+    }
+
+    fun tokenise(value: String): List<String> = words(value).map { it.token }
 }

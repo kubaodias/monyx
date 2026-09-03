@@ -238,7 +238,7 @@
          read back what was written. -->
     <string name="voice_hold_to_talk">Hold to add by voice</string>
     <string name="voice_listening">Listening…</string>
-    <string name="voice_say_example">Try “Add 200 to Transport”</string>
+    <string name="voice_say_example">Try “150 on groceries at the market”</string>
     <string name="voice_not_understood">That was not understood</string>
     <string name="voice_no_service">This phone cannot recognise speech</string>
     <string name="voice_no_speech">Nothing was heard</string>
@@ -246,7 +246,6 @@
     <string name="voice_offline">No connection, and no offline speech pack on this phone</string>
     <string name="voice_permission_needed">Monyx needs the microphone to add by voice</string>
     <string name="voice_permission_grant">Allow</string>
-    <string name="voice_saved">Saved</string>
     <string name="voice_edit_amount">Edit amount</string>
     <string name="voice_edit_category">Edit category</string>
     <string name="voice_edit_account">Edit account and date</string>

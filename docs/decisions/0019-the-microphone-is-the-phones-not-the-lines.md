@@ -76,6 +76,21 @@ opens the editor on a tap. A word saying "Poprawiono" went with it for the same
 reason: the changed value is better evidence that something changed than a
 label claiming it.
 
+- **Whatever no field claimed is the note.** "150 zł na zakupy w Biedronce" is
+  one amount, one category and two words nothing asked for — and those two words
+  are the entire reason anybody says the sentence that way. So the amount, the
+  date, the category and the kind keywords each report the span they used, and
+  what is left over at the end of that is written down. It is not a list of
+  shops and it never will be: the rule is about bookkeeping, not vocabulary.
+
+  The trap in it, and the one thing this must never get wrong, is that "dodaj
+  200 na transport" also has words left over — "dodaj" and "na". A note reading
+  *Dodaj na* would be worse than not having the feature, so leading fillers are
+  dropped, and there is a test whose whole job is that five ordinary sentences
+  produce no note at all. One preposition survives the trim, the one sitting
+  immediately in front of the first real word, because it belongs to the phrase:
+  "W Biedronce" is what somebody would have typed, where "Biedronce" is a word
+  left on its own in the locative case.
 - **A note is what is said ABOUT the row; a name is what is said INSTEAD of
   one.** "te zakupy były w lidlu" contains a seeded category name and is
   plainly not a category correction — *zakupy* is only being used to point at
@@ -254,6 +269,13 @@ setting for driving, and is out of scope.
   and the note each open `EditTransactionDialog` on a tap, with the whole row
   as the target rather than a glyph on it. The note is tappable while empty,
   because adding one is the main reason to reach for it.
+
+  Nothing marks the rows as pressable, and there is no "Zapisano" over them.
+  Both were tried and both were noise: the sheet only ever appears because
+  something was just written, so the heading said nothing the figures were not
+  already saying, and a pencil on every line turned a receipt into a form. The
+  labels survive as `onClickLabel`, so what TalkBack announces is unchanged —
+  the glyph was the part that carried no information.
 
   The dialog opens on all five fields rather than on the one that was tapped.
   Threading a target field through it would mean reshaping an `AlertDialog` that

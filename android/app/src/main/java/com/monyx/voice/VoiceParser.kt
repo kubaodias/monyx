@@ -133,20 +133,32 @@ object VoiceParser {
         // sentence, so a number or a category name inside the note is text and
         // not an instruction.
         val (instruction, dictatedNote) = CategoryMatcher.splitOnNoteMarker(text)
-        val tokens = CategoryMatcher.tokenise(instruction)
+        val words = CategoryMatcher.words(instruction)
+        val tokens = words.map { it.token }
+
+        // Which words are spoken for. Everything the grammar recognises marks
+        // its own span here, and whatever is left at the end of it is the note
+        // — see [leftoverNote].
+        val consumed = BooleanArray(tokens.size)
+
         val amount = SpokenAmount.find(tokens, locale)
-        val afterAmount = tokens.filterIndexed { index, _ -> amount == null || index !in amount.tokens }
+        amount?.tokens?.forEach { consumed[it] = true }
 
-        val spokenDate = VoiceDates.read(afterAmount, today)
-        val phraseTokens = spokenDate?.let { day ->
-            afterAmount.filterIndexed { index, _ -> index !in day.tokens }
-        } ?: afterAmount
+        val afterAmount = tokens.indices.filterNot { consumed[it] }
+        val spokenDate = VoiceDates.read(afterAmount.map { tokens[it] }, today)
+        spokenDate?.tokens?.forEach { consumed[afterAmount[it]] = true }
 
-        val contentTokens = phraseTokens.filterNot { token ->
+        val phraseIndices = tokens.indices.filterNot { consumed[it] }
+        val phraseTokens = phraseIndices.map { tokens[it] }
+
+        val contentIndices = phraseTokens.indices.filterNot { index ->
+            val token = phraseTokens[index]
             val stem = VoiceWords.stem(token)
-            token in VoiceWords.filler ||
-                stem in VoiceWords.incomeStems ||
-                stem in VoiceWords.expenseStems
+            // A kind keyword is spoken for wherever it lands: "wydałem" is an
+            // instruction about the row, never a word about the shop.
+            val keyword = stem in VoiceWords.incomeStems || stem in VoiceWords.expenseStems
+            if (keyword) consumed[phraseIndices[index]] = true
+            token in VoiceWords.filler || keyword
         }
 
         // The category is matched across BOTH kind lists first, and only THEN
@@ -155,7 +167,7 @@ object VoiceParser {
         // and "wypłaciłem 200 na zakupy" — I withdrew two hundred for the
         // shopping — shares its stem, so a keyword-first rule files a grocery
         // run as income and flips the sign of the month.
-        val matched = CategoryMatcher.match(phraseTokens, contentTokens, categories)
+        val matched = CategoryMatcher.match(phraseTokens, contentIndices, categories)
             as? CategoryMatcher.Outcome.One
         val keywordKind = keywordKind(phraseTokens)
 
@@ -193,6 +205,14 @@ object VoiceParser {
         // has no business finishing.
         val splitUtterance = (amount?.groups ?: 0) > 1 && (matched?.contenders ?: 0) > 1
 
+        // Only the name that was actually FILED under is spoken for. A match
+        // this sentence then refused (the kind disagreed, or two clauses were
+        // heard) leaves its words unclaimed, which is right: they were not used.
+        if (category != null) matched?.matched?.forEach { consumed[phraseIndices[it]] = true }
+
+        val heardSomething = amount != null && !splitUtterance || category != null
+        val note = dictatedNote ?: if (heardSomething) leftoverNote(words, consumed) else null
+
         val spoken = SpokenTransaction(
             kind = kind,
             amountMinor = if (splitUtterance) 0 else amount?.minor ?: 0,
@@ -202,7 +222,7 @@ object VoiceParser {
             // correction pass can set it, which is where it is actually used.
             accountId = accounts.firstOrNull()?.id,
             date = spokenDate?.date ?: today,
-            note = dictatedNote,
+            note = note,
             transcript = text,
         )
         if (splitUtterance) return VoiceParse.Partial(spoken, VoiceParse.Missing.Both)
@@ -215,6 +235,41 @@ object VoiceParser {
             keywordKind != null || spokenDate != null -> VoiceParse.Partial(spoken, VoiceParse.Missing.Both)
             else -> VoiceParse.Unrecognised(text)
         }
+    }
+
+    /**
+     * What the sentence said that the grammar had no field for.
+     *
+     * "150 zł na zakupy w Biedronce" is one amount, one category and two words
+     * nothing asked for, and those two words are the whole reason anybody would
+     * say the sentence that way. So the rule is not a list of shops: once the
+     * amount, the date, the category and the keywords have each claimed their
+     * words, what is left over IS the note.
+     *
+     * Two trims make it read like something a person wrote rather than like
+     * debris:
+     *
+     *  - Leading fillers go, because "dodaj 200 na transport" leaves "dodaj"
+     *    and "na" and a note reading "Dodaj na" would be worse than no feature
+     *    at all. That is the case this must never get wrong.
+     *  - EXCEPT one preposition sitting immediately in front of the first real
+     *    word, which is kept, because in both languages it belongs to the
+     *    phrase: "W Biedronce" is what somebody would have typed, "Biedronce"
+     *    is a word left on its own in the locative case.
+     *
+     * Trailing fillers go too. Everything between is kept, gaps included: the
+     * words are already known not to be an instruction, and a phrase reads
+     * worse with holes in it than with a stray "i".
+     */
+    private fun leftoverNote(words: List<CategoryMatcher.Word>, consumed: BooleanArray): String? {
+        val spare = words.indices.filterNot { consumed[it] }
+        val firstReal = spare.firstOrNull { words[it].token !in VoiceWords.filler } ?: return null
+        val start = (firstReal - 1)
+            .takeIf { it >= 0 && !consumed[it] && words[it].token in VoiceWords.filler }
+            ?: firstReal
+        val tail = spare.filter { it >= start }
+            .dropLastWhile { words[it].token in VoiceWords.filler }
+        return CategoryMatcher.asNote(tail.joinToString(" ") { words[it].source })
     }
 
     /** Expense is the default, the same as [com.monyx.ui.add.AddUiState]. Income

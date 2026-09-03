@@ -233,7 +233,7 @@
          Dodaj, powiedz, przeczytaj co zostało zapisane. -->
     <string name="voice_hold_to_talk">Przytrzymaj, aby dodać głosem</string>
     <string name="voice_listening">Słucham…</string>
-    <string name="voice_say_example">Powiedz „dodaj 200 na transport”</string>
+    <string name="voice_say_example">Powiedz „150 zł na zakupy w Biedronce”</string>
     <string name="voice_not_understood">Nie udało się tego zrozumieć</string>
     <string name="voice_no_service">Ten telefon nie rozpoznaje mowy</string>
     <string name="voice_no_speech">Nic nie usłyszano</string>
@@ -241,14 +241,13 @@
     <string name="voice_offline">Brak połączenia i brak pakietu mowy offline</string>
     <string name="voice_permission_needed">Monyx potrzebuje mikrofonu, aby dodawać głosem</string>
     <string name="voice_permission_grant">Zezwól</string>
-    <string name="voice_saved">Zapisano</string>
     <string name="voice_edit_amount">Zmień kwotę</string>
     <string name="voice_edit_category">Zmień kategorię</string>
     <string name="voice_edit_account">Zmień konto i datę</string>
     <string name="voice_edit_note">Zmień notatkę</string>
     <string name="voice_add_note">Dodaj notatkę</string>
-    <string name="voice_revert">Cofnij</string>
-    <string name="voice_reverted">Cofnięto</string>
+    <string name="voice_revert">Anuluj</string>
+    <string name="voice_reverted">Anulowano</string>
     <string name="voice_undo_revert">Przywróć</string>
     <string name="voice_done">Gotowe</string>
     <string name="voice_correct_hold">Przytrzymaj, aby poprawić głosem</string>

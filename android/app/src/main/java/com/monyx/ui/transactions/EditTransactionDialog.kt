@@ -21,6 +21,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.CloudUpload
 import androidx.compose.material.icons.filled.Delete
@@ -33,7 +34,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.SelectableDates
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberDatePickerState
@@ -113,15 +113,19 @@ fun EditTransactionDialog(
     var confirmDelete by remember { mutableStateOf(false) }
 
     // Only the list matching this row's kind; an expense cannot be filed under a
-    // salary category. Children follow their parent so the row reads in family
-    // order, and each is drawn in the parent's colour.
-    val selectable = remember(categories, original.kind) {
-        val ofKind = categories.filter { it.kind == original.kind }
-        val byParent = ofKind.filter { it.parentId != null }.groupBy { it.parentId }
-        ofKind.filter { it.parentId == null }
-            .sortedBy { it.sortOrder }
-            .flatMap { parent -> listOf(parent) + byParent[parent.id].orEmpty().sortedBy { it.sortOrder } }
+    // salary category.
+    val ofKind = remember(categories, original.kind) {
+        categories.filter { it.kind == original.kind }
     }
+
+    // Which family the row is showing, or null for the roots. It opens on the
+    // family the transaction is ALREADY in: somebody editing a row filed under
+    // Dom > Remonty should see that, not have to go looking for where it
+    // already is.
+    var openParent by remember(original.id, ofKind) {
+        mutableStateOf(CategoryDrill.openOn(ofKind, original.categoryId))
+    }
+    val shown = CategoryDrill.shown(ofKind, openParent)
     val colorOf: (CategoryEntity) -> Color = remember(categories) {
         val byId = categories.associateBy { it.id }
         val resolve: (CategoryEntity) -> Color = { c ->
@@ -186,17 +190,41 @@ fun EditTransactionDialog(
                         style = MaterialTheme.typography.labelMedium,
                     )
                     Spacer(Modifier.height(6.dp))
-                    LazyRow(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        modifier = Modifier.heightIn(max = 76.dp),
-                    ) {
-                        items(selectable, key = { it.id }) { category ->
-                            CategoryPill(
-                                category = category,
-                                tint = colorOf(category),
-                                selected = category.id == categoryId,
-                                onClick = { categoryId = category.id },
-                            )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        // Only while inside a family. At the top level there is
+                        // nowhere to go back to, and a permanently disabled
+                        // arrow is furniture.
+                        if (openParent != null) {
+                            IconButton(onClick = { openParent = null }) {
+                                Icon(
+                                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                    contentDescription = stringResource(R.string.common_back),
+                                )
+                            }
+                        }
+                        LazyRow(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            modifier = Modifier.heightIn(max = 76.dp),
+                        ) {
+                            items(shown, key = { it.id }) { category ->
+                                CategoryPill(
+                                    category = category,
+                                    tint = colorOf(category),
+                                    selected = category.id == categoryId,
+                                    // A parent with children opens; a parent
+                                    // without them, and every child, selects.
+                                    // Inside a family the parent is the first
+                                    // pill and selects itself — "Dom" is a
+                                    // category people file to, not a heading.
+                                    onClick = {
+                                        if (openParent == null && CategoryDrill.hasChildren(ofKind, category.id)) {
+                                            openParent = category.id
+                                        } else {
+                                            categoryId = category.id
+                                        }
+                                    },
+                                )
+                            }
                         }
                     }
                 }
@@ -218,6 +246,10 @@ fun EditTransactionDialog(
                     items(selectable, key = { it.id }) { account ->
                         ChoiceChip(
                             label = account.name,
+                            // The account's own icon key, the same one Settings
+                            // draws it with. A wallet for everything would be a
+                            // new convention; this is the existing one.
+                            icon = Palette.icon(account.icon),
                             selected = account.id == accountId,
                             onClick = { accountId = account.id },
                         )
@@ -298,15 +330,14 @@ fun EditTransactionDialog(
     }
 
     if (showDatePicker) {
-        val today = Dates.today()
+        // No floor and no ceiling, the same as the keypad's own picker. It used
+        // to refuse the future on the grounds that an expense has already
+        // happened — true of a receipt and false of the standing order leaving
+        // on Friday, the deposit due next week, the flights already booked.
+        // The keypad allows it and this refused it, so a date typed on one
+        // screen could not be edited on the other.
         val state = rememberDatePickerState(
             initialSelectedDateMillis = date.atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli(),
-            selectableDates = object : SelectableDates {
-                override fun isSelectableDate(utcTimeMillis: Long): Boolean =
-                    !Instant.ofEpochMilli(utcTimeMillis).atZone(ZoneOffset.UTC).toLocalDate().isAfter(today)
-
-                override fun isSelectableYear(year: Int): Boolean = year <= today.year
-            },
         )
         DatePickerDialog(
             onDismissRequest = { showDatePicker = false },
@@ -324,9 +355,51 @@ fun EditTransactionDialog(
                 }
             },
         ) {
-            DatePicker(state = state, title = null)
+            // Calendar only. The mode toggle offers a text field wanting
+            // "03.09.2026", which is a keyboard, a format to guess at and a
+            // validation error to get wrong, in place of tapping a day.
+            DatePicker(state = state, title = null, showModeToggle = false)
         }
     }
+}
+
+/**
+ * One level of categories at a time, and where to start.
+ *
+ * The flat list this replaced put every child inline after its parent, which is
+ * right for the keypad's four-column grid and wrong for a single scrolling row
+ * inside a dialog: a household with a few subcategories turned the row into a
+ * horizontal scroll with no landmarks, and the only way to know a name was a
+ * child was that it happened to sit after its parent.
+ *
+ * Pure, and separate from the composable, because "which family does this open
+ * on" and "does tapping this drill or select" are the two things worth pinning
+ * and neither of them needs a device.
+ */
+internal object CategoryDrill {
+
+    /** Roots, or one family. A family leads with the parent itself, because a
+     *  parent with children is still somewhere people file to — "Dom" as well
+     *  as "Dom > Remonty" — and it would otherwise become unreachable the
+     *  moment it grew its first child. */
+    fun shown(ofKind: List<CategoryEntity>, openParent: String?): List<CategoryEntity> {
+        if (openParent == null) {
+            return ofKind.filter { it.parentId == null }.sortedBy { it.sortOrder }
+        }
+        val parent = ofKind.firstOrNull { it.id == openParent } ?: return shown(ofKind, null)
+        return listOf(parent) + children(ofKind, openParent)
+    }
+
+    fun children(ofKind: List<CategoryEntity>, parentId: String): List<CategoryEntity> =
+        ofKind.filter { it.parentId == parentId }.sortedBy { it.sortOrder }
+
+    fun hasChildren(ofKind: List<CategoryEntity>, id: String): Boolean =
+        ofKind.any { it.parentId == id }
+
+    /** The family the dialog opens on: the one the row is already filed in.
+     *  Nesting is exactly one level deep, so a child's parent is the answer. */
+    fun openOn(ofKind: List<CategoryEntity>, selectedId: String?): String? =
+        ofKind.firstOrNull { it.id == selectedId }?.parentId
 }
 
 /**
@@ -386,8 +459,18 @@ private fun CategoryPill(
 }
 
 @Composable
-private fun ChoiceChip(label: String, selected: Boolean, onClick: () -> Unit) {
-    Box(
+private fun ChoiceChip(
+    label: String,
+    icon: ImageVector,
+    selected: Boolean,
+    onClick: () -> Unit,
+) {
+    val content = if (selected) {
+        MaterialTheme.colorScheme.onPrimaryContainer
+    } else {
+        MaterialTheme.colorScheme.onSurfaceVariant
+    }
+    Row(
         modifier = Modifier
             .clip(RoundedCornerShape(16.dp))
             .background(
@@ -399,15 +482,10 @@ private fun ChoiceChip(label: String, selected: Boolean, onClick: () -> Unit) {
             )
             .clickable(onClick = onClick)
             .padding(horizontal = 12.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
     ) {
-        Text(
-            label,
-            style = MaterialTheme.typography.bodySmall,
-            color = if (selected) {
-                MaterialTheme.colorScheme.onPrimaryContainer
-            } else {
-                MaterialTheme.colorScheme.onSurfaceVariant
-            },
-        )
+        Icon(icon, contentDescription = null, tint = content, modifier = Modifier.size(16.dp))
+        Text(label, style = MaterialTheme.typography.bodySmall, color = content)
     }
 }

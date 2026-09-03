@@ -445,8 +445,8 @@ class VoiceEntryTest {
         val viewModel = correct(ledger, FakeRecogniser(), "te zakupy były w lidlu")
 
         val saved = viewModel.state.value as VoiceEntryState.Saved
-        assertEquals("te zakupy były w lidlu", saved.summary.note)
-        assertEquals("te zakupy były w lidlu", ledger.rows.getValue("t-1").note)
+        assertEquals("Te zakupy były w lidlu", saved.summary.note)
+        assertEquals("Te zakupy były w lidlu", ledger.rows.getValue("t-1").note)
         // Named a category and changed none: "zakupy" was pointing at the row,
         // not renaming it.
         assertEquals(transport.id, ledger.rows.getValue("t-1").categoryId)
@@ -459,8 +459,8 @@ class VoiceEntryTest {
         val viewModel = say(ledger, FakeRecogniser(), "dodaj 200 na transport, notatka bilet miesięczny")
 
         val saved = viewModel.state.value as VoiceEntryState.Saved
-        assertEquals("bilet miesięczny", saved.summary.note)
-        assertEquals("bilet miesięczny", ledger.rows.getValue("t-1").note)
+        assertEquals("Bilet miesięczny", saved.summary.note)
+        assertEquals("Bilet miesięczny", ledger.rows.getValue("t-1").note)
     }
 
     // --------------------------------------------- every write can fail

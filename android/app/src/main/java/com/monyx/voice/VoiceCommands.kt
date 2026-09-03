@@ -115,17 +115,17 @@ object VoiceCommands {
         } ?: afterDate
 
         val kind = phraseTokens.firstNotNullOfOrNull { VoiceWords.kindByName[it] }
-        val contentTokens = phraseTokens.filterNot { token ->
-            val stem = VoiceWords.stem(token)
+        val contentIndices = phraseTokens.indices.filterNot { index ->
+            val token = phraseTokens[index]
             token in VoiceWords.filler ||
                 token in VoiceWords.kindByName ||
                 token in VoiceWords.negations(locale) ||
-                stem in VoiceWords.confirmStems
+                VoiceWords.stem(token) in VoiceWords.confirmStems
         }
 
         val outcome = CategoryMatcher.match(
             phraseTokens = phraseTokens,
-            contentTokens = contentTokens,
+            contentIndices = contentIndices,
             candidates = categories,
             minScore = CategoryMatcher.LENIENT_MIN_SCORE,
         )
@@ -166,7 +166,7 @@ object VoiceCommands {
         // and syncs to the other phone. Between the two readings, the note is
         // the safer landing.
         val statement = looksLikeAStatement(tokens, locale, correction, categories)
-        if (statement) return VoiceCorrection(note = text.trim())
+        if (statement) return VoiceCorrection(note = CategoryMatcher.asNote(text))
 
         // An undo verb AND something concrete in the same breath is a refusal,
         // not a revert.

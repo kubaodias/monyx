@@ -255,12 +255,66 @@ class VoiceParserTest {
         val spoken = complete("dodaj 200 na transport, notatka bilet miesięczny")
         assertEquals(20000L, spoken.amountMinor)
         assertEquals(transport.id, spoken.categoryId)
-        assertEquals("bilet miesięczny", spoken.note)
+        assertEquals("Bilet miesięczny", spoken.note)
 
         // Nothing said after the marker is somebody who stopped talking.
         assertNull(complete("dodaj 200 na transport notatka").note)
         // And with no marker there is no note: the sentence is not the note.
         assertNull(complete("dodaj 200 na transport").note)
+    }
+
+    /**
+     * The owner's own sentence. Nothing here is a rule about shops: the amount,
+     * the category and the fillers each claim their words, and the two nobody
+     * claimed are what the sentence was for.
+     */
+    @Test
+    fun `words the grammar had no field for become the note`() {
+        val spoken = complete("150 zł na zakupy w Biedronce")
+        assertEquals(15000L, spoken.amountMinor)
+        assertEquals(groceries.id, spoken.categoryId)
+        // "W", not just "Biedronce": one preposition in front of the first real
+        // word belongs to the phrase, and the capital is applied where the note
+        // is built rather than where it is drawn.
+        assertEquals("W Biedronce", spoken.note)
+    }
+
+    /**
+     * The case this must never get wrong. A sentence that is nothing but an
+     * instruction leaves only fillers behind, and a note reading "Dodaj na"
+     * would be worse than not having the feature.
+     */
+    @Test
+    fun `a sentence with nothing left over gets no note`() {
+        assertNull(complete("dodaj 200 na transport").note)
+        assertNull(complete("Add 200 to Transport", en).note)
+        assertNull(complete("wydałem trzydzieści pięć złotych na paliwo").note)
+        assertNull(complete("200 zł zakupy").note)
+        assertNull(complete("wczoraj 20 na transport").note)
+    }
+
+    @Test
+    fun `the leftover note survives a date at the end of the sentence`() {
+        val spoken = complete("wczoraj 150 zł na zakupy w Biedronce")
+        assertEquals(today.minusDays(1), spoken.date)
+        assertEquals("W Biedronce", spoken.note)
+    }
+
+    @Test
+    fun `a leftover with no preposition in front of it stands on its own`() {
+        val spoken = complete("dodaj 200 na transport bilet miesięczny")
+        assertEquals(transport.id, spoken.categoryId)
+        assertEquals("Bilet miesięczny", spoken.note)
+    }
+
+    /** An explicit marker still wins: what follows it is the note whole, and
+     *  the leftover rule never gets to look. */
+    @Test
+    fun `a dictated note beats a leftover one`() {
+        assertEquals(
+            "Bilet miesięczny",
+            complete("150 zł na zakupy w Biedronce, notatka bilet miesięczny").note,
+        )
     }
 
     @Test
@@ -269,7 +323,7 @@ class VoiceParserTest {
         assertEquals(20000L, spoken.amountMinor)
         assertEquals(transport.id, spoken.categoryId)
         assertEquals(today, spoken.date)
-        assertEquals("zakupy za 500 wczoraj", spoken.note)
+        assertEquals("Zakupy za 500 wczoraj", spoken.note)
     }
 
     @Test
