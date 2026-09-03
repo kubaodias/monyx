@@ -13,7 +13,19 @@ import kotlinx.coroutines.flow.asStateFlow
 /** Where a listen got to. Only [Done] and [Failed] are ends. */
 sealed interface ListenState {
     data object Idle : ListenState
+
+    /** The microphone is open and nobody has said anything yet. */
     data object Listening : ListenState
+
+    /**
+     * A voice started. Reported separately from [Hearing] because it arrives
+     * well before the first partial transcript does, and the difference matters
+     * to whoever is holding the clock: waiting five seconds for somebody to
+     * begin is a dead microphone, and waiting fifteen for them to finish is a
+     * long sentence. See VoiceEntryViewModel.
+     */
+    data object Speaking : ListenState
+
     data class Hearing(val partial: String) : ListenState
     data class Done(val best: String, val alternatives: List<String>) : ListenState
     data class Failed(val reason: ListenFailure) : ListenState
@@ -151,7 +163,13 @@ class SpeechListener(private val context: Context) : Recogniser {
             _state.value = ListenState.Failed(failureOf(error))
         }
 
-        override fun onBeginningOfSpeech() = Unit
+        override fun onBeginningOfSpeech() {
+            _state.value = ListenState.Speaking
+        }
+
+        // Deliberately not an end. The recogniser reports the pause it thinks
+        // it heard, and then goes on to decide whether it was really the end of
+        // the sentence; onResults is the one that means it.
         override fun onEndOfSpeech() = Unit
         override fun onRmsChanged(rmsdB: Float) = Unit
         override fun onBufferReceived(buffer: ByteArray?) = Unit

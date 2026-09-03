@@ -77,7 +77,6 @@ import com.monyx.voice.SpeechListener
 import com.monyx.voice.VoiceEntrySheet
 import com.monyx.voice.VoiceEntryState
 import com.monyx.voice.VoiceEntryViewModel
-import com.monyx.voice.holdToTalk
 import com.monyx.voice.rememberRecordAudioPermission
 
 private data class Tab(
@@ -341,7 +340,6 @@ private fun MainScaffold(
                                     if (!microphone.askedBefore) microphone.ask()
                                 }
                             },
-                            onHoldEnd = voiceViewModel::stopListening,
                         )
                         return@forEach
                     }
@@ -449,7 +447,6 @@ private fun MainScaffold(
         onRevert = voiceViewModel::revert,
         onUndoRevert = voiceViewModel::undoRevert,
         onCorrectionHoldStart = { voiceViewModel.startCorrecting(languageTag) },
-        onCorrectionHoldEnd = voiceViewModel::stopListening,
         onChooseCategory = voiceViewModel::chooseCategory,
         onBeginEdit = voiceViewModel::beginEdit,
         onCancelEdit = voiceViewModel::cancelEdit,
@@ -482,9 +479,13 @@ private fun MainScaffold(
  * already overrode its colours and drew its own indicator. combinedClickable
  * brings the tap, the ripple, the long press and its TalkBack action with it.
  *
- * TalkBack's long-press action fires onLongClick and never a release, so the
- * listen it starts can only be ended by the sheet's Stop button. That is why
- * there is one.
+ * The long press STARTS a listen and nothing here ends one. The release used to,
+ * and it was wrong: a phone half out of a pocket is not held still for the
+ * length of a sentence, and a thumb that shifts is not somebody saying they
+ * have finished. The recogniser's own endpointing ends it, or one of the two
+ * clocks in VoiceEntryViewModel does, or the sheet's Stop button — which is
+ * also the only thing that can end a listen TalkBack started, since its
+ * long-click action has no release either.
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -493,7 +494,6 @@ private fun RowScope.AddTabItem(
     voiceEnabled: Boolean,
     onClick: () -> Unit,
     onHoldStart: () -> Unit,
-    onHoldEnd: () -> Unit,
 ) {
     val haptics = LocalHapticFeedback.current
     val holdLabel = stringResource(R.string.voice_hold_to_talk)
@@ -517,7 +517,6 @@ private fun RowScope.AddTabItem(
                 },
                 onClick = onClick,
             )
-            .holdToTalk(enabled = voiceEnabled, onRelease = onHoldEnd)
             .semantics { this.selected = selected },
         contentAlignment = Alignment.Center,
     ) {

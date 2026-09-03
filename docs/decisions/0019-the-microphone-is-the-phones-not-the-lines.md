@@ -182,12 +182,39 @@ setting for driving, and is out of scope.
   which is the state the screen is in when the app opens in a shop; and
   `Button(enabled = false)` publishes `semantics { disabled() }`, so a long press
   hung on it would be invisible to TalkBack.
-- **Dragging off the item is not a cancel.** A thumb resting on the bar for
-  three seconds while somebody speaks will drift, and a silent cancel would
-  throw the sentence away with nothing to see, hear or feel. Leaving the item
-  delivers, the same as lifting; Revert is the undo, and it can be seen.
+- **The long press starts the listen. Nothing about the finger ends it.** The
+  first version recorded for exactly as long as the bar was held, and on a real
+  phone that is the wrong contract: a hand half out of a pocket does not hold
+  still for the length of a sentence, so the lift was not somebody saying they
+  had finished, it was a thumb shifting — and the sentence went with it,
+  silently. A listen now ends on the recogniser's own endpointing, which is the
+  normal path and the one that knows what a finished sentence sounds like; or
+  on the sheet's Stop button; or on one of two clocks. Five seconds waiting for
+  a voice to start, because nothing beginning means a mis-press or a microphone
+  that is not really working, and there is nothing to write. Fifteen once one
+  has, which is a safety net against a recogniser that never endpoints and not
+  a limit on the sentence — the longest thing this grammar can usefully be
+  told takes about three. The first cancels, because nothing was said; the
+  second stops, because something was.
+
+  This also removed the modifier that watched for the lift, which is a gain on
+  its own: it reported every pointer-up, an ordinary tab tap included, and could
+  not tell whether a long press had ever happened.
 - **TalkBack's long-press action starts a listen that no finger will ever end,**
-  which is why the sheet has a Stop button rather than only a released finger.
+  which the design now takes for granted rather than works around: Stop is a
+  real control for everybody, and the clocks catch what nobody stops.
+- **A message that asks nothing takes itself away.** "Nothing was heard" with a
+  Done button under it makes the phone's failure into the household's chore,
+  and the chore costs more than the message is worth. Everything that is a
+  report rather than a question — nothing heard, not understood, could not
+  save, only half understood, and every way the recogniser can fail — appears,
+  is read, and closes itself after about two seconds, with the wordier ones
+  given twice that. Nothing is drawn on them that can be tapped, because a
+  button vanishing under a thumb reaching for it is worse than no button. What
+  asks something stays: the summary, a reverted row with its Undo, and the
+  permission request, where the tap IS the point — which is why a recogniser
+  refusing for want of the microphone is routed to that state rather than to a
+  failure message.
 - **`source = 'voice'` has no reader today, and is set anyway.** The column and
   its `CHECK` constraint have allowed the value since `0001_init.sql`, and
   `sync/Mapping.kt` already round-trips it, so it costs no migration. Without it

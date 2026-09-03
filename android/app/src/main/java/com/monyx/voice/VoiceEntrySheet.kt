@@ -81,7 +81,6 @@ fun VoiceEntrySheet(
     onRevert: () -> Unit,
     onUndoRevert: () -> Unit,
     onCorrectionHoldStart: () -> Unit,
-    onCorrectionHoldEnd: () -> Unit,
     onChooseCategory: (VoiceCategory) -> Unit,
     onBeginEdit: () -> Unit,
     onCancelEdit: () -> Unit,
@@ -121,31 +120,27 @@ fun VoiceEntrySheet(
                     onStop = onStop,
                 )
 
+                // The four that take themselves away. No button on any of
+                // them: a control that vanishes under a thumb reaching for it
+                // is worse than no control, and none of these four is asking
+                // anything anyway.
                 is VoiceEntryState.NotUnderstood -> Message(
                     title = stringResource(R.string.voice_not_understood),
                     heard = state.transcript,
-                    action = stringResource(R.string.voice_done),
-                    onAction = onDismiss,
                 )
 
                 is VoiceEntryState.Incomplete -> Message(
                     title = stringResource(R.string.voice_partial_finish),
                     heard = state.transcript,
-                    action = stringResource(R.string.voice_done),
-                    onAction = onDismiss,
                 )
 
                 is VoiceEntryState.Failed -> Message(
                     title = stringResource(failureMessage(state.reason)),
-                    action = stringResource(R.string.voice_done),
-                    onAction = onDismiss,
                 )
 
                 is VoiceEntryState.SaveFailed -> Message(
                     title = stringResource(R.string.voice_save_failed),
                     heard = state.transcript,
-                    action = stringResource(R.string.voice_done),
-                    onAction = onDismiss,
                 )
 
                 is VoiceEntryState.Reverted -> {
@@ -175,7 +170,6 @@ fun VoiceEntrySheet(
                     onDone = onDismiss,
                     onStop = onStop,
                     onCorrectionHoldStart = onCorrectionHoldStart,
-                    onCorrectionHoldEnd = onCorrectionHoldEnd,
                     onChooseCategory = onChooseCategory,
                 )
             }
@@ -240,9 +234,11 @@ private fun ListeningBody(partial: String, onStop: () -> Unit) {
         },
     )
     Spacer(Modifier.height(24.dp))
-    // Not only for the finger that is holding the bar. TalkBack's long-press
-    // action starts a listen that no finger will ever end, and this is what
-    // ends it.
+    // The listen does not end when the finger comes off the bar — it ends when
+    // the recogniser hears the sentence finish, or when one of the two clocks
+    // runs out. This is how somebody says "I am done" before either, and it is
+    // the ONLY way to end a listen TalkBack started, whose long-click action
+    // has no release at all.
     Button(onClick = onStop, modifier = Modifier.fillMaxWidth()) {
         Text(stringResource(R.string.voice_stop))
     }
@@ -259,7 +255,6 @@ private fun SavedBody(
     onDone: () -> Unit,
     onStop: () -> Unit,
     onCorrectionHoldStart: () -> Unit,
-    onCorrectionHoldEnd: () -> Unit,
     onChooseCategory: (VoiceCategory) -> Unit,
 ) {
     val summary = state.summary
@@ -338,7 +333,6 @@ private fun SavedBody(
     CorrectionMic(
         listening = listening != null,
         onHoldStart = onCorrectionHoldStart,
-        onHoldEnd = onCorrectionHoldEnd,
         onStop = onStop,
     )
 }
@@ -348,7 +342,6 @@ private fun SavedBody(
 private fun CorrectionMic(
     listening: Boolean,
     onHoldStart: () -> Unit,
-    onHoldEnd: () -> Unit,
     onStop: () -> Unit,
 ) {
     val haptics = LocalHapticFeedback.current
@@ -364,6 +357,10 @@ private fun CorrectionMic(
                     MaterialTheme.colorScheme.surfaceVariant
                 },
             )
+            // Hold to start, tap to stop. The release is not an end here for
+            // the same reason it is not one on the bar: a thumb resting on a
+            // sheet while somebody speaks drifts, and dropping the correction
+            // silently is worse than waiting for the endpointer.
             .combinedClickable(
                 onClick = { if (listening) onStop() },
                 onLongClick = {
@@ -372,7 +369,6 @@ private fun CorrectionMic(
                 },
                 onLongClickLabel = label,
             )
-            .holdToTalk(enabled = true, onRelease = onHoldEnd)
             .padding(horizontal = 14.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -453,12 +449,19 @@ private fun CategoryChip(
     }
 }
 
+/**
+ * A message, and a button only when there is something to decide.
+ *
+ * With [action] left out this is the whole of a dead end: the text appears, it
+ * is read, and VoiceEntryViewModel takes the sheet away a couple of seconds
+ * later. Nothing to tap, and nothing left on screen to tap at.
+ */
 @Composable
 private fun Message(
     title: String,
     heard: String? = null,
-    action: String,
-    onAction: () -> Unit,
+    action: String? = null,
+    onAction: () -> Unit = {},
 ) {
     Text(text = title, style = MaterialTheme.typography.titleMedium)
     if (!heard.isNullOrBlank()) {
@@ -469,12 +472,11 @@ private fun Message(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
-    Spacer(Modifier.height(24.dp))
-    Button(
-        onClick = onAction,
-        modifier = Modifier.fillMaxWidth(),
-    ) {
-        Text(action)
+    if (action != null) {
+        Spacer(Modifier.height(24.dp))
+        Button(onClick = onAction, modifier = Modifier.fillMaxWidth()) {
+            Text(action)
+        }
     }
 }
 

@@ -9,12 +9,16 @@ import com.monyx.voice.Recogniser
 import com.monyx.voice.VoiceAccount
 import com.monyx.voice.VoiceCategory
 import com.monyx.voice.CorrectionState
+import com.monyx.voice.ListenFailure
 import com.monyx.voice.SavedNote
 import com.monyx.voice.VoiceEntryState
 import com.monyx.voice.VoiceEntryViewModel
+import com.monyx.voice.SpokenTransaction
 import com.monyx.voice.VoiceLedger
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -48,11 +52,17 @@ class VoiceEntryTest {
         val heard = MutableStateFlow<ListenState>(ListenState.Idle)
         override val state: StateFlow<ListenState> = heard
         var released = false
+        var stops = 0
+        var cancels = 0
         override fun start(languageTag: String) {
             heard.value = ListenState.Listening
         }
-        override fun stop() = Unit
-        override fun cancel() = Unit
+        override fun stop() {
+            stops++
+        }
+        override fun cancel() {
+            cancels++
+        }
         override fun release() {
             released = true
         }
@@ -132,15 +142,28 @@ class VoiceEntryTest {
         failWrites = failWrites,
     )
 
+    /**
+     * The three delays are injected, and a zero one is not a short wait: delay()
+     * returns without suspending at or below zero, so under Dispatchers.Unconfined
+     * the timer fires inline and the assertion follows it. A LONG one is
+     * equally useful — the coroutine parks, the test never joins it, and what is
+     * on screen at that moment is exactly what a person would be looking at.
+     */
     private fun viewModel(
         ledger: FakeLedger,
         recogniser: FakeRecogniser,
         onSync: () -> Unit = {},
+        silenceMillis: Long = FOREVER,
+        speechMillis: Long = FOREVER,
+        noticeMillis: Long = FOREVER,
     ) = VoiceEntryViewModel(
         ledger = ledger,
         recogniser = recogniser,
         onSyncRequested = onSync,
         today = { today },
+        silenceMillis = silenceMillis,
+        speechMillis = speechMillis,
+        noticeMillis = noticeMillis,
         scope = CoroutineScope(Dispatchers.Unconfined),
     )
 
@@ -416,5 +439,182 @@ class VoiceEntryTest {
         assertTrue(viewModel.state.value is VoiceEntryState.SaveFailed)
         assertEquals(1, ledger.rows.getValue("t-1").deleted)
         assertEquals(20000L, ledger.rows.getValue("t-1").amountMinor)
+    }
+
+    // ------------------------------------------------- the listen lifecycle
+
+    /**
+     * The lift is not an end any more, and this is the whole of that change.
+     *
+     * A phone half out of a pocket is not held still for the length of a
+     * sentence, so the release was never a reliable "I have finished speaking"
+     * — it was a thumb shifting. Nothing but the recogniser, the two clocks and
+     * the Stop button ends a listen now.
+     */
+    @Test
+    fun `nothing but the recogniser, a clock or Stop ends a listen`() {
+        val recogniser = FakeRecogniser()
+        val viewModel = viewModel(ledger(), recogniser)
+        viewModel.startListening("pl-PL", "m-1")
+
+        // Speech began and is still going: the microphone stays open with
+        // nobody's finger anywhere near it.
+        recogniser.heard.value = ListenState.Speaking
+        recogniser.heard.value = ListenState.Hearing("dodaj dwieście")
+        assertTrue(viewModel.state.value is VoiceEntryState.Listening)
+        assertEquals(0, recogniser.stops)
+        assertEquals(0, recogniser.cancels)
+
+        // Stop is still there, and still the only thing that can end a listen
+        // TalkBack started.
+        viewModel.stopListening()
+        assertEquals(1, recogniser.stops)
+    }
+
+    /** Nobody spoke. Give up, say so, and take the message away — no button. */
+    @Test
+    fun `the silence cap gives up when no voice ever starts`() {
+        val recogniser = FakeRecogniser()
+        val viewModel = viewModel(ledger(), recogniser, silenceMillis = 0)
+        viewModel.startListening("pl-PL", "m-1")
+
+        val failed = viewModel.state.value as VoiceEntryState.Failed
+        assertEquals(ListenFailure.NoSpeech, failed.reason)
+        // cancel, not stop: no voice was ever reported, so there is nothing to
+        // ask the recogniser for and nothing that can arrive late.
+        assertEquals(1, recogniser.cancels)
+        assertEquals(0, recogniser.stops)
+    }
+
+    /** ...and it must not fire once somebody has begun. */
+    @Test
+    fun `the silence cap is called off the moment a voice starts`() {
+        val recogniser = FakeRecogniser()
+        val viewModel = viewModel(ledger(), recogniser, silenceMillis = FOREVER)
+        viewModel.startListening("pl-PL", "m-1")
+        recogniser.heard.value = ListenState.Speaking
+
+        assertTrue(viewModel.state.value is VoiceEntryState.Listening)
+        assertEquals(0, recogniser.cancels)
+    }
+
+    /**
+     * The hard cap is a safety net against a recogniser that never endpoints,
+     * not a limit on the sentence — so it stops rather than cancels, and
+     * whatever was said still gets parsed.
+     */
+    @Test
+    fun `the hard cap stops a listen that never ends itself`() {
+        val recogniser = FakeRecogniser()
+        val viewModel = viewModel(ledger(), recogniser, speechMillis = 0)
+        viewModel.startListening("pl-PL", "m-1")
+        recogniser.heard.value = ListenState.Speaking
+
+        assertEquals(1, recogniser.stops)
+        assertEquals(0, recogniser.cancels)
+    }
+
+    @Test
+    fun `a recogniser that finishes by itself is never hurried`() {
+        val ledger = ledger()
+        val recogniser = FakeRecogniser()
+        val viewModel = viewModel(ledger, recogniser)
+        viewModel.startListening("pl-PL", "m-1")
+        recogniser.heard.value = ListenState.Speaking
+        recogniser.heard.value = ListenState.Done("dodaj 200 na transport", emptyList())
+
+        assertTrue(viewModel.state.value is VoiceEntryState.Saved)
+        assertEquals(0, recogniser.stops)
+        assertEquals(0, recogniser.cancels)
+    }
+
+    // ------------------------------------------------------ auto-dismissal
+
+    /**
+     * Every dead end takes itself away. None of them asks anything of anybody,
+     * and "Nothing was heard" with a button under it turns the phone's failure
+     * into the household's chore.
+     */
+    @Test
+    fun `a message that asks nothing closes itself`() {
+        val recogniser = FakeRecogniser()
+
+        val nothingHeard = viewModel(ledger(), recogniser, silenceMillis = 0, noticeMillis = 0)
+        nothingHeard.startListening("pl-PL", "m-1")
+        assertEquals(VoiceEntryState.Hidden, nothingHeard.state.value)
+
+        // Every recogniser failure except the one that is really a request:
+        // ERROR_INSUFFICIENT_PERMISSIONS has a button worth tapping.
+        for (reason in ListenFailure.entries - ListenFailure.NoPermission) {
+            val recognisers = FakeRecogniser()
+            val failing = viewModel(ledger(), recognisers, noticeMillis = 0)
+            failing.startListening("pl-PL", "m-1")
+            recognisers.heard.value = ListenState.Failed(reason)
+            assertEquals(reason.name, VoiceEntryState.Hidden, failing.state.value)
+        }
+
+        val refused = FakeRecogniser()
+        val needsMic = viewModel(ledger(), refused, noticeMillis = 0)
+        needsMic.startListening("pl-PL", "m-1")
+        refused.heard.value = ListenState.Failed(ListenFailure.NoPermission)
+        assertEquals(VoiceEntryState.NeedsPermission, needsMic.state.value)
+
+        val nonsense = FakeRecogniser()
+        val unparsed = viewModel(ledger(), nonsense, noticeMillis = 0)
+        unparsed.startListening("pl-PL", "m-1")
+        nonsense.heard.value = ListenState.Done("asdf qwerty", emptyList())
+        assertEquals(VoiceEntryState.Hidden, unparsed.state.value)
+
+        val broken = FakeRecogniser()
+        val unwritable = viewModel(ledger(failWrites = true), broken, noticeMillis = 0)
+        unwritable.startListening("pl-PL", "m-1")
+        broken.heard.value = ListenState.Done("dodaj 200 na transport", emptyList())
+        assertEquals(VoiceEntryState.Hidden, unwritable.state.value)
+    }
+
+    /**
+     * The prefill is the entire point of Incomplete, so the message closing
+     * itself must not be able to take the draft with it. It cannot: the handoff
+     * has already gone by then, and the dismissal is a state change here and
+     * nothing more.
+     */
+    @Test
+    fun `an incomplete sentence hands over first and closes second`() {
+        val recogniser = FakeRecogniser()
+        val viewModel = viewModel(ledger(), recogniser, noticeMillis = 0)
+        val handed = mutableListOf<SpokenTransaction>()
+        val scope = CoroutineScope(Dispatchers.Unconfined)
+        scope.launch { viewModel.handoff.collect { handed += it } }
+
+        viewModel.startListening("pl-PL", "m-1")
+        recogniser.heard.value = ListenState.Done("dodaj 200", emptyList())
+
+        assertEquals(20000L, handed.single().amountMinor)
+        assertEquals(VoiceEntryState.Hidden, viewModel.state.value)
+        scope.cancel()
+    }
+
+    /** What asks something stays. Three real choices, and a tap that is the
+     *  whole point of the state it is in. */
+    @Test
+    fun `a summary and a permission request stay until they are answered`() {
+        val recogniser = FakeRecogniser()
+        val saved = viewModel(ledger(), recogniser, noticeMillis = 0)
+        saved.startListening("pl-PL", "m-1")
+        recogniser.heard.value = ListenState.Done("dodaj 200 na transport", emptyList())
+        assertTrue(saved.state.value is VoiceEntryState.Saved)
+
+        saved.revert()
+        assertTrue(saved.state.value is VoiceEntryState.Reverted)
+
+        val asking = viewModel(ledger(), FakeRecogniser(), noticeMillis = 0)
+        asking.permissionRequired()
+        assertEquals(VoiceEntryState.NeedsPermission, asking.state.value)
+    }
+
+    private companion object {
+        /** Longer than any test will wait for. The coroutine parks and is never
+         *  joined, so the state under test is the one left on screen. */
+        const val FOREVER = 60_000L
     }
 }

@@ -8,6 +8,8 @@ import com.monyx.data.Dates
 import com.monyx.data.TransactionEntity
 import com.monyx.ui.add.EntryKind
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -123,6 +125,34 @@ class VoiceEntryViewModel(
     private val recogniser: Recogniser,
     private val onSyncRequested: () -> Unit,
     private val today: () -> LocalDate = Dates::today,
+    /**
+     * How long the microphone waits for somebody to START.
+     *
+     * Five seconds is the gap between "the phone is out of the pocket and they
+     * are drawing breath" and "this was a mis-press, or the microphone is not
+     * really working". Nothing is written and nothing is asked for: the sheet
+     * says nothing was heard and takes itself away.
+     */
+    private val silenceMillis: Long = 5_000,
+    /**
+     * How long it waits for somebody to FINISH, once they have begun.
+     *
+     * A safety net against a recogniser that never endpoints, and not a limit
+     * on the sentence: fifteen seconds is five times the longest thing this
+     * grammar can usefully be told ("wydałem trzydzieści pięć złotych na
+     * paliwo" is about three). It stops rather than cancels, so anything heard
+     * before it fired is still delivered and still parsed.
+     */
+    private val speechMillis: Long = 15_000,
+    /**
+     * How long a message that asks nothing of anybody stays on screen.
+     *
+     * Read-and-go, not read-and-tap. Doubled for the two messages that are a
+     * sentence rather than a phrase — the offline one and the language one,
+     * which are also the two most likely to be somebody's first encounter with
+     * them.
+     */
+    private val noticeMillis: Long = 2_000,
     scope: CoroutineScope? = null,
 ) : ViewModel() {
 
@@ -183,6 +213,13 @@ class VoiceEntryViewModel(
      */
     private var writing = false
 
+    /** Waiting for a voice to start, waiting for it to stop, and waiting for a
+     *  message to have been read. At most one of each, all of them cancelled by
+     *  whatever happens first. */
+    private var silenceTimer: Job? = null
+    private var speechTimer: Job? = null
+    private var noticeTimer: Job? = null
+
     init {
         work.launch {
             recogniser.state.collect(::onListen)
@@ -198,8 +235,9 @@ class VoiceEntryViewModel(
         correcting = false
         listening = true
         _editing.value = null
-        _state.value = VoiceEntryState.Listening("")
+        show(VoiceEntryState.Listening(""))
         recogniser.start(languageTag)
+        awaitSpeech()
     }
 
     /** A hold that began over the summary. It corrects the row; it does not
@@ -210,22 +248,69 @@ class VoiceEntryViewModel(
         locale = Locale.forLanguageTag(languageTag)
         correcting = true
         listening = true
-        _state.value = saved.copy(note = null, correction = CorrectionState.Listening(""))
+        show(saved.copy(note = null, correction = CorrectionState.Listening("")))
         recogniser.start(languageTag)
+        awaitSpeech()
     }
 
-    /** The finger came up, or the sheet's Stop was tapped — which is the same
-     *  thing, and has to be, because TalkBack's long-press action fires a hold
-     *  that no finger will ever end. */
+    /**
+     * "I have finished" said with a finger, from the sheet's Stop control.
+     *
+     * Not the only way a listen ends and no longer the usual one — the
+     * recogniser's own endpointing is — but it is the only way to end one that
+     * TalkBack started, because its long-click action has no release, and it is
+     * the way to skip the endpointer's own pause when somebody knows they are
+     * done.
+     */
     fun stopListening() {
-        // Reached by every pointer-up on the tab, a plain tap included: the
-        // gesture modifier reports the lift, not "the lift that ended a hold".
         if (!listening) return
         recogniser.stop()
     }
 
     fun permissionRequired() {
-        _state.value = VoiceEntryState.NeedsPermission
+        show(VoiceEntryState.NeedsPermission)
+    }
+
+    // ------------------------------------------------------- the two clocks
+
+    /**
+     * Nobody has spoken yet. Give them [silenceMillis] and then give up.
+     *
+     * cancel() rather than stop(): by definition the recogniser never reported
+     * a voice, so there is nothing to ask it for, and cancelling is the one
+     * that cannot come back with a surprise a second later.
+     */
+    private fun awaitSpeech() {
+        silenceTimer?.cancel()
+        speechTimer?.cancel()
+        silenceTimer = work.launch {
+            delay(silenceMillis)
+            if (!listening) return@launch
+            listening = false
+            recogniser.cancel()
+            reportFailure(ListenFailure.NoSpeech)
+        }
+    }
+
+    /**
+     * A voice started. Stop waiting for one, and start the long stop.
+     *
+     * stop() rather than cancel() here, because there IS something to ask for:
+     * whatever was said before the recogniser lost the thread still deserves to
+     * be parsed.
+     */
+    private fun awaitSilence() {
+        silenceTimer?.cancel()
+        if (speechTimer?.isActive == true) return
+        speechTimer = work.launch {
+            delay(speechMillis)
+            if (listening) recogniser.stop()
+        }
+    }
+
+    private fun stopClocks() {
+        silenceTimer?.cancel()
+        speechTimer?.cancel()
     }
 
     // ------------------------------------------------------- what came back
@@ -234,7 +319,16 @@ class VoiceEntryViewModel(
         when (listen) {
             ListenState.Idle -> Unit
             ListenState.Listening -> showListening("")
-            is ListenState.Hearing -> showListening(listen.partial)
+            ListenState.Speaking -> {
+                awaitSilence()
+                showListening("")
+            }
+            is ListenState.Hearing -> {
+                // A partial is a voice too, on a recogniser that reports one
+                // without ever calling onBeginningOfSpeech.
+                awaitSilence()
+                showListening(listen.partial)
+            }
             is ListenState.Done -> onTranscript(listen.best, listen.alternatives)
             is ListenState.Failed -> onFailure(listen.reason)
         }
@@ -242,30 +336,48 @@ class VoiceEntryViewModel(
 
     private fun showListening(partial: String) {
         val current = _state.value
-        _state.value = when {
-            correcting && current is VoiceEntryState.Saved ->
-                current.copy(correction = CorrectionState.Listening(partial))
-            correcting -> current
-            else -> VoiceEntryState.Listening(partial)
-        }
+        show(
+            when {
+                correcting && current is VoiceEntryState.Saved ->
+                    current.copy(correction = CorrectionState.Listening(partial))
+                correcting -> current
+                else -> VoiceEntryState.Listening(partial)
+            },
+        )
     }
 
     private fun onFailure(reason: ListenFailure) {
         listening = false
+        stopClocks()
+        reportFailure(reason)
+    }
+
+    private fun reportFailure(reason: ListenFailure) {
+        // The recogniser refusing for want of the microphone is not a dead end,
+        // it is the permission request wearing a different hat — and that one
+        // has a button worth tapping, so it goes to the state that draws one.
+        if (reason == ListenFailure.NoPermission) {
+            correcting = false
+            show(VoiceEntryState.NeedsPermission)
+            return
+        }
         val current = _state.value
         // A correction that could not be heard and a correction that made no
         // sense say the same thing to the person holding the phone: nothing
         // changed. The row is still on screen behind the message.
-        _state.value = when {
-            correcting && current is VoiceEntryState.Saved ->
-                current.copy(correction = CorrectionState.NotUnderstood)
-            else -> VoiceEntryState.Failed(reason)
-        }
+        show(
+            when {
+                correcting && current is VoiceEntryState.Saved ->
+                    current.copy(correction = CorrectionState.NotUnderstood)
+                else -> VoiceEntryState.Failed(reason)
+            },
+        )
         correcting = false
     }
 
     private fun onTranscript(best: String, alternatives: List<String>) {
         listening = false
+        stopClocks()
         if (correcting) {
             correcting = false
             correct(best, alternatives)
@@ -283,10 +395,14 @@ class VoiceEntryViewModel(
             is VoiceParse.Complete -> save(parsed.transaction)
             is VoiceParse.Partial -> {
                 // Not an error and not a save. The keypad is the second engine.
-                _state.value = VoiceEntryState.Incomplete(parsed.transaction.transcript)
+                //
+                // The handoff has already prefilled it by the time this message
+                // closes itself, and closing is only a state change here —
+                // nothing in the auto-dismiss touches the draft behind it.
+                show(VoiceEntryState.Incomplete(parsed.transaction.transcript))
                 _handoff.tryEmit(parsed.transaction)
             }
-            is VoiceParse.Unrecognised -> _state.value = VoiceEntryState.NotUnderstood(parsed.transcript)
+            is VoiceParse.Unrecognised -> show(VoiceEntryState.NotUnderstood(parsed.transcript))
         }
     }
 
@@ -314,7 +430,7 @@ class VoiceEntryViewModel(
         work.launch {
             val outcome = runCatching { block() }
             writing = false
-            _state.value = outcome.getOrElse { VoiceEntryState.SaveFailed(transcript) }
+            show(outcome.getOrElse { VoiceEntryState.SaveFailed(transcript) })
             if (outcome.isSuccess) onSyncRequested()
         }
     }
@@ -323,7 +439,7 @@ class VoiceEntryViewModel(
         val createdBy = memberId
         val accountId = spoken.accountId
         if (createdBy == null || accountId == null) {
-            _state.value = VoiceEntryState.SaveFailed(spoken.transcript)
+            show(VoiceEntryState.SaveFailed(spoken.transcript))
             return
         }
         write(spoken.transcript) {
@@ -430,9 +546,9 @@ class VoiceEntryViewModel(
             correction.revert -> revert()
             correction.confirm -> dismiss()
             correction.ambiguous.isNotEmpty() ->
-                _state.value = saved.copy(correction = CorrectionState.Ambiguous(correction.ambiguous))
+                show(saved.copy(correction = CorrectionState.Ambiguous(correction.ambiguous)))
             correction.isEmpty ->
-                _state.value = saved.copy(correction = CorrectionState.NotUnderstood)
+                show(saved.copy(correction = CorrectionState.NotUnderstood))
             else -> apply(saved, correction)
         }
     }
@@ -501,15 +617,68 @@ class VoiceEntryViewModel(
         _editing.value = null
     }
 
+    // ------------------------------------------------- showing and closing
+
+    /**
+     * The one place the sheet's state is set, and the one place it closes
+     * itself.
+     *
+     * A message that asks nothing of anybody should not need a tap to clear.
+     * "Nothing was heard" with a Done button under it makes the phone's failure
+     * into the household's chore — and every one of these states is either the
+     * recogniser reporting it could not do its job or the parser reporting the
+     * sentence was not one it knows. Neither is a decision. They appear, they
+     * are read, they go.
+     *
+     * What stays is what asks something: the summary (Revert, Change, Done are
+     * three real choices), the permission request (the Allow tap IS the point),
+     * and a reverted row (Undo has to be reachable).
+     *
+     * The equality guard matters more than it looks: a second long press while
+     * a message is fading starts a new listen, and without it the old timer
+     * would fire two seconds later and close the sheet out from under it.
+     */
+    private fun show(next: VoiceEntryState) {
+        noticeTimer?.cancel()
+        _state.value = next
+        val linger = selfClosingAfter(next) ?: return
+        noticeTimer = work.launch {
+            delay(linger)
+            if (_state.value == next) _state.value = VoiceEntryState.Hidden
+        }
+    }
+
+    private fun selfClosingAfter(state: VoiceEntryState): Long? = when (state) {
+        is VoiceEntryState.NotUnderstood,
+        is VoiceEntryState.Incomplete,
+        is VoiceEntryState.SaveFailed,
+        -> noticeMillis
+        // The wordy two get twice as long. "Brak połączenia i brak pakietu mowy
+        // offline" is a sentence with two clauses in it, and it is the one
+        // somebody reads for the first time in a basement.
+        is VoiceEntryState.Failed -> when (state.reason) {
+            ListenFailure.Network, ListenFailure.LanguageUnavailable, ListenFailure.NoService ->
+                noticeMillis * 2
+            else -> noticeMillis
+        }
+        VoiceEntryState.Hidden,
+        VoiceEntryState.NeedsPermission,
+        is VoiceEntryState.Listening,
+        is VoiceEntryState.Saved,
+        is VoiceEntryState.Reverted,
+        -> null
+    }
+
     /** Closes the sheet. The row stays exactly where it is — top of the history
      *  list, editable and deletable there. The summary is a fast path over
      *  TransactionDetailSheet, not a replacement for it. */
     fun dismiss() {
         correcting = false
         listening = false
+        stopClocks()
         _editing.value = null
         recogniser.cancel()
-        _state.value = VoiceEntryState.Hidden
+        show(VoiceEntryState.Hidden)
     }
 
     /** Midday on the chosen day when it is not today, so a date change cannot
@@ -522,6 +691,8 @@ class VoiceEntryViewModel(
         }
 
     override fun onCleared() {
+        stopClocks()
+        noticeTimer?.cancel()
         recogniser.release()
         super.onCleared()
     }

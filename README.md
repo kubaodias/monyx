@@ -258,12 +258,17 @@ button, and that path only ever reads.
 
 ### Adding by voice — on the phone
 
-Hold the Add tab in the bottom bar, say "dodaj 200 na transport" or "add 200 to
-Transport", let go. The row is written and a sheet shows exactly what was
-written — amount, category, account, day, and the sentence that was heard —
-with **Cofnij** and **Popraw** next to it. Both work by voice too: hold the
-microphone on the sheet and say "cofnij", "ma być 250", "zmień kategorię na
-zakupy".
+Hold the Add tab in the bottom bar until it buzzes, then say "dodaj 200 na
+transport" or "add 200 to Transport". Let go whenever you like — the phone
+stops listening when the sentence ends, not when the finger does. The row is
+written and a sheet shows exactly what was written — amount, category,
+account, day, and the sentence that was heard — with **Cofnij** and **Popraw**
+next to it. Both work by voice too: hold the microphone on the sheet and say
+"cofnij", "ma być 250", "zmień kategorię na zakupy".
+
+Say nothing and it gives up after five seconds. Anything it could not do — not
+understood, nothing heard, no speech pack for the language — says so and then
+takes itself away; there is no message here that has to be dismissed by hand.
 
 Nothing leaves the phone. Speech is Android's own `SpeechRecognizer`, asked to
 prefer the on-device pack; the parse is a few hundred lines of Kotlin in
