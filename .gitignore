@@ -14,6 +14,9 @@ android/.kotlin/
 *.keystore
 *.jks
 keystore.properties
+# The assistant's phone number. Kept out of the repo because a phone
+# number is personal data; the call button hides itself without it.
+android/voice.properties
 
 # Telnyx generated types (regenerate with `telnyx-edge types`)
 server/telnyx-env.d.ts

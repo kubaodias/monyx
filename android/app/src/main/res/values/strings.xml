@@ -232,4 +232,5 @@
     </plurals>
     <string name="recurring_needs_account">Add an account first</string>
     <string name="recurring_from_rule">Added by a repeating transaction</string>
+    <string name="call_assistant">Call the budget assistant</string>
 </resources>

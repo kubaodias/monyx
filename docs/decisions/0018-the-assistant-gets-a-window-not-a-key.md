@@ -66,6 +66,14 @@ all; and a global cap of ten failures an hour across every ticket. The third is
 the one that matters: the first two make minting tickets expensive, and the
 counter holds even if both are wrong.
 
+**The PIN is keyed, not spoken.** Inbound DTMF reaches the assistant by default,
+so the caller presses four digits rather than saying them. Tones cannot be
+misheard, do not depend on the transcription model's Polish, and are not said
+out loud in a room with other people in it. A spoken PIN is still accepted,
+because a caller driving cannot look at the keypad — the server strips
+everything that is not a digit either way, so `1986#` and "one nine eight six"
+arrive as the same four characters.
+
 **The allowlist is a secret, not a table.** It maps a caller to a household and
 carries that caller's PIN. Phone numbers are personal data, and a secret keeps
 them out of the repository, out of the database, and out of the backups that get
@@ -96,3 +104,7 @@ headers, and uses one.
   and the alert fires on, because there is one place it can come from.
 - The digest rolls a subcategory up into its parent, matching how a budget
   covers its children. "How much on Home" and "what is left on Home" agree.
+- The app carries a call button, and the number it dials is build configuration
+  read from an untracked file rather than a constant in the source. Without it
+  the button does not render — a checkout of this repository cannot dial
+  anywhere, which is the point.

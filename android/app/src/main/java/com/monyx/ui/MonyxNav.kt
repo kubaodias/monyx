@@ -208,6 +208,12 @@ private fun MainScaffold(
     }
 
     Scaffold(
+        // Everywhere except the keypad, where the bottom right is already the
+        // save button and a second circle over it would be a mis-tap waiting
+        // to happen. Hides itself entirely when no number is configured.
+        floatingActionButton = {
+            if (route != Destinations.ADD) CallAssistantButton()
+        },
         bottomBar = {
             NavigationBar {
                 TABS.forEach { tab ->

@@ -32,6 +32,16 @@ val keystoreProps = Properties().apply {
     if (keystorePropsFile.exists()) keystorePropsFile.inputStream().use { load(it) }
 }
 
+// The voice assistant's number, for the call button. Untracked, like the
+// keystore: a phone number is personal data and does not belong in the
+// repository. Absent, the constant is empty and the button hides itself, so a
+// clean checkout builds and simply has no call button.
+val voicePropsFile = rootProject.file("voice.properties")
+val voiceProps = Properties().apply {
+    if (voicePropsFile.exists()) voicePropsFile.inputStream().use { load(it) }
+}
+val assistantNumber: String = voiceProps.getProperty("assistantNumber").orEmpty()
+
 android {
     namespace = "com.monyx"
     compileSdk = 35
@@ -47,6 +57,8 @@ android {
         // Schemas are still exported and committed. No hand-written Migration
         // classes, ever — see the destructive-migration note in Entities.kt.
         ksp { arg("room.schemaLocation", "$projectDir/schemas") }
+
+        buildConfigField("String", "ASSISTANT_NUMBER", "\"$assistantNumber\"")
     }
 
     signingConfigs {

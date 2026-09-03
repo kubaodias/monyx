@@ -279,6 +279,28 @@ Three secrets, none of them in this repository:
 Both routes are `SELECT`-only. Adding a transaction by voice would write through
 the sync epoch and needs a `created_by` member without a device; it is not built.
 
+**The PIN is keyed on the handset, not spoken.** Inbound DTMF reaches the
+assistant by default, and digits that arrive as tones cannot be misheard, do not
+depend on the transcription language, and are not said out loud in a room with
+other people in it.
+
+**The app has a call button** — a floating action button, bottom right, in
+Telnyx green, on every tab but the keypad, where the bottom right is already the
+save button. It fires `ACTION_DIAL` rather than `ACTION_CALL`: dialling fills
+the number in and lets the person press call themselves, where calling would
+need the `CALL_PHONE` permission to place an outgoing call from under their
+thumb, to save one tap. The number comes from `BuildConfig.ASSISTANT_NUMBER`,
+read from an untracked `android/voice.properties`:
+
+```properties
+assistantNumber=+00000000000
+```
+
+Absent, the constant is empty and the button hides itself, so a clean checkout
+builds and simply has no call button rather than one that dials nowhere. A phone
+number is personal data and does not belong in the repository, which is the same
+reason `VOICE_ALLOWLIST` is a secret.
+
 To check the routes are alive without placing a call:
 
 ```sh

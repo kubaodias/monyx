@@ -227,4 +227,5 @@
     </plurals>
     <string name="recurring_needs_account">Najpierw dodaj konto</string>
     <string name="recurring_from_rule">Dodane przez transakcję cykliczną</string>
+    <string name="call_assistant">Zadzwoń do asystentki budżetu</string>
 </resources>
