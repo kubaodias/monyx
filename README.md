@@ -353,7 +353,7 @@ it: a PIN and a preload are mutually exclusive, because a secret placed in a
 prompt cannot be withdrawn from it, and the preload is what makes the first
 question of a call cost nothing.
 
-Four secrets, none of them in this repository:
+Three secrets, none of them in this repository:
 
 - `VOICE_ALLOWLIST` — JSON `[{msisdn, household_id, name}]`. Who may call and
   which household they reach. A secret rather than a table because phone numbers
@@ -362,10 +362,14 @@ Four secrets, none of them in this repository:
   the assistant's webhook field allows a secret.
 - `VOICE_TOOL_SECRET` — the `x-voice-secret` header on the tool webhook, held on
   the Telnyx side as an integration secret.
-- `TELNYX_API_KEY` — the bearer key `POST /voice/note` uses to reach
-  `api.telnyx.com/v2/ai/openai/chat/completions`. There is no edge binding for
-  inference, so the route makes an ordinary outbound call the way `fcm.ts` does.
-  Absent, the route answers "keep the note you have" and nothing breaks.
+
+`POST /voice/note` needs no secret of its own. It reaches the model through
+`env.TELNYX`, the client the `[telnyx]` binding in `telnyx.toml` puts on the
+environment; the runtime's auth proxy substitutes the real bearer as the request
+leaves the pod, so the function is authenticated as itself and there is no
+account-wide key anywhere in this repository, in a secret store, or in memory.
+Nothing to rotate and nothing to leak. Absent the binding, the route answers
+"keep the note you have" and nothing breaks.
 
 Two of the three routes are `SELECT`-only and stayed that way when adding by
 voice was built. The third, `POST /voice/note`, is stronger still: it has no

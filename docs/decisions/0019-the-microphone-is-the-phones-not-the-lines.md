@@ -406,14 +406,24 @@ can do is nothing.
   with. It is a text transform. There is a test that reads `src/note.ts` and
   fails if a database import, an `env.DB`, or a bare SQL keyword ever appears in
   it, because the way a claim like that is lost is one innocuous lookup.
-- **It authenticates with the device session, not a new secret.** The assistant's
-  URL-token pattern exists for a caller that has no session; this caller is an
-  enrolled phone that already holds one. There IS a new secret, but it is on the
-  other side: `TELNYX_API_KEY`, the bearer key the route uses to reach
-  `api.telnyx.com`. There is no edge binding for inference — the runtime offers
-  sqldb, kv, secrets, rate limiters, buckets and actors — so it is an ordinary
-  outbound fetch, the same way `fcm.ts` reaches Google. Absent, the route
-  answers "keep the note you have" and nothing anywhere reports an error.
+- **No new credential exists, on either side.** The phone authenticates with the
+  device session it already holds — the assistant's URL-token pattern is for a
+  caller that has none, and this caller is an enrolled phone. The server reaches
+  the model through `env.TELNYX`, the client the `[telnyx]` binding puts on the
+  environment, whose bearer the runtime's auth proxy substitutes as the request
+  leaves the pod. The function is already authenticated as itself.
+
+  This was got wrong first time and it is worth recording how. The route was
+  built with its own `TELNYX_API_KEY` secret and a hand-rolled `fetch`, on the
+  finding that the runtime has no inference binding — a finding taken from
+  reading every `.d.ts` in `@telnyx/edge-runtime`, none of which mentions one.
+  The `[telnyx]` handle is not declared in a type; it is materialised in
+  `build-env.js`, which the type sweep never opened. **When the question is
+  whether a platform offers something, the compiled JS and the loader are
+  evidence too, and the types alone are not conclusive.** Carrying an
+  account-wide key would have been strictly worse than not carrying one: a thing
+  to rotate, a thing to leak, and a second identity for a function that already
+  has one. There is a test that fails if a key ever returns.
 - **Behaviour now varies with connectivity**, which it did not before. The same
   sentence can produce one note on a phone with signal and another in a
   basement. That is a real difference and it is the acceptable one: the offline

@@ -189,8 +189,10 @@ async function handlePull(url: URL, session: SessionLike): Promise<Response> {
  * whatever network they happen to be on; two phones behind one router share
  * their allowance the way they share the bill.
  *
- * It reads no database, and a missing key is not an error: the phone already
- * has a perfectly good note and this route's whole contract is "or keep it".
+ * It reads no database and holds no credential. `env.TELNYX` is the client the
+ * `[telnyx]` binding puts on the environment; the runtime's auth proxy
+ * substitutes the real bearer as the request leaves the pod, so this function
+ * is authenticated as itself and there is no API key here to rotate or leak.
  */
 async function handleVoiceNote(req: Request, session: SessionLike): Promise<Response> {
   const limiter = env.NOTE_LIMIT;
@@ -204,15 +206,9 @@ async function handleVoiceNote(req: Request, session: SessionLike): Promise<Resp
   const input = parseNoteInput(body);
   if (!input) return fail(400, "bad_request");
 
-  let apiKey: string | null = null;
-  try {
-    apiKey = await env.SECRETS.get("TELNYX_API_KEY");
-  } catch {
-    // Not configured is not broken. A checkout with no key simply never
-    // improves a note, which is the same as every phone that is offline.
-    apiKey = null;
-  }
-  return json(await suggestNote(input, apiKey));
+  // Not configured is not broken: a deploy without the [telnyx] binding simply
+  // never improves a note, which is the same as every phone that is offline.
+  return json(await suggestNote(input, env.TELNYX ?? null));
 }
 
 async function handleCron(req: Request, nowMs: number): Promise<Response> {

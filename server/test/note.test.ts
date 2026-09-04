@@ -9,7 +9,14 @@
 // the row and shown the summary.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { acceptLabel, buildMessages, parseNoteInput, suggestNote, type NoteInput } from "../src/note.ts";
+import {
+  acceptLabel,
+  buildMessages,
+  parseNoteInput,
+  suggestNote,
+  type ChatClient,
+  type NoteInput,
+} from "../src/note.ts";
 
 const INPUT: NoteInput = {
   transcript: "150 zł na zakupy w Biedronce",
@@ -18,12 +25,31 @@ const INPUT: NoteInput = {
   note: "Biedronce",
 };
 
-function reply(content: string, status = 200): typeof fetch {
-  return (async () =>
-    new Response(JSON.stringify({ choices: [{ message: { content } }] }), {
-      status,
-      headers: { "content-type": "application/json" },
-    })) as unknown as typeof fetch;
+/**
+ * A stand-in for `env.TELNYX`. Two lines, because the module only ever reaches
+ * one method on it — and because a fake that satisfies the real client's whole
+ * surface would be testing the SDK rather than this.
+ */
+function client(
+  respond: (body: unknown) => unknown,
+  seen?: (body: Record<string, unknown>) => void,
+): ChatClient {
+  return {
+    ai: {
+      openai: {
+        chat: {
+          createCompletion: async (body) => {
+            seen?.(body as unknown as Record<string, unknown>);
+            return respond(body);
+          },
+        },
+      },
+    },
+  };
+}
+
+function reply(content: string): ChatClient {
+  return client(() => ({ choices: [{ message: { content } }] }));
 }
 
 // ------------------------------------------------------------------ input
@@ -89,49 +115,48 @@ test("a refusal, a sentence or an echo is not a label", () => {
 
 // -------------------------------------------------------------- the call
 
-test("no key configured is not an error, and makes no call", async () => {
-  let called = false;
-  const spy = (async () => {
-    called = true;
-    return new Response("{}");
-  }) as unknown as typeof fetch;
-
-  assert.deepEqual(await suggestNote(INPUT, null, spy), { note: null });
-  assert.equal(called, false);
+test("no binding is not an error, and makes no call", async () => {
+  assert.deepEqual(await suggestNote(INPUT, null), { note: null });
 });
 
 test("a good answer comes back as the note", async () => {
-  assert.deepEqual(await suggestNote(INPUT, "key", reply("Biedronka")), { note: "Biedronka" });
+  assert.deepEqual(await suggestNote(INPUT, reply("Biedronka")), { note: "Biedronka" });
 });
 
-test("the key travels as a bearer token and the transcript in the body", async () => {
-  let seen: Request | null = null;
-  const spy = (async (_url: string, init: RequestInit) => {
-    seen = { headers: new Headers(init.headers), body: init.body } as unknown as Request;
-    return new Response(JSON.stringify({ choices: [{ message: { content: "Biedronka" } }] }));
-  }) as unknown as typeof fetch;
+/**
+ * No credential appears anywhere in the request this module builds — that is
+ * the point of reaching the model through the binding. The runtime's auth
+ * proxy attaches the bearer after this code is done with it.
+ */
+test("the sentence goes in the body and no key goes anywhere", async () => {
+  let seen: Record<string, unknown> | null = null;
+  await suggestNote(INPUT, client(() => ({ choices: [{ message: { content: "Biedronka" } }] }), (b) => {
+    seen = b;
+  }));
 
-  await suggestNote(INPUT, "sekret", spy);
-  assert.equal(new Headers(seen!.headers).get("authorization"), "Bearer sekret");
-  assert.match(String(seen!.body), /Biedronce/);
+  const messages = seen!["messages"] as Array<{ content: string }>;
+  assert.match(messages.map((m) => m.content).join("\n"), /Biedronce/);
+  assert.equal("api_key_ref" in seen!, false);
+  assert.equal(JSON.stringify(seen).toLowerCase().includes("bearer"), false);
 });
 
 test("every upstream failure means keep the note you have", async () => {
-  const boom = (async () => {
-    throw new Error("offline");
-  }) as unknown as typeof fetch;
-  const notOk = (async () => new Response("nope", { status: 502 })) as unknown as typeof fetch;
-  const garbage = (async () => new Response("not json")) as unknown as typeof fetch;
-  const empty = (async () => new Response(JSON.stringify({}))) as unknown as typeof fetch;
+  const boom = client(() => {
+    throw new Error("upstream");
+  });
+  const garbage = client(() => "not an object");
+  const empty = client(() => ({}));
+  const noChoices = client(() => ({ choices: [] }));
+  const noContent = client(() => ({ choices: [{ message: {} }] }));
 
-  for (const impl of [boom, notOk, garbage, empty]) {
-    assert.deepEqual(await suggestNote(INPUT, "key", impl), { note: null });
+  for (const impl of [boom, garbage, empty, noChoices, noContent]) {
+    assert.deepEqual(await suggestNote(INPUT, impl), { note: null });
   }
 });
 
 test("an apology from the model is not written into the ledger", async () => {
   const sorry = reply("I'm sorry, I cannot determine a label from that sentence.");
-  assert.deepEqual(await suggestNote(INPUT, "key", sorry), { note: null });
+  assert.deepEqual(await suggestNote(INPUT, sorry), { note: null });
 });
 
 // The point of the module, stated as a test.
@@ -148,6 +173,8 @@ test("the note module has no database to touch", async () => {
   const code = raw.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
   assert.equal(/from "\.\/db\.ts"/.test(code), false);
   assert.equal(/env\.DB|env\.KV/.test(code), false);
+  // Nor a credential. The binding is the whole authentication story.
+  assert.equal(/API_KEY|apiKey|Bearer|SECRETS/.test(code), false);
   assert.equal(/\bSELECT\b|\bINSERT\b|\bUPDATE\b|\bDELETE\b/.test(code), false);
   assert.equal(/prepare\s*\(/.test(code), false);
 });
@@ -184,5 +211,25 @@ test("the note route is rate limited, per household", async () => {
 
   const config = await (await import("node:fs/promises")).readFile("telnyx.toml", "utf8");
   assert.match(config, /name = "NOTE_LIMIT"/);
-  assert.match(config, /binding = "TELNYX_API_KEY"/);
+});
+
+/**
+ * The credential that is not there.
+ *
+ * An earlier version of this route carried its own `TELNYX_API_KEY` secret,
+ * because the runtime's binding types do not mention inference and the `.d.ts`
+ * files looked conclusive. They were not: `[telnyx]` is materialised in
+ * build-env.js, and it hands the function a client whose bearer the auth proxy
+ * fills in on the way out of the pod. An account-wide key in a secret store is
+ * strictly worse — one more thing to rotate, one more thing to leak — so this
+ * fails if one ever comes back.
+ */
+test("inference goes through the binding, not through a key of our own", async () => {
+  const config = await (await import("node:fs/promises")).readFile("telnyx.toml", "utf8");
+  assert.match(config, /\[telnyx\]\nbinding = "TELNYX"/);
+  assert.equal(/TELNYX_API_KEY/.test(config), false);
+
+  const index = await (await import("node:fs/promises")).readFile("src/index.ts", "utf8");
+  assert.match(index, /suggestNote\(input, env\.TELNYX/);
+  assert.equal(/TELNYX_API_KEY/.test(index), false);
 });

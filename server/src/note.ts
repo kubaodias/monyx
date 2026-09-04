@@ -9,6 +9,12 @@
 // `SELECT`-only by construction; this one is stronger — there is nothing here
 // to construct a query with. A text transform in, a text transform out.
 //
+// **It holds no credential.** The model is reached through `env.TELNYX`, the
+// client the `[telnyx]` binding puts on the environment, whose bearer the
+// runtime's auth proxy substitutes as the request leaves the pod. The function
+// is already authenticated as itself; handing it an account-wide API key to
+// carry around as well would be a second, worse credential to rotate and leak.
+//
 // **It never logs the transcript.** The phone is now sending a sentence a
 // household said out loud about its own money. That is the cost the owner
 // accepted when they chose this over an on-device model, and the least this
@@ -30,17 +36,6 @@ export interface NoteInput {
 export interface NoteSuggestion {
   note: string | null;
 }
-
-/**
- * Telnyx's OpenAI-compatible completion endpoint. `POST /v2/ai/chat/completions`
- * is deprecated in the published spec in favour of this one.
- *
- * There is no edge binding for inference — the runtime exposes sqldb, kv,
- * secrets, rate limiters, buckets and actors, and nothing else — so this is an
- * ordinary outbound fetch with a bearer key, exactly the way `fcm.ts` reaches
- * Google.
- */
-const ENDPOINT = "https://api.telnyx.com/v2/ai/openai/chat/completions";
 
 /**
  * The spec's own default, and small on purpose. Naming a shop out of a sentence
@@ -97,7 +92,9 @@ export function parseNoteInput(body: Record<string, unknown>): NoteInput | null 
  * instructions above them and should stay real rather than become tidy
  * illustrations of a rule.
  */
-export function buildMessages(input: NoteInput): Array<{ role: string; content: string }> {
+export type ChatMessage = { role: "system" | "user" | "assistant" | "tool"; content: string };
+
+export function buildMessages(input: NoteInput): ChatMessage[] {
   return [
     {
       role: "system",
@@ -148,51 +145,59 @@ export function acceptLabel(raw: string | null | undefined, input: NoteInput): s
   return cleaned;
 }
 
-/** Injected so the tests never reach the network. */
-export type Fetcher = typeof fetch;
+/**
+ * The slice of the Telnyx client this module uses.
+ *
+ * Structural rather than the SDK's own type, for one reason: the tests stand a
+ * two-line object in front of it and never open a socket. `env.TELNYX`
+ * satisfies it as it is.
+ */
+export interface ChatClient {
+  ai: {
+    openai: {
+      chat: {
+        createCompletion(body: {
+          messages: ChatMessage[];
+          model?: string;
+          temperature?: number;
+          max_tokens?: number;
+          stop?: string | Array<string>;
+        }): Promise<unknown>;
+      };
+    };
+  };
+}
 
 /**
  * Ask, once, and give up quietly.
  *
- * Every failure — no key configured, a non-200, malformed JSON, a timeout, a
- * refusal dressed as an answer — returns `{ note: null }`, which the phone
- * reads as "keep the note you already have". There is no error to report
+ * Every failure — no binding, an upstream error, a shape nobody expected, a
+ * timeout, a refusal dressed as an answer — returns `{ note: null }`, which the
+ * phone reads as "keep the note you already have". There is no error to report
  * because there is nothing the household could do about one, and nothing is
  * broken when it happens: the row was written before this was called.
  */
 export async function suggestNote(
   input: NoteInput,
-  apiKey: string | null,
-  fetchImpl: Fetcher = fetch,
+  client: ChatClient | null,
 ): Promise<NoteSuggestion> {
-  if (!apiKey) return { note: null };
+  if (!client) return { note: null };
 
   try {
-    const response = await withTimeout(
-      fetchImpl(ENDPOINT, {
-        method: "POST",
-        headers: {
-          authorization: `Bearer ${apiKey}`,
-          "content-type": "application/json",
-        },
-        body: JSON.stringify({
-          model: MODEL,
-          messages: buildMessages(input),
-          // Deterministic, and capped hard. A label is a handful of tokens; a
-          // model that wants more of them is explaining itself, and the answer
-          // is refused below anyway.
-          temperature: 0,
-          max_tokens: 24,
-          stop: ["\n"],
-        }),
+    const completion = await withTimeout(
+      client.ai.openai.chat.createCompletion({
+        messages: buildMessages(input),
+        model: MODEL,
+        // Deterministic, and capped hard. A label is a handful of tokens; a
+        // model that wants more of them is explaining itself, and the answer
+        // is refused below anyway.
+        temperature: 0,
+        max_tokens: 24,
+        stop: ["\n"],
       }),
     );
-    if (!response || !response.ok) return { note: null };
-
-    const payload = (await response.json()) as {
-      choices?: Array<{ message?: { content?: string } }>;
-    };
-    return { note: acceptLabel(payload?.choices?.[0]?.message?.content, input) };
+    if (completion === null) return { note: null };
+    return { note: acceptLabel(readContent(completion), input) };
   } catch (error) {
     // The code, never the sentence. See the header.
     console.error("note inference failed", error instanceof Error ? error.name : "unknown");
@@ -201,11 +206,29 @@ export async function suggestNote(
 }
 
 /**
+ * The first choice's text, dug out defensively.
+ *
+ * The SDK types this response as `{ [key: string]: unknown }` — it is the
+ * OpenAI shape rather than a generated model — so every step down is checked.
+ * Anything unexpected reads as "no answer", which is already a supported
+ * outcome and needs no special case.
+ */
+function readContent(completion: unknown): string | null {
+  if (typeof completion !== "object" || completion === null) return null;
+  const choices = (completion as { choices?: unknown }).choices;
+  if (!Array.isArray(choices) || choices.length === 0) return null;
+  const message = (choices[0] as { message?: unknown })?.message;
+  if (typeof message !== "object" || message === null) return null;
+  const content = (message as { content?: unknown }).content;
+  return typeof content === "string" ? content : null;
+}
+
+/**
  * Promise.race rather than AbortSignal.timeout: the abort helper is not
  * something this runtime's surface promises, and a missing global here would
  * turn every call into an exception rather than a slow one.
  */
-async function withTimeout(pending: Promise<Response>): Promise<Response | null> {
+async function withTimeout<T>(pending: Promise<T>): Promise<T | null> {
   let timer: ReturnType<typeof setTimeout> | undefined;
   const expiry = new Promise<null>((resolve) => {
     timer = setTimeout(() => resolve(null), TIMEOUT_MS);

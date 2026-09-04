@@ -42,13 +42,15 @@ name = "VOICE_CONTEXT_TOKEN"
 binding = "VOICE_TOOL_SECRET"
 name = "VOICE_TOOL_SECRET"
 
-# Bearer key for api.telnyx.com, used by POST /voice/note and nothing else.
-# There is no edge binding for inference, so the note route is an ordinary
-# outbound fetch and needs a credential of its own. Absent, the route answers
-# "keep the note you have" and the phone is none the wiser.
-[[secrets]]
-binding = "TELNYX_API_KEY"
-name = "TELNYX_API_KEY"
+# The platform's own Telnyx client, for POST /voice/note and nothing else.
+#
+# A singleton table, not an array: [[telnyx_api]] is the deprecated spelling.
+# What it puts on env.TELNYX is a fully configured SDK client whose bearer the
+# runtime's auth proxy substitutes on the way out of the pod — the function is
+# already authenticated as itself, so there is no API key in this repository, in
+# a secret store, or in memory here. Nothing to rotate and nothing to leak.
+[telnyx]
+binding = "TELNYX"
 
 # Second layer on enrolment; 10-character invite codes are the real defence.
 [[ratelimits]]
