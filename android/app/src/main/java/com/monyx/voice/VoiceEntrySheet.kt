@@ -19,7 +19,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.Undo
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -48,7 +47,7 @@ import com.monyx.data.TransactionEntity
 import com.monyx.data.Money
 import com.monyx.ui.add.EntryKind
 import com.monyx.ui.theme.Palette
-import com.monyx.ui.transactions.EditTransactionDialog
+import com.monyx.ui.transactions.EditTransactionSheet
 import com.monyx.ui.transactions.TransactionEdit
 import java.time.LocalDate
 
@@ -78,7 +77,6 @@ fun VoiceEntrySheet(
     onStop: () -> Unit,
     onGrantPermission: () -> Unit,
     onRevert: () -> Unit,
-    onUndoRevert: () -> Unit,
     onCorrectionHoldStart: () -> Unit,
     onChooseCategory: (VoiceCategory) -> Unit,
     onBeginEdit: () -> Unit,
@@ -135,24 +133,6 @@ fun VoiceEntrySheet(
                 is VoiceEntryState.SaveFailed ->
                     Message(stringResource(R.string.voice_save_failed))
 
-                is VoiceEntryState.Reverted -> {
-                    Header(stringResource(R.string.voice_reverted))
-                    Spacer(Modifier.height(8.dp))
-                    Amount(state.summary.amountMinor, state.summary.kind, faded = true)
-                    Spacer(Modifier.height(24.dp))
-                    Row(modifier = Modifier.fillMaxWidth()) {
-                        OutlinedButton(onClick = onUndoRevert, modifier = Modifier.weight(1f)) {
-                            Icon(Icons.AutoMirrored.Filled.Undo, contentDescription = null, modifier = Modifier.size(18.dp))
-                            Spacer(Modifier.width(8.dp))
-                            Text(stringResource(R.string.voice_undo_revert))
-                        }
-                        Spacer(Modifier.width(12.dp))
-                        Button(onClick = onDismiss, modifier = Modifier.weight(1f)) {
-                            Text(stringResource(R.string.voice_done))
-                        }
-                    }
-                }
-
                 is VoiceEntryState.Saved -> SavedBody(
                     state = state,
                     categories = categories,
@@ -180,7 +160,7 @@ fun VoiceEntrySheet(
     // It does not reopen the keypad prefilled. The row already exists;
     // prefilling the keypad would offer to write a second one.
     editing?.let { row ->
-        EditTransactionDialog(
+        EditTransactionSheet(
             original = row,
             categories = editableCategories,
             accounts = editableAccounts,
@@ -188,8 +168,8 @@ fun VoiceEntrySheet(
             onSave = onEdit,
             // Deleting from the editor and tapping Revert are the same write —
             // a tombstone on the row this sheet is describing — so they land in
-            // the same place, with Undo still on offer. Anything else would
-            // leave the summary describing a row that no longer exists.
+            // the same place, and that place closes the sheet. Anything else
+            // would leave the summary describing a row that no longer exists.
             onDelete = { onRevert() },
         )
     }

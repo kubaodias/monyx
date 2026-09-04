@@ -57,7 +57,7 @@ data class VoiceCorrection(
  * lowered, because the one reason to hold the microphone over a summary is to
  * name a category.
  *
- * The kind is in this grammar and is NOT in [com.monyx.ui.transactions.EditTransactionDialog],
+ * The kind is in this grammar and is NOT in [com.monyx.ui.transactions.EditTransactionSheet],
  * deliberately. The dialog refuses it because switching an expense to income
  * invalidates the category already chosen; here the category is being re-chosen
  * in the same breath, so there is nothing left to invalidate.

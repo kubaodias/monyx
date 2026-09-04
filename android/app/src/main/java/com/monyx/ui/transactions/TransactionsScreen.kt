@@ -245,7 +245,7 @@ fun TransactionsScreen(
     }
 
     editing?.let { original ->
-        EditTransactionDialog(
+        EditTransactionSheet(
             original = original,
             categories = categories,
             accounts = accounts,

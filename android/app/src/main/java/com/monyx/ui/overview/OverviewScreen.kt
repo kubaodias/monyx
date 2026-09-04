@@ -64,7 +64,7 @@ import com.monyx.data.Money
 import com.monyx.data.TransactionListItem
 import com.monyx.ui.MonthSwitcher
 import com.monyx.ui.theme.Palette
-import com.monyx.ui.transactions.EditTransactionDialog
+import com.monyx.ui.transactions.EditTransactionSheet
 import kotlinx.coroutines.launch
 
 /**
@@ -88,7 +88,7 @@ fun OverviewScreen(
     var editing by remember { mutableStateOf<TransactionEntity?>(null) }
 
     editing?.let { original ->
-        EditTransactionDialog(
+        EditTransactionSheet(
             original = original,
             categories = categories,
             accounts = accounts,

@@ -24,7 +24,7 @@ interface VoiceLedger {
     val accounts: Flow<List<VoiceAccount>>
 
     /**
-     * The same two lists as Room rows, for EditTransactionDialog.
+     * The same two lists as Room rows, for EditTransactionSheet.
      *
      * It is not this package's dialog and is not going to be, so it takes
      * entities and gets them from here rather than from a repository handed
@@ -49,13 +49,6 @@ interface VoiceLedger {
     suspend fun update(entity: TransactionEntity)
 
     suspend fun remove(id: String)
-
-    /**
-     * Un-revert. A mis-tapped Revert is otherwise unrecoverable from this
-     * sheet, and clearing the tombstone is a whole-row write like any other —
-     * the row never went anywhere, the same way the server's never do.
-     */
-    suspend fun restore(id: String)
 }
 
 /** [VoiceLedger] over the real thing. */
@@ -121,9 +114,4 @@ class RepositoryVoiceLedger(private val repository: MonyxRepository) : VoiceLedg
     override suspend fun update(entity: TransactionEntity) = repository.updateTransaction(entity)
 
     override suspend fun remove(id: String) = repository.deleteTransaction(id)
-
-    override suspend fun restore(id: String) {
-        val existing = repository.transaction(id) ?: return
-        repository.updateTransaction(existing.copy(deleted = 0))
-    }
 }

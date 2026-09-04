@@ -451,7 +451,6 @@ private fun MainScaffold(
         onStop = voiceViewModel::stopListening,
         onGrantPermission = microphone.ask,
         onRevert = voiceViewModel::revert,
-        onUndoRevert = voiceViewModel::undoRevert,
         onCorrectionHoldStart = { voiceViewModel.startCorrecting(languageTag) },
         onChooseCategory = voiceViewModel::chooseCategory,
         onBeginEdit = voiceViewModel::beginEdit,

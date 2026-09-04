@@ -132,11 +132,6 @@ class VoiceEntryTest {
             if (failWrites) throw IllegalStateException("disk full")
             rows[id] = rows.getValue(id).copy(deleted = 1, pending = 1)
         }
-
-        override suspend fun restore(id: String) {
-            if (failWrites) throw IllegalStateException("disk full")
-            rows[id] = rows.getValue(id).copy(deleted = 0, pending = 1)
-        }
     }
 
     private fun ledger(failWrites: Boolean = false) = FakeLedger(
@@ -217,18 +212,26 @@ class VoiceEntryTest {
     }
 
     @Test
-    fun `revert tombstones the row and keeps the summary for an undo`() {
+    fun `revert tombstones the row and closes the sheet`() {
         val ledger = ledger()
         val viewModel = say(ledger, FakeRecogniser(), "dodaj 200 na transport")
         viewModel.revert()
 
-        val reverted = viewModel.state.value as VoiceEntryState.Reverted
         assertEquals(1, ledger.rows.getValue("t-1").deleted)
-        assertEquals(20000L, reverted.summary.amountMinor)
+        // Straight to Hidden. There is no "Anulowano" panel between the tap and
+        // the app any more, and no undo behind it.
+        assertEquals(VoiceEntryState.Hidden, viewModel.state.value)
+    }
 
-        viewModel.undoRevert()
+    @Test
+    fun `a revert whose write throws does not close the sheet`() {
+        val ledger = ledger()
+        val viewModel = say(ledger, FakeRecogniser(), "dodaj 200 na transport")
+        ledger.failWrites = true
+
+        viewModel.revert()
+        assertTrue(viewModel.state.value is VoiceEntryState.SaveFailed)
         assertEquals(0, ledger.rows.getValue("t-1").deleted)
-        assertTrue(viewModel.state.value is VoiceEntryState.Saved)
     }
 
     @Test
@@ -513,18 +516,6 @@ class VoiceEntryTest {
         assertEquals(20000L, ledger.rows.getValue("t-1").amountMinor)
     }
 
-    @Test
-    fun `an undo whose write throws does not report success`() {
-        val ledger = ledger()
-        val viewModel = say(ledger, FakeRecogniser(), "dodaj 200 na transport")
-        viewModel.revert()
-        ledger.failWrites = true
-
-        viewModel.undoRevert()
-        assertTrue(viewModel.state.value is VoiceEntryState.SaveFailed)
-        assertEquals(1, ledger.rows.getValue("t-1").deleted)
-    }
-
     /**
      * `copy(...)` does not touch `deleted`, so writing a row back over a
      * tombstone resurrects a transaction somebody had taken back. Reached here
@@ -706,9 +697,6 @@ class VoiceEntryTest {
         saved.startListening("pl-PL", "m-1")
         recogniser.heard.value = ListenState.Done("dodaj 200 na transport", emptyList())
         assertTrue(saved.state.value is VoiceEntryState.Saved)
-
-        saved.revert()
-        assertTrue(saved.state.value is VoiceEntryState.Reverted)
 
         val asking = viewModel(ledger(), FakeRecogniser(), noticeMillis = 0)
         asking.permissionRequired()

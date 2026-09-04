@@ -70,6 +70,8 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -314,6 +316,7 @@ private fun MembersSection(members: List<MemberEntity>, myMemberId: String?) {
         } else {
             members.forEach { member ->
                 val isMe = member.id == myMemberId
+                val youLabel = stringResource(R.string.settings_member_you)
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -325,7 +328,12 @@ private fun MembersSection(members: List<MemberEntity>, myMemberId: String?) {
                                 Color.Transparent
                             },
                         )
-                        .padding(horizontal = if (isMe) 12.dp else 0.dp, vertical = 6.dp),
+                        .padding(horizontal = if (isMe) 12.dp else 0.dp, vertical = 6.dp)
+                        // The tint is now the only visible mark — the word that
+                        // used to sit on the right is gone. TalkBack reads no
+                        // colour at all, so the fact moves into the semantics
+                        // rather than disappearing with the label.
+                        .semantics { if (isMe) stateDescription = youLabel },
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Column(Modifier.weight(1f)) {
@@ -350,16 +358,6 @@ private fun MembersSection(members: List<MemberEntity>, myMemberId: String?) {
                             } else {
                                 MaterialTheme.colorScheme.onSurfaceVariant
                             },
-                        )
-                    }
-                    // The word, as well as the colour. A tinted row alone would
-                    // be unreadable to anyone who cannot separate the two, and
-                    // TalkBack reads none of it.
-                    if (isMe) {
-                        Text(
-                            stringResource(R.string.settings_member_you),
-                            style = MaterialTheme.typography.labelLarge,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer,
                         )
                     }
                 }

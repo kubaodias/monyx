@@ -90,9 +90,6 @@ sealed interface VoiceEntryState {
         val summary: VoiceSummary,
         val correction: CorrectionState = CorrectionState.Idle,
     ) : VoiceEntryState
-
-    /** The summary is kept, because Undo needs something to put back. */
-    data class Reverted(val summary: VoiceSummary) : VoiceEntryState
 }
 
 /**
@@ -178,7 +175,7 @@ class VoiceEntryViewModel(
     val accounts: StateFlow<List<VoiceAccount>> =
         ledger.accounts.stateIn(work, SharingStarted.Eagerly, emptyList())
 
-    /** The rows EditTransactionDialog wants, in the shape it wants them. It is
+    /** The rows EditTransactionSheet wants, in the shape it wants them. It is
      *  not this package's dialog and is not going to be, so it gets entities. */
     val editableCategories: StateFlow<List<CategoryEntity>> =
         ledger.editableCategories.stateIn(work, SharingStarted.WhileSubscribed(5_000), emptyList())
@@ -585,6 +582,17 @@ class VoiceEntryViewModel(
      * hard one: the never-physically-delete rule is not server-only, and if the
      * create has already been pushed the tombstone follows it and every read
      * path already honours tombstones.
+     *
+     * It closes the sheet. There used to be one more panel after this one —
+     * "Anulowano", with Undo and Done — which is a screen whose only content is
+     * the news that the thing you asked for happened, standing between you and
+     * the app until you dismiss it. Taking a row back is not a decision that
+     * needs confirming twice, and the sheet is the wrong place to keep offering
+     * it: the entry is gone from a list you are already looking at.
+     *
+     * Undo went with it, and that is a real loss, stated plainly: a reverted
+     * row cannot be brought back from here. It is the same finality the
+     * editor's own delete has had all along.
      */
     fun revert() {
         val saved = _state.value as? VoiceEntryState.Saved ?: return
@@ -593,20 +601,12 @@ class VoiceEntryViewModel(
         _editing.value = null
         write {
             ledger.remove(saved.summary.transactionId)
-            VoiceEntryState.Reverted(saved.summary)
-        }
-    }
-
-    fun undoRevert() {
-        val reverted = _state.value as? VoiceEntryState.Reverted ?: return
-        write {
-            ledger.restore(reverted.summary.transactionId)
-            VoiceEntryState.Saved(reverted.summary)
+            VoiceEntryState.Hidden
         }
     }
 
     /**
-     * The tap route, straight from EditTransactionDialog. Five loose fields
+     * The tap route, straight from EditTransactionSheet. Five loose fields
      * rather than the dialog's own record, mirroring TransactionsViewModel.saveEdit
      * — an edit is an upsert of the whole row, because the sync protocol carries
      * whole rows and there is no partial-update path to get wrong.
@@ -722,7 +722,7 @@ class VoiceEntryViewModel(
     // ---------------------------------------------------- change, by tap
 
     /**
-     * Loads the whole row for EditTransactionDialog.
+     * Loads the whole row for EditTransactionSheet.
      *
      * Here rather than in the sheet: the sheet is Compose and nothing else, and
      * [VoiceLedger] exists so that exactly one class in this package knows the
@@ -785,7 +785,6 @@ class VoiceEntryViewModel(
         VoiceEntryState.NeedsPermission,
         is VoiceEntryState.Listening,
         is VoiceEntryState.Saved,
-        is VoiceEntryState.Reverted,
         -> null
     }
 

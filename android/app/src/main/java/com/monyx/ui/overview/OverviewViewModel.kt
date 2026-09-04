@@ -111,7 +111,7 @@ class OverviewViewModel(
         )
 
     /** For the editor a recent row opens. Both kinds and every account it
-     *  might already sit on, which is what EditTransactionDialog expects. */
+     *  might already sit on, which is what EditTransactionSheet expects. */
     val categories: StateFlow<List<CategoryEntity>> = repository.categories()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 

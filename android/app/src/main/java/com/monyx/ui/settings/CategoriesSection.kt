@@ -99,20 +99,19 @@ fun CategoriesSection(
         }
     }
 
-    // The root a category hangs under, whatever list it came from. Only ever
-    // one level up, because nesting is exactly one level deep.
-    val parentOf: (String?) -> CategoryEntity? = { id ->
-        id?.let { pid -> groups.flatMap { it.roots }.firstOrNull { it.entity.id == pid }?.entity }
+    // Every root of a kind: what the parent picker offers, and what an
+    // inherited colour is looked up in.
+    val rootsOf: (String) -> List<CategoryEntity> = { kind ->
+        groups.firstOrNull { it.kind == kind }?.roots?.map { it.entity }.orEmpty()
     }
 
     addTarget?.let { target ->
-        val rootOptions = if (target.parentId == null) {
-            groups.firstOrNull { it.kind == target.kind }?.roots?.map { it.entity }.orEmpty()
-        } else {
-            emptyList()
-        }
+        val roots = rootsOf(target.kind)
+        // Adding UNDER a parent fixes it; adding at the top level offers the
+        // roots, so one tap turns a new category into a subcategory.
+        val rootOptions = if (target.parentId == null) roots else emptyList()
         CategoryEditDialog(
-            parent = parentOf(target.parentId),
+            roots = roots,
             title = if (target.parentId == null) {
                 stringResource(R.string.settings_add_category)
             } else {
@@ -133,20 +132,43 @@ fun CategoriesSection(
     }
 
     editing?.let { entity ->
+        // Which roots this one could hang under, and whether it may move at all.
+        //
+        // Editing used to refuse to reparent, on the grounds that nesting is
+        // exactly one level deep — but refusing the move is not what keeps it
+        // one level deep, the OPTIONS are: only roots are ever offered, and a
+        // root that already has children of its own is offered nothing, because
+        // hanging it under another root would make its children grandchildren.
+        // A childless category can go either way, which is the ask: a
+        // subcategory can be promoted to a category in its own right.
+        val siblings = groups.firstOrNull { it.kind == entity.kind }?.roots.orEmpty()
+        val hasChildren = siblings.any { it.entity.id == entity.id && it.children.isNotEmpty() }
+        val roots = siblings.map { it.entity }
         CategoryEditDialog(
-            parent = parentOf(entity.parentId),
+            roots = roots,
             title = stringResource(R.string.settings_edit_category),
             kind = entity.kind,
-            // Editing never reparents — nesting stays exactly one level deep
-            // by construction, so the parent field is fixed here.
-            parentOptions = emptyList(),
+            parentOptions = if (hasChildren) {
+                emptyList()
+            } else {
+                // Never itself: a category that is its own parent is a cycle,
+                // and the picker is the only place it could be made.
+                roots.filterNot { it.id == entity.id }
+            },
             fixedParentId = entity.parentId,
             initialName = entity.name,
             initialIcon = entity.icon,
             initialColor = entity.color,
             onDismiss = { editing = null },
-            onSave = { name, _, icon, color ->
-                onUpdate(entity.copy(name = name, icon = icon, color = color))
+            onSave = { name, parentId, icon, color ->
+                onUpdate(
+                    entity.copy(
+                        name = name,
+                        parentId = parentId,
+                        icon = icon,
+                        color = color,
+                    ),
+                )
                 editing = null
             },
         )
@@ -299,14 +321,16 @@ private fun CategoryLeafRow(
 }
 
 /**
- * @param parent the root this category hangs under, when it has one. It supplies
- *   the colour a subcategory takes when it is given none — which is the state a
- *   new one starts in, so a subcategory belongs to its family by default and
- *   only leaves it if somebody says so.
+ * @param roots every root of this kind, for looking up the colour an inherited
+ *   subcategory takes. Read against the parent CURRENTLY chosen rather than the
+ *   one the category arrived with, so moving it between families — or out of
+ *   one entirely — repaints the inherit swatch as you go.
+ * @param parentOptions what the parent picker offers, empty when there is no
+ *   move to make.
  */
 @Composable
 private fun CategoryEditDialog(
-    parent: CategoryEntity?,
+    roots: List<CategoryEntity>,
     title: String,
     kind: String,
     parentOptions: List<CategoryEntity>,
@@ -322,12 +346,16 @@ private fun CategoryEditDialog(
     var icon by remember { mutableStateOf(initialIcon) }
     var color by remember { mutableStateOf(initialColor) }
 
+    // Null once it is a root of its own: nothing to inherit from, so the swatch
+    // goes away rather than offering the colour of a family it has just left.
+    val inheritFrom = roots.firstOrNull { it.id == parentId }
+
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(title) },
         text = {
             Column {
-                if (parentOptions.isEmpty() && fixedParentId == null) {
+                if (fixedParentId == null) {
                     Text(
                         "${stringResource(R.string.settings_kind)}: " +
                             if (kind == "expense") {
@@ -368,7 +396,7 @@ private fun CategoryEditDialog(
                 ColorSwatchRow(
                     selected = color,
                     onSelect = { color = it },
-                    inherit = parent?.let { Palette.colorFor(it.color, it.id) },
+                    inherit = inheritFrom?.let { Palette.colorFor(it.color, it.id) },
                 )
             }
         },

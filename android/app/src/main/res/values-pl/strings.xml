@@ -248,8 +248,6 @@
     <string name="voice_edit_note">Zmień notatkę</string>
     <string name="voice_add_note">Dodaj notatkę</string>
     <string name="voice_revert">Anuluj</string>
-    <string name="voice_reverted">Anulowano</string>
-    <string name="voice_undo_revert">Przywróć</string>
     <string name="voice_done">Gotowe</string>
     <string name="voice_correct_hold">Przytrzymaj, aby poprawić głosem</string>
     <string name="voice_correction_not_understood">Nie zrozumiano — nic nie zmieniono</string>

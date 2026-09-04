@@ -253,8 +253,6 @@
     <string name="voice_edit_note">Edit note</string>
     <string name="voice_add_note">Add a note</string>
     <string name="voice_revert">Revert</string>
-    <string name="voice_reverted">Reverted</string>
-    <string name="voice_undo_revert">Undo</string>
     <string name="voice_done">Done</string>
     <string name="voice_correct_hold">Hold to correct by voice</string>
     <string name="voice_correction_not_understood">Not understood — nothing changed</string>
