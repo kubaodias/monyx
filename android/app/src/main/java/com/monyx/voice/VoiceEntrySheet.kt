@@ -218,18 +218,19 @@ private fun ListeningBody(partial: String, onStop: () -> Unit) {
             style = MaterialTheme.typography.titleMedium,
         )
     }
-    Spacer(Modifier.height(16.dp))
-    Text(
-        // Live text while the sentence is still being said, and an example
-        // before there is any. An empty panel gives no clue what may be said.
-        text = partial.ifBlank { stringResource(R.string.voice_say_example) },
-        style = MaterialTheme.typography.bodyLarge,
-        color = if (partial.isBlank()) {
-            MaterialTheme.colorScheme.onSurfaceVariant
-        } else {
-            MaterialTheme.colorScheme.onSurface
-        },
-    )
+    // Live text while the sentence is still being said, and NOTHING before
+    // there is any. There used to be a worked example here — a whole sentence
+    // to read at the one moment the person is already talking, teaching a
+    // phrasing the parser does not actually require. It taught it once and then
+    // sat there for every listen afterwards.
+    if (partial.isNotBlank()) {
+        Spacer(Modifier.height(16.dp))
+        Text(
+            text = partial,
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurface,
+        )
+    }
     Spacer(Modifier.height(24.dp))
     // The listen does not end when the finger comes off the bar — it ends when
     // the recogniser hears the sentence finish, or when one of the two clocks

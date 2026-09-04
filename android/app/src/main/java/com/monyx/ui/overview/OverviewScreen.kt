@@ -4,6 +4,7 @@ import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -20,16 +21,17 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AllInclusive
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ShowChart
 import androidx.compose.runtime.Composable
@@ -44,13 +46,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -417,12 +417,18 @@ private fun BreakdownCard(
 /**
  * Accounts as a filter rather than a row of read-only cards.
  *
- * The balance stays on the chip, so nothing that used to be on screen is gone —
- * it just became a control. Selecting nothing means every account, which is why
- * "All" is a chip and not the absence of one: an overview filtered down to
- * nothing has no honest reading.
+ * The balance stays on the button, so nothing that used to be on screen is gone
+ * — it just became a control. Selecting nothing means every account, which is
+ * why "All" is a button and not the absence of one: an overview filtered down
+ * to nothing has no honest reading.
  *
  * Hidden entirely below two accounts, where a filter can only ever be a no-op.
+ *
+ * Hand-drawn, not a Material `FilterChip`. A chip is a fixed 32.dp tall and
+ * does not grow for its content, which is why the name and the balance used to
+ * be crushed onto one line: it is the first thing on the screen and it was the
+ * smallest. These are two lines — the account, then what is in it — because
+ * that is the order the question is asked in, and they are tall enough to hit.
  */
 @Composable
 private fun AccountFilter(
@@ -432,54 +438,101 @@ private fun AccountFilter(
     onClear: () -> Unit,
 ) {
     LazyRow(
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         item {
-            FilterChip(
+            AccountButton(
+                name = stringResource(R.string.overview_all_accounts),
+                // The total, which is what "all accounts" is a filter for. It
+                // keeps this button the same shape as the ones beside it —
+                // a short one among tall ones reads as a different kind of
+                // control rather than as the first of the same kind.
+                balanceMinor = accounts.sumOf { it.balanceMinor },
+                icon = Icons.Filled.AllInclusive,
+                // The theme's own accent, not a neutral: the ring is drawn in
+                // this colour, and onSurfaceVariant made the selected "all"
+                // button look outlined in black beside accounts ringed in
+                // their own quiet greens and blues.
+                color = MaterialTheme.colorScheme.primary,
                 selected = selected.isEmpty(),
                 onClick = onClear,
-                label = { Text(stringResource(R.string.overview_all_accounts)) },
             )
         }
         items(accounts, key = { it.id }) { account ->
-            val color = Palette.colorFor(account.color, account.id)
-            FilterChip(
+            AccountButton(
+                name = account.name,
+                balanceMinor = account.balanceMinor,
+                icon = Palette.icon(account.icon),
+                color = Palette.colorFor(account.color, account.id),
                 selected = account.id in selected,
                 onClick = { onToggle(account.id) },
-                leadingIcon = {
-                    Icon(
-                        imageVector = Palette.icon(account.icon),
-                        contentDescription = null,
-                        tint = color,
-                        modifier = Modifier.size(16.dp),
-                    )
-                },
-                // ONE line, not a stacked name and balance. A Material chip is a
-                // fixed 32.dp tall and does not grow for its content, so two
-                // lines were squeezed inside it and sat visibly off against the
-                // single-line "all accounts" chip beside them. The balance keeps
-                // its own colour through a span instead of a second row.
-                label = {
-                    val balanceColor = if (account.balanceMinor < 0) {
-                        MaterialTheme.colorScheme.error
-                    } else {
-                        MaterialTheme.colorScheme.onSurfaceVariant
-                    }
-                    Text(
-                        text = buildAnnotatedString {
-                            append(account.name)
-                            withStyle(SpanStyle(color = balanceColor)) {
-                                append("  ${Money.formatWithCurrency(account.balanceMinor)}")
-                            }
-                        },
-                        style = MaterialTheme.typography.labelLarge,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                },
             )
         }
+    }
+}
+
+/**
+ * One account in the filter strip: icon and name on top, balance underneath.
+ *
+ * Selected is carried by a filled tint AND a ring, not by the fill alone — the
+ * account's own colour is already on the icon, so a tinted background on its
+ * own would be one more shade of the same thing.
+ */
+@Composable
+private fun AccountButton(
+    name: String,
+    balanceMinor: Long,
+    icon: ImageVector,
+    color: Color,
+    selected: Boolean,
+    onClick: () -> Unit,
+) {
+    val container = if (selected) {
+        MaterialTheme.colorScheme.secondaryContainer
+    } else {
+        MaterialTheme.colorScheme.surface
+    }
+    Column(
+        modifier = Modifier
+            .clip(RoundedCornerShape(18.dp))
+            .background(container)
+            .border(
+                width = if (selected) 2.dp else 1.dp,
+                color = if (selected) color else MaterialTheme.colorScheme.outlineVariant,
+                shape = RoundedCornerShape(18.dp),
+            )
+            .selectable(selected = selected, onClick = onClick)
+            .padding(horizontal = 14.dp, vertical = 10.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = color,
+                modifier = Modifier.size(18.dp),
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(
+                text = name,
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+        }
+        Spacer(modifier = Modifier.height(2.dp))
+        Text(
+            text = Money.formatWithCurrency(balanceMinor),
+            style = MaterialTheme.typography.bodyMedium.copy(fontFeatureSettings = "tnum"),
+            maxLines = 1,
+            color = if (balanceMinor < 0) {
+                MaterialTheme.colorScheme.error
+            } else {
+                MaterialTheme.colorScheme.onSurfaceVariant
+            },
+        )
     }
 }
 
@@ -539,7 +592,9 @@ private fun RecentSection(
 
 @Composable
 private fun TransactionRow(tx: TransactionListItem, onClick: () -> Unit) {
-    val color = Palette.colorFor(tx.categoryColor, tx.id)
+    // Keyed on the category's family, never on the transaction: keyed on the
+    // row id a colourless category came out a different colour on every line.
+    val color = Palette.colorFor(tx.categoryColor, tx.categoryColorKey ?: tx.id)
     Card(
         shape = RoundedCornerShape(18.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),

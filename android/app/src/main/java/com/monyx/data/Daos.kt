@@ -65,9 +65,23 @@ data class TransactionListItem(
     val accountId: String?,
     val categoryName: String?,
     val categoryIcon: String?,
-    /** Already resolved: a subcategory reports its PARENT's colour, so a family
-     *  of categories reads as one colour group wherever it is drawn. */
+    /** Already resolved: a subcategory reports its PARENT's colour unless it
+     *  has been given one of its own, so a family of categories reads as one
+     *  colour group wherever it is drawn. Same precedence as
+     *  Palette.colorForChild — the two must agree or the same category is drawn
+     *  in two colours on two screens. */
     val categoryColor: String?,
+    /**
+     * What to hash on when [categoryColor] comes back null — which happens only
+     * when neither the category nor its parent has ever been given a colour.
+     *
+     * The parent's id for a subcategory, its own for a root, which is the key
+     * Palette.colorForChild hashes. Without it the fallback was keyed on
+     * something local to the row and one colourless family came out as several
+     * unrelated colours: the picker hashed the parent, the list hashed the
+     * child, and the same category was drawn in two colours on two screens.
+     */
+    val categoryColorKey: String?,
     val accountName: String?,
     val transferAccountName: String?,
     /** Non-null when a repeating rule wrote this row rather than a person. */
@@ -93,8 +107,20 @@ data class RecurringRuleListItem(
     val accountId: String,
     val categoryName: String?,
     val categoryIcon: String?,
-    /** Already resolved to the parent's colour, as everywhere else. */
+    /** Already resolved to the parent's colour unless the subcategory carries
+     *  one of its own, as everywhere else. */
     val categoryColor: String?,
+    /**
+     * What to hash on when [categoryColor] comes back null — which happens only
+     * when neither the category nor its parent has ever been given a colour.
+     *
+     * The parent's id for a subcategory, its own for a root, which is the key
+     * Palette.colorForChild hashes. Without it the fallback was keyed on
+     * something local to the row and one colourless family came out as several
+     * unrelated colours: the picker hashed the parent, the list hashed the
+     * child, and the same category was drawn in two colours on two screens.
+     */
+    val categoryColorKey: String?,
     val accountName: String?,
     val generatedCount: Int,
     val pending: Int,
@@ -446,7 +472,8 @@ interface MonyxDao {
         """SELECT t.id, t.kind, t.amountMinor, t.note, t.occurredAt, t.occurredOn,
                   t.categoryId, t.accountId,
                   c.name AS categoryName, c.icon AS categoryIcon,
-                  COALESCE(pc.color, c.color) AS categoryColor,
+                  COALESCE(c.color, pc.color) AS categoryColor,
+                  COALESCE(c.parentId, c.id) AS categoryColorKey,
                   a.name AS accountName, ta.name AS transferAccountName,
                   t.recurringRuleId, t.pending, t.rejected
            FROM transactions t
@@ -472,7 +499,8 @@ interface MonyxDao {
         """SELECT t.id, t.kind, t.amountMinor, t.note, t.occurredAt, t.occurredOn,
                   t.categoryId, t.accountId,
                   c.name AS categoryName, c.icon AS categoryIcon,
-                  COALESCE(pc.color, c.color) AS categoryColor,
+                  COALESCE(c.color, pc.color) AS categoryColor,
+                  COALESCE(c.parentId, c.id) AS categoryColorKey,
                   a.name AS accountName, ta.name AS transferAccountName,
                   t.recurringRuleId, t.pending, t.rejected
            FROM transactions t
@@ -498,7 +526,8 @@ interface MonyxDao {
         """SELECT r.id, r.kind, r.amountMinor, r.note, r.freq, r.startsOn, r.endsOn,
                   r.categoryId, r.accountId,
                   c.name AS categoryName, c.icon AS categoryIcon,
-                  COALESCE(pc.color, c.color) AS categoryColor,
+                  COALESCE(c.color, pc.color) AS categoryColor,
+                  COALESCE(c.parentId, c.id) AS categoryColorKey,
                   a.name AS accountName,
                   (SELECT COUNT(*) FROM transactions t
                     WHERE t.recurringRuleId = r.id AND t.deleted = 0) AS generatedCount,

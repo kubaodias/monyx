@@ -1,6 +1,5 @@
 package com.monyx.ui.settings
 
-import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -31,19 +30,16 @@ import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SelectableDates
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -82,10 +78,14 @@ import java.time.ZoneOffset
  * were never both visible. A form this long is a screen, not a dialog.
  *
  * The category is chosen the way it is chosen on the keypad: a grid of its own
- * icons in its own colours, not a dropdown of names. That colour then runs up
- * into the header, so the thing being set up looks like the thing it will
- * produce in the ledger. Picking "Rent" out of a menu of eleven words is the
- * same number of taps and tells you nothing on the way past.
+ * icons in its own colours, not a dropdown of names. Picking "Rent" out of a
+ * menu of eleven words is the same number of taps and tells you nothing on the
+ * way past.
+ *
+ * That colour used to run up into the header, the amount card, the chips and
+ * the save button. It does not any more. The screen is the
+ * theme's, like every other editor in the app; the category's colour marks the
+ * category.
  *
  * It REPLACES the settings content rather than floating over it in a Dialog.
  * A full-screen Dialog has to be told how tall the screen is, and gets it wrong:
@@ -138,24 +138,27 @@ fun RecurringEditor(
     val amountMinor = Money.parseToMinor(amountText)
     val chosen = ofKind.firstOrNull { it.id == categoryId }
 
-    // Neutral until a category is picked, so the header is not asserting a
-    // colour the rule has not been given yet.
-    val neutral = MaterialTheme.colorScheme.surfaceVariant
-    val accent by animateColorAsState(
-        targetValue = chosen?.let { Palette.colorFor(it.color, it.id) } ?: neutral,
-        label = "recurringAccent",
-    )
-    val onAccent = if (chosen == null) MaterialTheme.colorScheme.onSurfaceVariant else Color.White
-    // A chip tinted with the neutral accent at a fifth of its alpha is the
-    // background: the SELECTED chip disappears while the unselected ones keep
-    // their outline, which reads as backwards. Before a category is picked the
-    // chips fall back to the theme's own selected colour and only take the
-    // category's once there is one.
-    val chipSelected = if (chosen == null) {
-        MaterialTheme.colorScheme.secondaryContainer
-    } else {
-        accent.copy(alpha = 0.22f)
+    // A subcategory takes its parent's colour unless it has one of its own,
+    // the same rule the keypad and the edit dialog draw these circles by.
+    val colorOf: (CategoryEntity) -> Color = remember(categories) {
+        val byId = categories.associateBy { it.id }
+        val resolve: (CategoryEntity) -> Color = { c ->
+            Palette.colorForChild(c.color, byId[c.parentId]?.color, c.parentId, c.id)
+        }
+        resolve
     }
+
+    // The ONE coloured thing on the screen, and it is the category's circle —
+    // the same mark the ledger will show. Everything else is the theme.
+    //
+    // The whole editor used to be painted in it: the app bar, the card behind
+    // the amount, the selected chips, the save button, all animating from one
+    // category's colour to the next. That made a form for setting up the rent
+    // the loudest screen in the app, and it looked like nothing else — no other
+    // editor here takes its colour from its content. The category colour is a
+    // way to recognise a category at a glance, and it stops being that when it
+    // is also the background, the button and the chrome.
+    val chosenColor = chosen?.let(colorOf)
 
     // Which single thing is still missing, in the order a person fills the form
     // in. Naming it beats grey-and-silent: a disabled control that will not say
@@ -193,11 +196,6 @@ fun RecurringEditor(
                         )
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = accent,
-                    titleContentColor = onAccent,
-                    navigationIconContentColor = onAccent,
-                ),
                 windowInsets = WindowInsets(0, 0, 0, 0),
             )
         },
@@ -205,7 +203,6 @@ fun RecurringEditor(
             SaveButton(
                 blocker = blocker,
                 amountMinor = amountMinor,
-                accent = accent,
                 onSave = {
                     onSave(
                         RuleDraft(
@@ -230,19 +227,25 @@ fun RecurringEditor(
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 16.dp),
         ) {
-            // The amount sits on the accent, in the shape of the row it
-            // will write: the category's own circle, then the figure.
+            // The amount in the shape of the row it will write: the
+            // category's own circle, then the figure. The card behind it is
+            // the theme's surface, not the category's colour.
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(top = 16.dp)
                     .clip(RoundedCornerShape(20.dp))
-                    .background(accent.copy(alpha = 0.14f))
+                    .background(MaterialTheme.colorScheme.surfaceVariant)
                     .padding(16.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Box(
-                    modifier = Modifier.size(52.dp).background(accent, CircleShape),
+                    modifier = Modifier
+                        .size(52.dp)
+                        .background(
+                            chosenColor ?: MaterialTheme.colorScheme.surface,
+                            CircleShape,
+                        ),
                     contentAlignment = Alignment.Center,
                 ) {
                     Icon(
@@ -262,11 +265,6 @@ fun RecurringEditor(
                     label = { Text(stringResource(R.string.recurring_amount)) },
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = accent,
-                        focusedLabelColor = accent,
-                        cursorColor = accent,
-                    ),
                     modifier = Modifier.weight(1f),
                 )
             }
@@ -274,9 +272,6 @@ fun RecurringEditor(
             Spacer(Modifier.height(16.dp))
             KindToggle(
                 selected = kind,
-                // The label's colour, and it has to be legible on the
-                // white pill before any category has supplied one.
-                accent = if (chosen == null) MaterialTheme.colorScheme.onSurface else accent,
                 onSelect = {
                     kind = it
                     // Expense and income categories are different lists,
@@ -291,6 +286,7 @@ fun RecurringEditor(
             CategoryPicker(
                 categories = ofKind,
                 selectedId = categoryId,
+                colorOf = colorOf,
                 onSelect = { categoryId = it },
             )
 
@@ -305,10 +301,6 @@ fun RecurringEditor(
                         selected = account.id == accountId,
                         onClick = { accountId = account.id },
                         label = { Text(account.name) },
-                        colors = FilterChipDefaults.filterChipColors(
-                            selectedContainerColor = chipSelected,
-                            selectedLabelColor = MaterialTheme.colorScheme.onSurface,
-                        ),
                     )
                 }
             }
@@ -330,10 +322,6 @@ fun RecurringEditor(
                         selected = freq == option,
                         onClick = { freq = option },
                         label = { Text(labelForFreq(option)) },
-                        colors = FilterChipDefaults.filterChipColors(
-                            selectedContainerColor = chipSelected,
-                            selectedLabelColor = MaterialTheme.colorScheme.onSurface,
-                        ),
                     )
                 }
             }
@@ -370,11 +358,6 @@ fun RecurringEditor(
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(
                     capitalization = KeyboardCapitalization.Sentences,
-                ),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = accent,
-                    focusedLabelColor = accent,
-                    cursorColor = accent,
                 ),
                 modifier = Modifier.fillMaxWidth(),
             )
@@ -416,6 +399,7 @@ fun RecurringEditor(
 private fun CategoryPicker(
     categories: List<CategoryEntity>,
     selectedId: String?,
+    colorOf: (CategoryEntity) -> Color,
     onSelect: (String) -> Unit,
 ) {
     if (categories.isEmpty()) {
@@ -432,7 +416,7 @@ private fun CategoryPicker(
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         categories.forEach { category ->
-            val color = Palette.colorFor(category.color, category.id)
+            val color = colorOf(category)
             val selected = category.id == selectedId
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
@@ -470,7 +454,7 @@ private fun CategoryPicker(
 }
 
 @Composable
-private fun KindToggle(selected: String, accent: Color, onSelect: (String) -> Unit) {
+private fun KindToggle(selected: String, onSelect: (String) -> Unit) {
     val options = listOf("expense" to R.string.add_expense, "income" to R.string.add_income)
     Row(
         modifier = Modifier
@@ -494,9 +478,10 @@ private fun KindToggle(selected: String, accent: Color, onSelect: (String) -> Un
                 Text(
                     text = stringResource(label),
                     fontWeight = if (active) FontWeight.SemiBold else FontWeight.Normal,
-                    color = when {
-                        active -> accent
-                        else -> MaterialTheme.colorScheme.onSurfaceVariant
+                    color = if (active) {
+                        MaterialTheme.colorScheme.onSurface
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant
                     },
                 )
             }
@@ -511,14 +496,13 @@ private fun KindToggle(selected: String, accent: Color, onSelect: (String) -> Un
  * refuses to explain is the bug, not the guard.
  */
 @Composable
-private fun SaveButton(blocker: Int?, amountMinor: Long, accent: Color, onSave: () -> Unit) {
+private fun SaveButton(blocker: Int?, amountMinor: Long, onSave: () -> Unit) {
     Surface(color = MaterialTheme.colorScheme.background) {
         Button(
             onClick = onSave,
             enabled = blocker == null,
             shape = RoundedCornerShape(18.dp),
             colors = ButtonDefaults.buttonColors(
-                containerColor = accent,
                 disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant,
                 disabledContentColor = MaterialTheme.colorScheme.primary,
             ),

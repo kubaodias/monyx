@@ -21,7 +21,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Category
 import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -100,6 +99,12 @@ fun CategoriesSection(
         }
     }
 
+    // The root a category hangs under, whatever list it came from. Only ever
+    // one level up, because nesting is exactly one level deep.
+    val parentOf: (String?) -> CategoryEntity? = { id ->
+        id?.let { pid -> groups.flatMap { it.roots }.firstOrNull { it.entity.id == pid }?.entity }
+    }
+
     addTarget?.let { target ->
         val rootOptions = if (target.parentId == null) {
             groups.firstOrNull { it.kind == target.kind }?.roots?.map { it.entity }.orEmpty()
@@ -107,6 +112,7 @@ fun CategoriesSection(
             emptyList()
         }
         CategoryEditDialog(
+            parent = parentOf(target.parentId),
             title = if (target.parentId == null) {
                 stringResource(R.string.settings_add_category)
             } else {
@@ -128,6 +134,7 @@ fun CategoriesSection(
 
     editing?.let { entity ->
         CategoryEditDialog(
+            parent = parentOf(entity.parentId),
             title = stringResource(R.string.settings_edit_category),
             kind = entity.kind,
             // Editing never reparents — nesting stays exactly one level deep
@@ -205,6 +212,12 @@ private fun CategoryNodeItem(
         ) { child, childDragging ->
             CategoryLeafRow(
                 entity = child,
+                // Its parent's colour unless it has been given one of its own —
+                // the rule every other screen already draws these by. Settings
+                // was the one place that hashed a colourless subcategory to a
+                // colour of its own, so "Dom > Remonty" was brown in the picker
+                // and pink in the list that names it.
+                parentColor = node.entity.color,
                 dragging = childDragging,
                 onEdit = { onEditChild(child) },
                 onDelete = { onDeleteChild(child) },
@@ -214,12 +227,24 @@ private fun CategoryNodeItem(
     }
 }
 
+/**
+ * One category, tappable.
+ *
+ * The row opens the editor; there is no pencil. A pencil beside a row whose
+ * only other gesture was a long-press drag was a button competing with the name
+ * for width to offer what tapping the row offers everywhere else in the app —
+ * a transaction, a repeating rule, an account. Delete keeps its button because
+ * it is destructive and must never be the thing a mis-tap does.
+ *
+ * @param parentColor the family's colour, for a child with none of its own.
+ */
 @Composable
 private fun CategoryLeafRow(
     entity: CategoryEntity,
     dragging: Boolean,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
+    parentColor: String? = null,
     onAddChild: (() -> Unit)? = null,
     indent: Boolean = false,
 ) {
@@ -233,13 +258,20 @@ private fun CategoryLeafRow(
             .background(
                 if (dragging) MaterialTheme.colorScheme.surfaceVariant else Color.Transparent,
             )
+            // Tap to edit. A plain click, not a combined one: ReorderableColumn
+            // picks a row up on a LONG press, which is exactly why the short
+            // one is free to mean something.
+            .clickable(onClickLabel = stringResource(R.string.settings_edit), onClick = onEdit)
             .padding(top = 4.dp, bottom = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(
             modifier = Modifier
                 .size(32.dp)
-                .background(Palette.colorFor(entity.color, entity.id), CircleShape),
+                .background(
+                    Palette.colorForChild(entity.color, parentColor, entity.parentId, entity.id),
+                    CircleShape,
+                ),
             contentAlignment = Alignment.Center,
         ) {
             Icon(
@@ -260,17 +292,21 @@ private fun CategoryLeafRow(
                 )
             }
         }
-        IconButton(onClick = onEdit) {
-            Icon(Icons.Filled.Edit, contentDescription = stringResource(R.string.settings_edit), modifier = Modifier.size(18.dp))
-        }
         IconButton(onClick = onDelete) {
             Icon(Icons.Filled.Delete, contentDescription = stringResource(R.string.settings_delete), modifier = Modifier.size(18.dp))
         }
     }
 }
 
+/**
+ * @param parent the root this category hangs under, when it has one. It supplies
+ *   the colour a subcategory takes when it is given none — which is the state a
+ *   new one starts in, so a subcategory belongs to its family by default and
+ *   only leaves it if somebody says so.
+ */
 @Composable
 private fun CategoryEditDialog(
+    parent: CategoryEntity?,
     title: String,
     kind: String,
     parentOptions: List<CategoryEntity>,
@@ -329,7 +365,11 @@ private fun CategoryEditDialog(
                 Spacer(Modifier.height(12.dp))
                 Text(stringResource(R.string.settings_color), style = MaterialTheme.typography.labelMedium)
                 Spacer(Modifier.height(6.dp))
-                ColorSwatchRow(selected = color, onSelect = { color = it })
+                ColorSwatchRow(
+                    selected = color,
+                    onSelect = { color = it },
+                    inherit = parent?.let { Palette.colorFor(it.color, it.id) },
+                )
             }
         },
         confirmButton = {

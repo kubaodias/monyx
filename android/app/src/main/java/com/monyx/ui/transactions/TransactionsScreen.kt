@@ -168,15 +168,18 @@ fun TransactionsScreen(
                     .padding(bottom = 8.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                CategoryFilterChip(
-                    categories = remember(categories) { categories.filter { it.parentId == null } },
-                    selectedId = categoryId,
-                    onSelect = viewModel::setCategoryFilter,
-                )
+                // Account first, then category. It reads as narrowing: which
+                // money, then what it went on — and it is the order the edit
+                // dialog puts the same two choices in.
                 AccountFilterChip(
                     accounts = accounts,
                     selectedId = accountId,
                     onSelect = viewModel::setAccountFilter,
+                )
+                CategoryFilterChip(
+                    categories = remember(categories) { categories.filter { it.parentId == null } },
+                    selectedId = categoryId,
+                    onSelect = viewModel::setCategoryFilter,
                 )
                 if (hasActiveFilters) {
                     AssistChip(
@@ -393,7 +396,9 @@ private fun TransactionRow(item: TransactionListItem, onClick: () -> Unit) {
     val iconTint = if (isTransfer) {
         MaterialTheme.colorScheme.onSurfaceVariant
     } else {
-        Palette.colorFor(item.categoryColor, item.categoryName ?: item.id)
+        // The colour is already resolved by the query; the key is only reached
+        // when a whole family has never been given one. See categoryColorKey.
+        Palette.colorFor(item.categoryColor, item.categoryColorKey ?: item.id)
     }
 
     Row(

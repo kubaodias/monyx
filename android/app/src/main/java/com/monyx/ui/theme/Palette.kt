@@ -87,13 +87,24 @@ object Palette {
         colorMap[key] ?: colors[(id.hashCode().let { if (it < 0) -it else it }) % colors.size].second
 
     /**
-     * A subcategory takes its parent's colour, so "Dom" and "Dom > Remonty" read
-     * as one family rather than two unrelated blobs. The parent's OWN key is
-     * used for the fallback too — otherwise a parent with no colour set would
-     * hash to one colour and its children to another.
+     * A subcategory takes its parent's colour BY DEFAULT, so "Dom" and
+     * "Dom > Remonty" read as one family rather than two unrelated blobs. The
+     * parent's OWN key is used for the fallback too — otherwise a parent with
+     * no colour set would hash to one colour and its children to another.
+     *
+     * By default, not always. A child that has been given a colour of its own
+     * keeps it. This used to ignore [childColor] outright whenever there was a
+     * parent, which made the colour picker in the subcategory dialog a control
+     * that silently did nothing — you chose violet, saved, and the row stayed
+     * brown. Inheriting is the default because most subcategories are never
+     * given a colour at all; overriding it is the point of offering the choice.
      */
     fun colorForChild(childColor: String?, parentColor: String?, parentId: String?, ownId: String): Color =
-        if (parentId != null) colorFor(parentColor, parentId) else colorFor(childColor, ownId)
+        when {
+            childColor != null -> colorFor(childColor, ownId)
+            parentId != null -> colorFor(parentColor, parentId)
+            else -> colorFor(null, ownId)
+        }
 
     /**
      * Keys are stable and synced; the ImageVector behind one may be swapped, a

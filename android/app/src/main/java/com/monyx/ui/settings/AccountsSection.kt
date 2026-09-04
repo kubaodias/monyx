@@ -1,6 +1,7 @@
 package com.monyx.ui.settings
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -18,7 +19,6 @@ import androidx.compose.material.icons.filled.AccountBalanceWallet
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Archive
 import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Unarchive
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
@@ -198,6 +198,13 @@ fun AccountsSection(
     }
 }
 
+/**
+ * One account, tappable.
+ *
+ * The row opens the editor; there is no pencil, the same bargain the category
+ * list makes. Archive and delete keep their buttons — one is not what editing
+ * means and the other is destructive.
+ */
 @Composable
 private fun AccountRowItem(
     row: AccountRow,
@@ -217,6 +224,8 @@ private fun AccountRowItem(
             .background(
                 if (dragging) MaterialTheme.colorScheme.surfaceVariant else Color.Transparent,
             )
+            // A short tap edits; ReorderableColumn takes the long one.
+            .clickable(onClickLabel = stringResource(R.string.settings_edit), onClick = onEdit)
             .padding(vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -248,9 +257,6 @@ private fun AccountRowItem(
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-        }
-        IconButton(onClick = onEdit) {
-            Icon(Icons.Filled.Edit, contentDescription = stringResource(R.string.settings_edit))
         }
         onArchive?.let {
             IconButton(onClick = it) {

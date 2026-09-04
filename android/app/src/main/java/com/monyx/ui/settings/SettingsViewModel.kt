@@ -74,6 +74,9 @@ class SettingsViewModel(private val app: MonyxApp) : ViewModel() {
     }
 
     val members = repository.members()
+
+    /** Whose phone this is, for the mark beside their name in the member list. */
+    val memberId: Flow<String?> = session.memberIdFlow
     val categories: Flow<List<CategoryEntity>> = repository.categories()
     val recurringRules: Flow<List<RecurringRuleListItem>> = repository.recurringRules()
     val syncState = repository.syncStateFlow()

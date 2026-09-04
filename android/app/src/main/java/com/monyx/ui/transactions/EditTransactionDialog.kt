@@ -1,6 +1,7 @@
 package com.monyx.ui.transactions
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -15,7 +16,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
@@ -25,6 +28,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.CloudUpload
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Dialpad
 import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DatePicker
@@ -38,6 +42,8 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -48,16 +54,21 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.input.KeyboardCapitalization
-import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.monyx.R
 import com.monyx.data.AccountEntity
 import com.monyx.data.CategoryEntity
 import com.monyx.data.Dates
-import com.monyx.data.Money
 import com.monyx.data.TransactionEntity
 import com.monyx.ui.theme.Palette
+import com.monyx.ui.add.AmountInput
+import com.monyx.ui.add.KeyAction
+import com.monyx.ui.add.Keypad
+import kotlinx.coroutines.flow.first
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneOffset
@@ -104,7 +115,15 @@ fun EditTransactionDialog(
     onSave: (TransactionEdit) -> Unit,
     onDelete: (String) -> Unit,
 ) {
-    var amountText by remember(original.id) { mutableStateOf(Money.format(original.amountMinor)) }
+    // The same object the keypad builds on the add screen, so a typed amount
+    // and an edited one go through identical arithmetic.
+    var amount by remember(original.id) { mutableStateOf(AmountInput.ofMinor(original.amountMinor)) }
+    // Hidden until the amount is tapped. Editing a row is usually about its
+    // category or its note, and 220dp of keys between the figure and the rest
+    // of the form would push every other field off a dialog. The figure carries
+    // the dialpad glyph while they are away, which is how the add screen says
+    // the same thing.
+    var showKeypad by remember(original.id) { mutableStateOf(false) }
     var categoryId by remember(original.id) { mutableStateOf(original.categoryId) }
     var accountId by remember(original.id) { mutableStateOf(original.accountId) }
     var note by remember(original.id) { mutableStateOf(original.note.orEmpty()) }
@@ -134,7 +153,9 @@ fun EditTransactionDialog(
         resolve
     }
 
-    val amountMinor = Money.parseToMinor(amountText)
+    // Folded, so a sum left mid-entry ("60 + 40" with = never pressed) saves
+    // as 100 rather than as the 40 sitting in the field.
+    val amountMinor = amount.evaluate().toMinor()
     val isTransfer = original.kind == "transfer"
     val canSave = amountMinor > 0 && (isTransfer || categoryId != null)
 
@@ -174,14 +195,22 @@ fun EditTransactionDialog(
                     Spacer(Modifier.height(10.dp))
                 }
 
-                OutlinedTextField(
-                    value = amountText,
-                    onValueChange = { amountText = it },
-                    label = { Text(stringResource(R.string.transactions_edit_amount)) },
-                    singleLine = true,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                    modifier = Modifier.fillMaxWidth(),
+                Text(
+                    stringResource(R.string.transactions_edit_amount),
+                    style = MaterialTheme.typography.labelMedium,
                 )
+                EditableAmount(
+                    amount = amount,
+                    keypadHidden = !showKeypad,
+                    onClick = { showKeypad = !showKeypad },
+                )
+                if (showKeypad) {
+                    Keypad(
+                        onKey = { action -> amount = amount.press(action) },
+                        equalsEnabled = amount.hasPendingOperation,
+                        modifier = Modifier.height(220.dp),
+                    )
+                }
 
                 // Which way the money went, as a fact rather than a control.
                 //
@@ -279,9 +308,37 @@ fun EditTransactionDialog(
                                 )
                             }
                         }
+                        // Scrolled to whatever is selected, when it is not
+                        // already on screen. Six categories do not fit the
+                        // width of a dialog, so the one this row is filed under
+                        // was routinely past the right edge — and a selection
+                        // nobody can see reads as no selection at all, however
+                        // well it is drawn.
+                        val listState = rememberLazyListState()
+                        val selectedIndex = shown.indexOfFirst { it.id == categoryId }
+                        LaunchedEffect(openParent, selectedIndex) {
+                            if (selectedIndex < 0) return@LaunchedEffect
+                            // The dialog composes before the row is measured,
+                            // and a scroll issued against a list with nothing
+                            // laid out in it does nothing and never retries.
+                            snapshotFlow { listState.layoutInfo.totalItemsCount }
+                                .first { it > 0 }
+                            // Only when it is actually out of sight. Snapping
+                            // the row every time the selection changes would
+                            // move the pills out from under the finger that
+                            // just tapped one.
+                            val info = listState.layoutInfo
+                            val onScreen = info.visibleItemsInfo.any {
+                                it.index == selectedIndex &&
+                                    it.offset >= 0 &&
+                                    it.offset + it.size <= info.viewportEndOffset
+                            }
+                            if (!onScreen) listState.animateScrollToItem(selectedIndex)
+                        }
                         LazyRow(
+                            state = listState,
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            modifier = Modifier.heightIn(max = 76.dp),
+                            modifier = Modifier.heightIn(max = 84.dp),
                         ) {
                             items(shown, key = { it.id }) { category ->
                                 CategoryPill(
@@ -459,6 +516,16 @@ private fun StatusRow(icon: ImageVector, tint: Color, text: String) {
     }
 }
 
+/**
+ * One category in the row, and whether it is the chosen one.
+ *
+ * Selection used to be carried by the fill alone — a solid circle against
+ * circles at 16% of the same colour. Against a coral category the unselected
+ * pink was near enough that people could not tell which one they had picked,
+ * and the name underneath was set identically either way. So it is now said
+ * three times over: the fill, a ring standing off the circle, and the name in
+ * the category's own colour and weight. Any one of them alone is a guess.
+ */
 @Composable
 private fun CategoryPill(
     category: CategoryEntity,
@@ -468,30 +535,114 @@ private fun CategoryPill(
 ) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = Modifier.width(64.dp).clickable(onClick = onClick),
+        modifier = Modifier
+            .width(64.dp)
+            .selectable(selected = selected, onClick = onClick),
     ) {
+        // Two boxes, and the OUTER one is the same 48.dp whether or not this is
+        // the chosen category. A ring that made the pill bigger would shift
+        // every label in the row down by the difference each time the selection
+        // moved, which is a whole row twitching to report one change.
         Box(
             modifier = Modifier
-                .size(40.dp)
-                .clip(CircleShape)
-                .background(if (selected) tint else tint.copy(alpha = 0.16f)),
+                .size(48.dp)
+                .then(if (selected) Modifier.border(2.dp, tint, CircleShape) else Modifier),
             contentAlignment = Alignment.Center,
         ) {
-            Icon(
-                imageVector = Palette.icon(category.icon),
-                contentDescription = null,
-                tint = if (selected) Color.White else tint,
-                modifier = Modifier.size(20.dp),
-            )
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(CircleShape)
+                    .background(if (selected) tint else tint.copy(alpha = 0.16f)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    imageVector = Palette.icon(category.icon),
+                    contentDescription = null,
+                    tint = if (selected) Color.White else tint,
+                    modifier = Modifier.size(20.dp),
+                )
+            }
         }
         Spacer(Modifier.height(2.dp))
         Text(
             text = category.name,
             style = MaterialTheme.typography.labelSmall,
             maxLines = 1,
-            color = MaterialTheme.colorScheme.onSurface,
+            overflow = TextOverflow.Ellipsis,
+            fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+            color = if (selected) tint else MaterialTheme.colorScheme.onSurface,
         )
     }
+}
+
+/**
+ * The amount, as a figure rather than a text field.
+ *
+ * The same trade the add screen makes: no system keyboard, no focus to request,
+ * and the calculator comes free — "45 + 12" is a thing people actually do to a
+ * row they are correcting. It is tappable, and that tap is the only way to the
+ * keypad, so it grows a dialpad glyph while the keys are hidden.
+ */
+@Composable
+private fun EditableAmount(amount: AmountInput, keypadHidden: Boolean, onClick: () -> Unit) {
+    val locale = LocalConfiguration.current.locales[0]
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(vertical = 4.dp),
+    ) {
+        // The running total while a second operand is being typed, so the sum
+        // so far never leaves the screen.
+        amount.operatorLabel?.let { op ->
+            val soFar = amount.pendingDisplay(locale)
+            Text(
+                text = if (soFar == null) op else "$soFar $op",
+                color = MaterialTheme.colorScheme.primary,
+                style = MaterialTheme.typography.titleMedium,
+            )
+        }
+        Row(verticalAlignment = Alignment.Bottom) {
+            if (keypadHidden) {
+                Icon(
+                    imageVector = Icons.Filled.Dialpad,
+                    contentDescription = stringResource(R.string.add_show_keypad),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(18.dp).padding(bottom = 2.dp),
+                )
+                Spacer(Modifier.width(8.dp))
+            }
+            Text(
+                text = amount.display(locale),
+                style = MaterialTheme.typography.headlineMedium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                color = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.weight(1f, fill = false),
+            )
+            Spacer(Modifier.width(6.dp))
+            Text(
+                text = stringResource(R.string.currency_suffix),
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(bottom = 3.dp),
+            )
+        }
+    }
+}
+
+/**
+ * One key press against the value. The add screen does the same thing through
+ * its ViewModel; here there is no ViewModel to go through, and the mapping is
+ * the whole of it.
+ */
+private fun AmountInput.press(action: KeyAction): AmountInput = when (action) {
+    is KeyAction.Digit -> digit(action.value)
+    KeyAction.Separator -> separator()
+    KeyAction.Backspace -> backspace()
+    is KeyAction.Operator -> operator(action.op)
+    KeyAction.Equals -> evaluate()
 }
 
 @Composable

@@ -1,5 +1,6 @@
 package com.monyx.ui.settings
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -28,6 +29,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CloudUpload
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Groups
+import androidx.compose.material.icons.filled.Link
 import androidx.compose.material.icons.filled.PersonAdd
 import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material.icons.filled.Warning
@@ -63,6 +65,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
@@ -130,6 +133,9 @@ fun SettingsScreen() {
     val rejectedCount by viewModel.rejectedCount.collectAsStateWithLifecycle(initialValue = 0)
     val inviteState by viewModel.inviteState.collectAsStateWithLifecycle()
     val reuploadRequested by viewModel.reuploadRequested.collectAsStateWithLifecycle()
+    // Which of the household's members is holding THIS phone. Null until
+    // enrolment has landed, and then never again.
+    val myMemberId by viewModel.memberId.collectAsStateWithLifecycle(initialValue = null)
 
     val snackbarHostState = remember { SnackbarHostState() }
     val coroutineScope = rememberCoroutineScope()
@@ -152,6 +158,12 @@ fun SettingsScreen() {
     var editor by remember { mutableStateOf<RuleSeed?>(null) }
 
     editor?.let { seed ->
+        // Back closes the editor and lands on Settings, which is where it was
+        // opened from. The editor REPLACES the settings content rather than
+        // being a destination of its own, so without this the system back
+        // gesture goes past it to whichever tab preceded Settings — the form
+        // vanishes and so does the screen behind it, for one press.
+        BackHandler { editor = null }
         RecurringEditor(
             seed = seed,
             accounts = accounts.filter { it.entity.archived == 0 }.map { it.entity },
@@ -234,7 +246,7 @@ fun SettingsScreen() {
                 }
 
                 SettingsTab.People -> {
-                    item { MembersSection(members = members) }
+                    item { MembersSection(members = members, myMemberId = myMemberId) }
                     item {
                         InviteSection(
                             state = inviteState,
@@ -279,8 +291,19 @@ fun SettingsScreen() {
     }
 }
 
+/**
+ * The household, and which of them is holding this phone.
+ *
+ * Two people who share a ledger have both entered rows as each other at some
+ * point, and a list of names says nothing about which name this device writes
+ * under. The mark answers that. It is a name badge and not a control: there is
+ * nothing here to change, so the row is not tappable.
+ *
+ * @param myMemberId from the session. Null while enrolment is still landing,
+ *   and then nothing is marked — better unmarked than marked wrong.
+ */
 @Composable
-private fun MembersSection(members: List<MemberEntity>) {
+private fun MembersSection(members: List<MemberEntity>, myMemberId: String?) {
     SectionCard(title = stringResource(R.string.settings_members), icon = Icons.Filled.Groups) {
         if (members.isEmpty()) {
             Text(
@@ -290,16 +313,55 @@ private fun MembersSection(members: List<MemberEntity>) {
             )
         } else {
             members.forEach { member ->
-                Column(Modifier.padding(vertical = 6.dp)) {
-                    Text(member.name, style = MaterialTheme.typography.bodyLarge)
-                    Text(
-                        stringResource(
-                            R.string.settings_member_since,
-                            Dates.dayLabel(Dates.localDate(member.createdAt)),
-                        ),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
+                val isMe = member.id == myMemberId
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(
+                            if (isMe) {
+                                MaterialTheme.colorScheme.primaryContainer
+                            } else {
+                                Color.Transparent
+                            },
+                        )
+                        .padding(horizontal = if (isMe) 12.dp else 0.dp, vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(Modifier.weight(1f)) {
+                        Text(
+                            member.name,
+                            style = MaterialTheme.typography.bodyLarge,
+                            fontWeight = if (isMe) FontWeight.SemiBold else FontWeight.Normal,
+                            color = if (isMe) {
+                                MaterialTheme.colorScheme.onPrimaryContainer
+                            } else {
+                                MaterialTheme.colorScheme.onSurface
+                            },
+                        )
+                        Text(
+                            stringResource(
+                                R.string.settings_member_since,
+                                Dates.dayLabel(Dates.localDate(member.createdAt)),
+                            ),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = if (isMe) {
+                                MaterialTheme.colorScheme.onPrimaryContainer
+                            } else {
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                            },
+                        )
+                    }
+                    // The word, as well as the colour. A tinted row alone would
+                    // be unreadable to anyone who cannot separate the two, and
+                    // TalkBack reads none of it.
+                    if (isMe) {
+                        Text(
+                            stringResource(R.string.settings_member_you),
+                            style = MaterialTheme.typography.labelLarge,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer,
+                        )
+                    }
                 }
             }
         }
@@ -619,14 +681,51 @@ internal fun IconSwatchRow(selected: String?, onSelect: (String) -> Unit) {
     }
 }
 
+/**
+ * @param inherit the colour this thing takes when it is given none of its own —
+ *   the parent's, for a subcategory. Non-null adds a first swatch that means
+ *   "whatever the parent is", selected while [selected] is null. Without it a
+ *   subcategory could be given a colour but never handed back to the family,
+ *   because there is no gesture for un-choosing a swatch.
+ */
 @Composable
-internal fun ColorSwatchRow(selected: String?, onSelect: (String) -> Unit) {
+internal fun ColorSwatchRow(
+    selected: String?,
+    onSelect: (String?) -> Unit,
+    inherit: Color? = null,
+) {
     LazyVerticalGrid(
         columns = GridCells.Adaptive(minSize = 44.dp),
         modifier = Modifier.fillMaxWidth().heightIn(max = 104.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
+        inherit?.let { parentColor ->
+            item(key = "inherit") {
+                // A dashed ring would be the obvious "not really chosen" mark
+                // and Compose has no dashed border; the link glyph says the
+                // same thing and survives being 36dp across.
+                Box(
+                    modifier = Modifier
+                        .size(36.dp)
+                        .background(parentColor, CircleShape)
+                        .border(
+                            width = if (selected == null) 3.dp else 0.dp,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            shape = CircleShape,
+                        )
+                        .clickable { onSelect(null) },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        Icons.Filled.Link,
+                        contentDescription = stringResource(R.string.settings_color_inherit),
+                        tint = Color.White,
+                        modifier = Modifier.size(18.dp),
+                    )
+                }
+            }
+        }
         items(Palette.colors, key = { it.first }) { (key, color) ->
             val isSelected = key == selected
             Box(

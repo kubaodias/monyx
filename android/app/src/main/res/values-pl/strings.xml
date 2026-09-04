@@ -190,6 +190,7 @@
     <string name="settings_delete_category_confirm">Usunąć kategorię \"%1$s\"?</string>
     <string name="settings_icon">Ikona</string>
     <string name="settings_color">Kolor</string>
+    <string name="settings_color_inherit">Taki jak kategoria nadrzędna</string>
     <string name="settings_edit">Edytuj</string>
     <string name="settings_edit_account">Edytuj konto</string>
     <string name="settings_edit_category">Edytuj kategorię</string>
@@ -199,6 +200,7 @@
     <string name="settings_add_subcategory">Dodaj podkategorię</string>
     <string name="settings_kind">Rodzaj</string>
     <string name="settings_member_since">Dołączenie: %1$s</string>
+    <string name="settings_member_you">To Ty</string>
 
     <!-- Transakcje cykliczne -->
     <string name="settings_recurring">Cykliczne</string>
@@ -233,7 +235,6 @@
          Dodaj, powiedz, przeczytaj co zostało zapisane. -->
     <string name="voice_hold_to_talk">Przytrzymaj, aby dodać głosem</string>
     <string name="voice_listening">Słucham…</string>
-    <string name="voice_say_example">Powiedz „150 zł na zakupy w Biedronce”</string>
     <string name="voice_not_understood">Nie udało się tego zrozumieć</string>
     <string name="voice_no_service">Ten telefon nie rozpoznaje mowy</string>
     <string name="voice_no_speech">Nic nie usłyszano</string>

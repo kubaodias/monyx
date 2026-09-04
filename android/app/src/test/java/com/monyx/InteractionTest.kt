@@ -69,10 +69,20 @@ class InteractionTest {
     // ------------------------------------------------------------- colours
 
     @Test
-    fun `a subcategory takes its parent's colour`() {
+    fun `a subcategory with no colour of its own takes its parent's`() {
+        val parent = Palette.colorForChild(childColor = "teal", parentColor = null, parentId = null, ownId = "p")
+        val child = Palette.colorForChild(childColor = null, parentColor = "teal", parentId = "p", ownId = "c")
+        assertEquals("an uncoloured child belongs to its family", parent, child)
+    }
+
+    @Test
+    fun `a subcategory that HAS been given a colour keeps it`() {
+        // The other half of "by default". Without this the colour picker in the
+        // subcategory dialog is a control that silently does nothing.
         val parent = Palette.colorForChild(childColor = "teal", parentColor = null, parentId = null, ownId = "p")
         val child = Palette.colorForChild(childColor = "coral", parentColor = "teal", parentId = "p", ownId = "c")
-        assertEquals("a child must not keep a colour of its own", parent, child)
+        assertNotEquals(parent, child)
+        assertEquals(Palette.color("coral"), child)
     }
 
     @Test

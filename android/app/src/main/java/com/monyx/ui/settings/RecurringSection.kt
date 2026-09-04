@@ -126,7 +126,7 @@ private fun RuleRow(
     onEdit: () -> Unit,
     onDelete: () -> Unit,
 ) {
-    val color = Palette.colorFor(rule.categoryColor, rule.categoryId ?: rule.id)
+    val color = Palette.colorFor(rule.categoryColor, rule.categoryColorKey ?: rule.id)
     val anchor = runCatching { LocalDate.parse(rule.startsOn) }.getOrNull()
     val next = anchor?.let {
         Recurrence.nextOccurrence(

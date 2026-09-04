@@ -197,6 +197,7 @@
     <string name="settings_delete_category_confirm">Delete category \"%1$s\"?</string>
     <string name="settings_icon">Icon</string>
     <string name="settings_color">Colour</string>
+    <string name="settings_color_inherit">Same as the parent category</string>
     <string name="settings_edit">Edit</string>
     <string name="settings_edit_account">Edit account</string>
     <string name="settings_edit_category">Edit category</string>
@@ -206,6 +207,7 @@
     <string name="settings_add_subcategory">Add a subcategory</string>
     <string name="settings_kind">Kind</string>
     <string name="settings_member_since">Joined: %1$s</string>
+    <string name="settings_member_you">You</string>
 
     <!-- Recurring transactions -->
     <string name="settings_recurring">Repeating</string>
@@ -238,7 +240,6 @@
          read back what was written. -->
     <string name="voice_hold_to_talk">Hold to add by voice</string>
     <string name="voice_listening">Listening…</string>
-    <string name="voice_say_example">Try “150 on groceries at the market”</string>
     <string name="voice_not_understood">That was not understood</string>
     <string name="voice_no_service">This phone cannot recognise speech</string>
     <string name="voice_no_speech">Nothing was heard</string>
