@@ -21,16 +21,18 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
-import androidx.compose.material.icons.filled.CloudUpload
-import androidx.compose.material.icons.filled.Repeat
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.CloudUpload
 import androidx.compose.material.icons.filled.ErrorOutline
+import androidx.compose.material.icons.filled.Repeat
+import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -38,9 +40,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -50,9 +52,12 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -108,6 +113,9 @@ fun TransactionsScreen(
     val categories by viewModel.categories.collectAsStateWithLifecycle()
     val accounts by viewModel.accounts.collectAsStateWithLifecycle()
     val transactions by viewModel.transactions.collectAsStateWithLifecycle()
+    val includePlanned by viewModel.includePlanned.collectAsStateWithLifecycle()
+    val plannedAvailable by viewModel.plannedAvailable.collectAsStateWithLifecycle()
+    val plannedIds by viewModel.plannedIds.collectAsStateWithLifecycle()
 
     var editing by remember { mutableStateOf<TransactionEntity?>(null) }
     var refreshing by remember { mutableStateOf(false) }
@@ -119,7 +127,8 @@ fun TransactionsScreen(
     // The month is not in here. It is the scope of the screen, always set, the
     // way it is on Overview and Budget — a chip offering to clear it would be
     // offering to clear something that cannot be empty.
-    val hasActiveFilters = query.isNotBlank() || categoryId != null || accountId != null
+    val hasActiveFilters =
+        query.isNotBlank() || categoryId != null || accountId != null || includePlanned
 
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
@@ -181,6 +190,37 @@ fun TransactionsScreen(
                     selectedId = categoryId,
                     onSelect = viewModel::setCategoryFilter,
                 )
+                // Third, after the two that narrow, because this one is the odd
+                // one out: it ADDS rows rather than removing them. A FilterChip
+                // with a tick rather than a bare Checkbox — it is a checkbox in
+                // every way that matters and it is the only shape that belongs
+                // in a row of chips.
+                //
+                // Disabled outside this month and the next, where there is
+                // nothing to project. See Planned.isAvailable.
+                FilterChip(
+                    selected = includePlanned,
+                    enabled = plannedAvailable,
+                    onClick = { viewModel.setIncludePlanned(!includePlanned) },
+                    label = { Text(stringResource(R.string.transactions_filter_planned)) },
+                    leadingIcon = if (includePlanned) {
+                        {
+                            Icon(
+                                Icons.Filled.Check,
+                                contentDescription = null,
+                                modifier = Modifier.size(16.dp),
+                            )
+                        }
+                    } else {
+                        {
+                            Icon(
+                                Icons.Filled.Schedule,
+                                contentDescription = null,
+                                modifier = Modifier.size(16.dp),
+                            )
+                        }
+                    },
+                )
                 if (hasActiveFilters) {
                     AssistChip(
                         onClick = viewModel::clearFilters,
@@ -227,6 +267,7 @@ fun TransactionsScreen(
                             DayGroup(
                                 day = day,
                                 items = dayItems,
+                                plannedIds = plannedIds,
                                 // Straight to the editor. What used to open here
                                 // was a sheet whose whole content was two
                                 // buttons, Edit and Delete, and both of them are
@@ -235,6 +276,9 @@ fun TransactionsScreen(
                                 // The list projection is a join, not the row —
                                 // load the real entity before handing it to
                                 // something that will write it back.
+                                // A planned row has no entity behind it, so
+                                // this is never reached for one — DayGroup does
+                                // not make it clickable.
                                 onRowClick = { item -> scope.launch { editing = viewModel.load(item.id) } },
                             )
                         }
@@ -337,6 +381,7 @@ private fun AccountFilterChip(
 private fun DayGroup(
     day: String,
     items: List<TransactionListItem>,
+    plannedIds: Set<String>,
     onRowClick: (TransactionListItem) -> Unit,
 ) {
     // A transfer moves money, it does not spend it — it never enters the total.
@@ -376,7 +421,11 @@ private fun DayGroup(
             ) {
                 Column {
                     items.forEachIndexed { index, item ->
-                        TransactionRow(item = item, onClick = { onRowClick(item) })
+                        TransactionRow(
+                            item = item,
+                            planned = item.id in plannedIds,
+                            onClick = { onRowClick(item) },
+                        )
                         if (index != items.lastIndex) {
                             HorizontalDivider(
                                 modifier = Modifier.padding(start = 68.dp),
@@ -391,7 +440,11 @@ private fun DayGroup(
 }
 
 @Composable
-private fun TransactionRow(item: TransactionListItem, onClick: () -> Unit) {
+private fun TransactionRow(
+    item: TransactionListItem,
+    planned: Boolean = false,
+    onClick: () -> Unit,
+) {
     val isTransfer = item.kind == "transfer"
     val iconTint = if (isTransfer) {
         MaterialTheme.colorScheme.onSurfaceVariant
@@ -400,11 +453,26 @@ private fun TransactionRow(item: TransactionListItem, onClick: () -> Unit) {
         // when a whole family has never been given one. See categoryColorKey.
         Palette.colorFor(item.categoryColor, item.categoryColorKey ?: item.id)
     }
+    val plannedLabel = stringResource(R.string.transactions_planned)
 
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick)
+            // Not clickable when planned: there is no row to open. Tapping one
+            // used to be indistinguishable from tapping a real one and did
+            // nothing at all, which reads as the app being broken rather than as
+            // the row being hypothetical. TalkBack gets the reason in words.
+            .then(
+                if (planned) {
+                    Modifier.semantics { stateDescription = plannedLabel }
+                } else {
+                    Modifier.clickable(onClick = onClick)
+                },
+            )
+            // Faded, the way an unsent draft is faded. The row is otherwise
+            // identical — same colour, same icon, same figure — because it is
+            // the same expense, just not yet.
+            .alpha(if (planned) 0.55f else 1f)
             .padding(horizontal = 12.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -445,8 +513,15 @@ private fun TransactionRow(item: TransactionListItem, onClick: () -> Unit) {
                 if (item.recurringRuleId != null) {
                     Spacer(Modifier.width(6.dp))
                     Icon(
-                        imageVector = Icons.Filled.Repeat,
-                        contentDescription = stringResource(R.string.recurring_from_rule),
+                        // A clock, not the repeat arrows, when the row has not
+                        // happened yet. Both facts are true of it and only one
+                        // is worth 14dp: that this is a plan.
+                        imageVector = if (planned) Icons.Filled.Schedule else Icons.Filled.Repeat,
+                        contentDescription = if (planned) {
+                            plannedLabel
+                        } else {
+                            stringResource(R.string.recurring_from_rule)
+                        },
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.size(14.dp),
                     )

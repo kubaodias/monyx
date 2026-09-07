@@ -68,6 +68,10 @@
     <string name="transactions_empty">No transactions</string>
     <string name="transactions_filter_all">All</string>
     <string name="transactions_filter_category">Category</string>
+    <string name="transactions_filter_planned">Planned</string>
+    <!-- Shown on the projected rows themselves, and read out by TalkBack in
+         place of the tap that a real row would offer. -->
+    <string name="transactions_planned">Planned, not recorded yet</string>
     <string name="transactions_filter_account">Account</string>
     <string name="transactions_clear_filters">Clear filters</string>
     <string name="transactions_delete">Delete</string>
