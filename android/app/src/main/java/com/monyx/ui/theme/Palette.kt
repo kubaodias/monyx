@@ -16,6 +16,7 @@ import androidx.compose.material.icons.filled.CreditCard
 import androidx.compose.material.icons.filled.DirectionsBike
 import androidx.compose.material.icons.filled.DirectionsBus
 import androidx.compose.material.icons.filled.DirectionsCar
+import androidx.compose.material.icons.filled.DryCleaning
 import androidx.compose.material.icons.filled.Fastfood
 import androidx.compose.material.icons.filled.FitnessCenter
 import androidx.compose.material.icons.filled.Flight
@@ -25,6 +26,7 @@ import androidx.compose.material.icons.filled.HomeWork
 import androidx.compose.material.icons.filled.Hotel
 import androidx.compose.material.icons.filled.LocalBar
 import androidx.compose.material.icons.filled.LocalCafe
+import androidx.compose.material.icons.filled.LocalFireDepartment
 import androidx.compose.material.icons.filled.LocalFlorist
 import androidx.compose.material.icons.filled.LocalGasStation
 import androidx.compose.material.icons.filled.LocalGroceryStore
@@ -33,6 +35,7 @@ import androidx.compose.material.icons.filled.LocalLaundryService
 import androidx.compose.material.icons.filled.LocalParking
 import androidx.compose.material.icons.filled.LocalPharmacy
 import androidx.compose.material.icons.filled.LocalPizza
+import androidx.compose.material.icons.filled.Medication
 import androidx.compose.material.icons.filled.MenuBook
 import androidx.compose.material.icons.filled.Movie
 import androidx.compose.material.icons.filled.MusicNote
@@ -42,14 +45,17 @@ import androidx.compose.material.icons.filled.Redeem
 import androidx.compose.material.icons.filled.Restaurant
 import androidx.compose.material.icons.filled.Savings
 import androidx.compose.material.icons.filled.School
+import androidx.compose.material.icons.filled.Science
 import androidx.compose.material.icons.filled.ShoppingBag
 import androidx.compose.material.icons.filled.Smartphone
+import androidx.compose.material.icons.filled.Soap
 import androidx.compose.material.icons.filled.SportsEsports
 import androidx.compose.material.icons.filled.SportsSoccer
 import androidx.compose.material.icons.filled.Spa
 import androidx.compose.material.icons.filled.Train
 import androidx.compose.material.icons.filled.Tv
 import androidx.compose.material.icons.filled.Umbrella
+import androidx.compose.material.icons.filled.VolunteerActivism
 import androidx.compose.material.icons.filled.Wallet
 import androidx.compose.material.icons.filled.Water
 import androidx.compose.material.icons.filled.Wifi
@@ -167,6 +173,27 @@ object Palette {
         "savings" to Icons.Filled.Savings,
         "work" to Icons.Filled.WorkOutline,
         "church" to Icons.Filled.Church,
+        // Asked for by name, because the list had nothing close enough and
+        // people were settling for the generic Category blob.
+        "hygiene" to Icons.Filled.Soap,
+        // Gas, as in the bill. LocalFireDepartment is Material's flame; there
+        // is a GasMeter too and it is a box with a dial, which reads as
+        // metering rather than as heating.
+        "gas" to Icons.Filled.LocalFireDepartment,
+        // A pill bottle with a cross, next to the existing "pharmacy" shopfront:
+        // one is where you go, the other is what you came back with.
+        "pills" to Icons.Filled.Medication,
+        // Supplements. Material has no vitamin bottle — MedicationLiquid does
+        // not exist in this version — and Science is the only bottle-shaped
+        // vessel in the set that is not alcohol.
+        "supplements" to Icons.Filled.Science,
+        // A hand holding a heart: giving, which is what a tithe is.
+        "giving" to Icons.Filled.VolunteerActivism,
+        // Clothes, again. "clothes" above is Checkroom, a bare hanger, which is
+        // Material's own clothing icon and the one thing it has; this is a
+        // hanger with a garment on it, for anyone who did not read the first as
+        // clothing at 22dp.
+        "wardrobe" to Icons.Filled.DryCleaning,
     )
 
     private val iconMap = icons.toMap()
