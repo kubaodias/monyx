@@ -214,9 +214,12 @@ fun AddScreen(
         // the keypad stands down, so the space it takes is space that was just
         // freed rather than space taken from the categories.
         //
-        // It cannot vanish from under a cursor: the only way back to the amount
-        // is tapping it, and editAmount() drops this field's focus first.
-        if (state.amountMinor > 0 && state.categoryId != null) {
+        // Nor while the keypad is up, for the same reason the editor hides it:
+        // the keys and the note are both bottom-of-screen inputs and only one
+        // of them can be the one being answered. It cannot vanish from under a
+        // cursor either — the only way back to the amount is tapping it, and
+        // editAmount() drops this field's focus before the keys come up.
+        if (editing != Editing.Amount && state.amountMinor > 0 && state.categoryId != null) {
             OutlinedTextField(
                 value = state.note,
                 onValueChange = viewModel::setNote,

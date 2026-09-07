@@ -361,12 +361,21 @@ fun EditTransactionSheet(
                 )
             }
 
-            // The same gate the add screen puts on it: no note until there is a
-            // transaction for the note to be about. A row opened for editing
-            // already has both, so in practice this is always open here — it is
-            // written out rather than assumed because a half-typed amount is
-            // reachable in this sheet too, by backspacing one.
-            if (amountMinor > 0 && (isTransfer || categoryId != null)) {
+            // Two gates, and the second is the one that matters here.
+            //
+            // No note until there is a transaction for the note to be about —
+            // the same rule the add screen uses. A row opened for editing
+            // already has both, so that half is usually a no-op; it is written
+            // out rather than assumed because a half-typed amount is reachable
+            // in this sheet too, by backspacing one.
+            //
+            // And no note while the keypad is up. Tapping the note and then
+            // tapping the amount left the field sitting between the grid and
+            // the keys with its label still lit and its cursor gone, which reads
+            // as a field that is still taking input — the system keyboard had
+            // just been dismissed out from under it. One question at a time at
+            // the bottom of the screen: the keys, or the note, never both.
+            if (!keypadUp && amountMinor > 0 && (isTransfer || categoryId != null)) {
                 OutlinedTextField(
                     value = note,
                     onValueChange = { note = it },
