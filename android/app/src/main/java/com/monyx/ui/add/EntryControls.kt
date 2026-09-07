@@ -36,6 +36,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -200,6 +201,14 @@ internal fun CategoryGrid(
     var openRootId by remember(categories) {
         mutableStateOf(categories.firstOrNull { it.id == selectedId }?.parentId)
     }
+    // Cleared selection closes the family. The selection is only ever cleared
+    // from outside — a saved transaction resetting the screen, or a kind switch
+    // — and both of those mean "start again", which the next person to open
+    // this screen expects to see at the roots rather than three taps deep in
+    // whatever the last transaction was filed under. Nothing in the grid itself
+    // can clear it: tapping a category always sets one.
+    LaunchedEffect(selectedId) { if (selectedId == null) openRootId = null }
+
     val openRoot = roots.firstOrNull { it.id == openRootId }
     val shown = if (openRoot == null) roots else childrenOf[openRoot.id].orEmpty()
 
