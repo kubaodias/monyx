@@ -15,11 +15,13 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Wallet
 import androidx.compose.material3.AlertDialog
@@ -34,6 +36,10 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -152,6 +158,24 @@ internal fun ContextChip(
     }
 }
 
+/**
+ * The categories, two levels deep, one level at a time.
+ *
+ * It used to be one flat grid: every root followed by its children, so a
+ * household with eleven families and their subcategories put fifty circles on
+ * screen and "Paliwo" sat beside "Dom i ogród" as an equal. Nothing said which
+ * belonged to which, and finding the one you wanted meant reading the whole
+ * grid rather than aiming at it.
+ *
+ * So: the roots, and tapping one opens its children. Tapping a root also FILES
+ * on that root — "Dom i ogród" and nothing further is a complete answer, and
+ * making people pick a leaf they do not want is how a category tree fills up
+ * with "Inne". The subcategory step is genuinely optional; the header at the
+ * top of it goes back.
+ *
+ * [openRootId] is derived state, reset whenever the list itself changes — which
+ * is what a kind switch does, since expense and income are different lists.
+ */
 @Composable
 internal fun CategoryGrid(
     categories: List<CategoryEntity>,
@@ -159,7 +183,26 @@ internal fun CategoryGrid(
     colorOf: (CategoryEntity) -> Color,
     onSelect: (String) -> Unit,
     modifier: Modifier = Modifier,
+    footer: (@Composable () -> Unit)? = null,
 ) {
+    val roots = remember(categories) {
+        categories.filter { it.parentId == null }.sortedBy { it.sortOrder }
+    }
+    val childrenOf = remember(categories) {
+        categories.filter { it.parentId != null }
+            .sortedBy { it.sortOrder }
+            .groupBy { it.parentId }
+    }
+
+    // Opened where the current selection already lives, so arriving at an
+    // edit whose category is "Transport > Paliwo" lands on the step that has
+    // Paliwo lit rather than on the roots with nothing to show for it.
+    var openRootId by remember(categories) {
+        mutableStateOf(categories.firstOrNull { it.id == selectedId }?.parentId)
+    }
+    val openRoot = roots.firstOrNull { it.id == openRootId }
+    val shown = if (openRoot == null) roots else childrenOf[openRoot.id].orEmpty()
+
     LazyVerticalGrid(
         columns = GridCells.Fixed(4),
         modifier = modifier.fillMaxWidth(),
@@ -170,7 +213,16 @@ internal fun CategoryGrid(
         horizontalArrangement = Arrangement.spacedBy(4.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        items(categories, key = { it.id }) { category ->
+        if (openRoot != null) {
+            item(key = "up", span = { GridItemSpan(maxLineSpan) }) {
+                SubcategoryHeader(
+                    root = openRoot,
+                    color = colorOf(openRoot),
+                    onBack = { openRootId = null },
+                )
+            }
+        }
+        items(shown, key = { it.id }) { category ->
             val color = colorOf(category)
             val selected = category.id == selectedId
             // fillMaxWidth, or the cell is only as wide as its widest child and
@@ -182,7 +234,15 @@ internal fun CategoryGrid(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clickable { onSelect(category.id) },
+                    .clickable {
+                        onSelect(category.id)
+                        // Filed on the root AND opened, in one tap. The two are
+                        // not alternatives: the answer is recorded immediately,
+                        // and refining it is offered rather than demanded.
+                        if (childrenOf[category.id].orEmpty().isNotEmpty()) {
+                            openRootId = category.id
+                        }
+                    },
             ) {
                 Box(
                     modifier = Modifier
@@ -229,6 +289,69 @@ internal fun CategoryGrid(
                 )
             }
         }
+        // Inside the scroll, not below it. A note is wanted on maybe one
+        // transaction in ten, and a field pinned under the grid charges every
+        // other one 56dp of category space for it — while the keypad is up
+        // there is barely a row and a half left to charge. Down here it costs
+        // nothing until somebody scrolls past the categories looking for it,
+        // which is exactly when they want it.
+        if (footer != null) {
+            item(key = "footer", span = { GridItemSpan(maxLineSpan) }) { footer() }
+        }
+    }
+}
+
+/**
+ * Which family is open, and the way back out of it.
+ *
+ * The root is drawn selected-looking because it IS selected — opening it filed
+ * the transaction there. The arrow is the only control: tapping the name would
+ * be ambiguous between "go back" and "keep this one", and the second of those
+ * has already happened.
+ */
+@Composable
+private fun SubcategoryHeader(root: CategoryEntity, color: Color, onBack: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .clickable(onClick = onBack)
+            .padding(horizontal = 4.dp, vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Icon(
+            Icons.AutoMirrored.Filled.ArrowBack,
+            contentDescription = stringResource(R.string.add_pick_category),
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(20.dp),
+        )
+        Box(
+            modifier = Modifier.size(28.dp).clip(CircleShape).background(color),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                imageVector = Palette.icon(root.icon),
+                contentDescription = null,
+                tint = Color.White,
+                modifier = Modifier.size(16.dp),
+            )
+        }
+        Text(
+            text = root.name,
+            fontSize = 13.sp,
+            fontWeight = FontWeight.SemiBold,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            color = MaterialTheme.colorScheme.onBackground,
+        )
+        Text(
+            text = stringResource(R.string.add_pick_subcategory),
+            fontSize = 11.sp,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }
 

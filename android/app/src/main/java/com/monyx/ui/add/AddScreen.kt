@@ -100,19 +100,11 @@ fun AddScreen(
         EntryKind.Income -> incomeCategories
         else -> expenseCategories
     }
-    // Nesting is one level deep, and BOTH levels are tappable: a parent that has
-    // children is still a category people file to ("Dom" as well as
-    // "Dom > Remonty"). Children follow their parent so the grid reads in
-    // family order rather than by raw sort key.
-    val selectable = remember(categories) {
-        val byParent = categories.filter { it.parentId != null }.groupBy { it.parentId }
-        categories
-            .filter { it.parentId == null }
-            .sortedBy { it.sortOrder }
-            .flatMap { parent ->
-                listOf(parent) + byParent[parent.id].orEmpty().sortedBy { it.sortOrder }
-            }
-    }
+    // Handed to the grid whole, both levels of it. The grid shows the roots and
+    // opens one family at a time — see CategoryGrid — and BOTH levels stay
+    // tappable: a parent that has children is still a category people file to
+    // ("Dom" as well as "Dom > Remonty").
+    val selectable = remember(categories) { categories.sortedBy { it.sortOrder } }
 
     // A subcategory is drawn in its parent's colour, so a family of categories
     // reads as one group in the grid instead of a scatter of unrelated hues.
@@ -213,38 +205,40 @@ fun AddScreen(
                 }
             },
             modifier = Modifier.weight(1f),
+            // Below the categories, inside their scroll, always there.
+            //
+            // It used to be a sibling of the grid, and gated: no amount, no
+            // category or keypad up meant no field at all. That bought the grid
+            // 56dp back, and cost anyone who wanted a note the ability to find
+            // one — a control that is only present after two other answers is a
+            // control you have to already know about. Down here it takes no
+            // space from the categories at all; you scroll past the last row and
+            // it is there, with the keypad still up if that is where you were.
+            footer = {
+                OutlinedTextField(
+                    value = state.note,
+                    onValueChange = viewModel::setNote,
+                    label = { Text(stringResource(R.string.add_note_hint)) },
+                    singleLine = true,
+                    // A note is a sentence fragment ("Zakupy na weekend"), so
+                    // the keyboard opens shifted. A hint only: shift still wins
+                    // for "iPhone".
+                    keyboardOptions = KeyboardOptions(
+                        capitalization = KeyboardCapitalization.Sentences,
+                    ),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 4.dp, vertical = 4.dp)
+                        // Tapping it takes the keypad down: the keys and the
+                        // note are both bottom-of-screen inputs and only one of
+                        // them can be the one being answered. Tapping the amount
+                        // comes back the other way, and editAmount() drops this
+                        // field's focus first so the system keyboard goes with
+                        // it.
+                        .onFocusChanged { if (it.isFocused) editing = Editing.Note },
+                )
+            },
         )
-
-        // Last, and only once the row it would annotate exists. Until then the
-        // screen is amount-then-category and the field is a third input sitting
-        // between the grid and the keypad, taking 56dp off the grid to offer
-        // something almost no transaction gets. It appears at exactly the moment
-        // the keypad stands down, so the space it takes is space that was just
-        // freed rather than space taken from the categories.
-        //
-        // Nor while the keypad is up, for the same reason the editor hides it:
-        // the keys and the note are both bottom-of-screen inputs and only one
-        // of them can be the one being answered. It cannot vanish from under a
-        // cursor either — the only way back to the amount is tapping it, and
-        // editAmount() drops this field's focus before the keys come up.
-        if (editing != Editing.Amount && state.amountMinor > 0 && state.categoryId != null) {
-            OutlinedTextField(
-                value = state.note,
-                onValueChange = viewModel::setNote,
-                label = { Text(stringResource(R.string.add_note_hint)) },
-                singleLine = true,
-                // A note is a sentence fragment ("Zakupy na weekend"), so the
-                // keyboard opens shifted. A hint only: shift still wins for
-                // "iPhone".
-                keyboardOptions = KeyboardOptions(
-                    capitalization = KeyboardCapitalization.Sentences,
-                ),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 12.dp, vertical = 4.dp)
-                    .onFocusChanged { if (it.isFocused) editing = Editing.Note },
-            )
-        }
 
         if (editing == Editing.Amount) {
             Keypad(

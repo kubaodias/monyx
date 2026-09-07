@@ -24,6 +24,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Wallet
 import androidx.compose.material3.Button
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
@@ -248,6 +249,23 @@ fun RecurringEditor(
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 16.dp),
         ) {
+            // Account first, the way the keypad screen asks it: it is the
+            // question that is already answered nine times in ten, and it
+            // belongs where the eye lands rather than buried between the
+            // subcategory and the frequency, which is where it used to be.
+            //
+            // As circles, not as a row of bare names. An account is the one
+            // thing in this app people recognise by colour before they read it
+            // — the overview's strip is nothing but coloured icons — and this
+            // was the last place that made you read instead.
+            Spacer(Modifier.height(16.dp))
+            FieldLabel(stringResource(R.string.add_pick_account))
+            AccountPicker(
+                accounts = accounts,
+                selectedId = accountId,
+                onSelect = { accountId = it },
+            )
+
             // The amount in the shape of the row it will write: the
             // category's own circle, then the figure. The card behind it is
             // the theme's surface, not the category's colour.
@@ -331,21 +349,6 @@ fun RecurringEditor(
                     // required step with a softer label.
                     onSelect = { categoryId = if (it == categoryId) rootId else it },
                 )
-            }
-
-            Spacer(Modifier.height(16.dp))
-            FieldLabel(stringResource(R.string.add_pick_account))
-            FlowRow(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(4.dp),
-            ) {
-                accounts.forEach { account ->
-                    FilterChip(
-                        selected = account.id == accountId,
-                        onClick = { accountId = account.id },
-                        label = { Text(account.name) },
-                    )
-                }
             }
 
             Spacer(Modifier.height(16.dp))
@@ -492,6 +495,68 @@ private fun CategoryPicker(
                     // sits under its icon on its own. A name that wraps does
                     // not: the block is as wide as its longer line and the
                     // shorter one hangs off the left of it.
+                    textAlign = TextAlign.Center,
+                    color = MaterialTheme.colorScheme.onBackground,
+                    fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+                )
+            }
+        }
+    }
+}
+
+/**
+ * The accounts, as circles — the same shape and the same colours as the
+ * category picker above it and the account picker on the keypad screen.
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun AccountPicker(
+    accounts: List<AccountEntity>,
+    selectedId: String?,
+    onSelect: (String) -> Unit,
+) {
+    FlowRow(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        accounts.forEach { account ->
+            // colorFor, not color: an account with no colour set still gets a
+            // stable one from its id, and it is the same one the overview and
+            // the add screen give it.
+            val color = Palette.colorFor(account.color, account.id)
+            val selected = account.id == selectedId
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier.width(72.dp).clickable { onSelect(account.id) },
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(48.dp)
+                        .clip(CircleShape)
+                        .background(if (selected) color else color.copy(alpha = 0.16f))
+                        .then(
+                            if (selected) Modifier.border(2.dp, color, CircleShape) else Modifier,
+                        ),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        // The account's own icon where it has one, falling back
+                        // to the wallet rather than to Palette's Category blob:
+                        // an account is never a category.
+                        imageVector = account.icon?.let { Palette.icon(it) } ?: Icons.Filled.Wallet,
+                        contentDescription = null,
+                        tint = if (selected) Color.White else color,
+                        modifier = Modifier.size(22.dp),
+                    )
+                }
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    text = account.name,
+                    fontSize = 11.sp,
+                    lineHeight = 13.sp,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
                     textAlign = TextAlign.Center,
                     color = MaterialTheme.colorScheme.onBackground,
                     fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
