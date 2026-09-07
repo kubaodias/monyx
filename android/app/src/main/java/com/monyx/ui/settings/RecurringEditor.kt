@@ -54,6 +54,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -445,6 +446,11 @@ private fun CategoryPicker(
                     fontSize = 11.sp,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
+                    // The column is 72dp wide and centred, so a one-line name
+                    // sits under its icon on its own. A name that wraps does
+                    // not: the block is as wide as its longer line and the
+                    // shorter one hangs off the left of it.
+                    textAlign = TextAlign.Center,
                     color = MaterialTheme.colorScheme.onBackground,
                     fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
                 )

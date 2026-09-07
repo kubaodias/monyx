@@ -6,12 +6,16 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CalendarToday
@@ -24,6 +28,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
@@ -189,6 +194,11 @@ fun EditTransactionSheet(
         accounts.filter { it.archived == 0 || it.id == original.accountId }
     }
 
+    // Recomputed as the picker changes it, so the chip repaints in the new
+    // account's colour rather than staying the colour of the old one.
+    val account = selectableAccounts.firstOrNull { it.id == accountId }
+    val accountColor = account?.let { Palette.colorFor(it.color, it.id) }
+
     // Folded, so a sum left mid-entry ("60 + 40" with = never pressed) saves
     // as 100 rather than as the 40 sitting in the field.
     val amountMinor = amount.evaluate().toMinor()
@@ -203,8 +213,27 @@ fun EditTransactionSheet(
         // it would be a third dismissal affordance stacked on the first two.
         dragHandle = null,
         containerColor = MaterialTheme.colorScheme.background,
+        // Zero here, and the padding applied on the Column below instead.
+        //
+        // The sheet fills the height, so its top edge is the top of the screen —
+        // and the window is edge to edge, which puts the clock and the battery
+        // exactly where the close button and the title are. Material's default
+        // for this parameter has moved between versions; asking for nothing and
+        // then insetting the content by hand is the one arrangement that cannot
+        // come out either overlapped or double-padded.
+        contentWindowInsets = { WindowInsets(0, 0, 0, 0) },
     ) {
-        Column(modifier = Modifier.fillMaxSize()) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                // systemBars, not statusBars: the save bar is the last thing in
+                // this Column and the gesture pill is drawn over it otherwise.
+                .windowInsetsPadding(WindowInsets.systemBars)
+                // The sheet is its own window and inherits nothing from the
+                // NavHost, so the note field's keyboard would cover the save
+                // button it sits directly above.
+                .imePadding(),
+        ) {
             Row(
                 modifier = Modifier.fillMaxWidth().padding(start = 4.dp, end = 4.dp, top = 4.dp),
                 verticalAlignment = Alignment.CenterVertically,
@@ -276,13 +305,15 @@ fun EditTransactionSheet(
                 ContextChip(
                     icon = {
                         Icon(
-                            Icons.Filled.Wallet,
+                            imageVector = account?.icon?.let { Palette.icon(it) }
+                                ?: Icons.Filled.Wallet,
                             contentDescription = null,
+                            tint = accountColor ?: LocalContentColor.current,
                             modifier = Modifier.size(16.dp),
                         )
                     },
-                    label = selectableAccounts.firstOrNull { it.id == accountId }?.name
-                        ?: stringResource(R.string.add_needs_account),
+                    label = account?.name ?: stringResource(R.string.add_needs_account),
+                    accent = accountColor,
                     onClick = { showAccountPicker = true },
                 )
                 ContextChip(
@@ -330,21 +361,28 @@ fun EditTransactionSheet(
                 )
             }
 
-            OutlinedTextField(
-                value = note,
-                onValueChange = { note = it },
-                label = { Text(stringResource(R.string.add_note_hint)) },
-                singleLine = true,
-                keyboardOptions = KeyboardOptions(
-                    capitalization = KeyboardCapitalization.Sentences,
-                ),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 12.dp, vertical = 4.dp)
-                    // The system keyboard and the keypad cannot both have the
-                    // bottom of the screen.
-                    .onFocusChanged { if (it.isFocused) keypadUp = false },
-            )
+            // The same gate the add screen puts on it: no note until there is a
+            // transaction for the note to be about. A row opened for editing
+            // already has both, so in practice this is always open here — it is
+            // written out rather than assumed because a half-typed amount is
+            // reachable in this sheet too, by backspacing one.
+            if (amountMinor > 0 && (isTransfer || categoryId != null)) {
+                OutlinedTextField(
+                    value = note,
+                    onValueChange = { note = it },
+                    label = { Text(stringResource(R.string.add_note_hint)) },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(
+                        capitalization = KeyboardCapitalization.Sentences,
+                    ),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 12.dp, vertical = 4.dp)
+                        // The system keyboard and the keypad cannot both have
+                        // the bottom of the screen.
+                        .onFocusChanged { if (it.isFocused) keypadUp = false },
+                )
+            }
 
             if (keypadUp) {
                 Keypad(

@@ -39,6 +39,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -116,16 +117,28 @@ internal fun AmountDisplay(amount: AmountInput, onClick: () -> Unit) {
     }
 }
 
+/**
+ * @param accent the colour this chip is *about*, or null for a neutral one.
+ *   The account chip passes the account's own colour, so the wallet at the top
+ *   of the add screen is the same green or blue as the button for that account
+ *   on the overview — "which account is this going on" answered by the shape of
+ *   the thing rather than by reading the word. Date and Repeat stay neutral:
+ *   they are not colour-coded anywhere else in the app, and three tinted chips
+ *   in a row would be three accents competing with the category grid below.
+ */
 @Composable
 internal fun ContextChip(
     icon: (@Composable () -> Unit)?,
     label: String,
     onClick: () -> Unit,
+    accent: Color? = null,
 ) {
     Row(
         modifier = Modifier
             .clip(RoundedCornerShape(10.dp))
-            .background(MaterialTheme.colorScheme.surface)
+            // The same 0.16 wash the unselected category pills use, so a tinted
+            // chip reads as a quiet label rather than as a filled button.
+            .background(accent?.copy(alpha = 0.16f) ?: MaterialTheme.colorScheme.surface)
             .clickable(onClick = onClick)
             .padding(horizontal = 10.dp, vertical = 7.dp),
         horizontalArrangement = Arrangement.spacedBy(5.dp),
@@ -147,16 +160,26 @@ internal fun CategoryGrid(
     LazyVerticalGrid(
         columns = GridCells.Fixed(4),
         modifier = modifier.fillMaxWidth(),
-        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 10.dp),
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        // Tight, because every dp here is a dp of label width: at 12/6 a name
+        // like "Zakupy spożywcze" wrapped on a phone where 8/4 fits it on one
+        // line, and four columns multiply the saving by four.
+        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 10.dp),
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         items(categories, key = { it.id }) { category ->
             val color = colorOf(category)
             val selected = category.id == selectedId
+            // fillMaxWidth, or the cell is only as wide as its widest child and
+            // sits at the start of the grid slot: "Dom" made a narrow column
+            // with the icon centred over three letters, "Zakupy spożywcze" made
+            // a column the full width of the slot, and the icons in one row
+            // stopped lining up with each other.
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
-                modifier = Modifier.clickable { onSelect(category.id) },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { onSelect(category.id) },
             ) {
                 Box(
                     modifier = Modifier
@@ -183,8 +206,21 @@ internal fun CategoryGrid(
                 Text(
                     text = category.name,
                     fontSize = 11.sp,
+                    // 11sp default leading is ~15sp, which makes a wrapped name
+                    // look like two separate labels rather than one over two
+                    // lines. Two lines is the floor, not a failure: a narrow
+                    // screen cannot fit "Dom i ogród" beside three other
+                    // columns, and truncating to "Dom i o…" loses the word that
+                    // distinguishes it from "Dom".
+                    lineHeight = 13.sp,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
+                    // Centring the Column centres the text BLOCK; it says
+                    // nothing about the lines inside it. Without this,
+                    // "Zakupy spożywcze" wraps to two lines whose width is set
+                    // by the longer one, and the short line hangs off its left
+                    // edge — under the icon by accident rather than by design.
+                    textAlign = TextAlign.Center,
                     color = MaterialTheme.colorScheme.onBackground,
                     fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
                 )

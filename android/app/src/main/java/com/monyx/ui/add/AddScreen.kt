@@ -20,6 +20,7 @@ import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.Repeat
 import androidx.compose.material.icons.filled.Wallet
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -206,19 +207,33 @@ fun AddScreen(
             modifier = Modifier.weight(1f),
         )
 
-        OutlinedTextField(
-            value = state.note,
-            onValueChange = viewModel::setNote,
-            label = { Text(stringResource(R.string.add_note_hint)) },
-            singleLine = true,
-            // A note is a sentence fragment ("Zakupy na weekend"), so the
-            // keyboard opens shifted. A hint only: shift still wins for "iPhone".
-            keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 4.dp)
-                .onFocusChanged { if (it.isFocused) editing = Editing.Note },
-        )
+        // Last, and only once the row it would annotate exists. Until then the
+        // screen is amount-then-category and the field is a third input sitting
+        // between the grid and the keypad, taking 56dp off the grid to offer
+        // something almost no transaction gets. It appears at exactly the moment
+        // the keypad stands down, so the space it takes is space that was just
+        // freed rather than space taken from the categories.
+        //
+        // It cannot vanish from under a cursor: the only way back to the amount
+        // is tapping it, and editAmount() drops this field's focus first.
+        if (state.amountMinor > 0 && state.categoryId != null) {
+            OutlinedTextField(
+                value = state.note,
+                onValueChange = viewModel::setNote,
+                label = { Text(stringResource(R.string.add_note_hint)) },
+                singleLine = true,
+                // A note is a sentence fragment ("Zakupy na weekend"), so the
+                // keyboard opens shifted. A hint only: shift still wins for
+                // "iPhone".
+                keyboardOptions = KeyboardOptions(
+                    capitalization = KeyboardCapitalization.Sentences,
+                ),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 12.dp, vertical = 4.dp)
+                    .onFocusChanged { if (it.isFocused) editing = Editing.Note },
+            )
+        }
 
         if (editing == Editing.Amount) {
             Keypad(
@@ -329,8 +344,10 @@ private fun ContextRow(
     onPickDate: () -> Unit,
     onMakeRecurring: () -> Unit,
 ) {
-    val accountName = accounts.firstOrNull { it.id == state.accountId }?.name
-        ?: stringResource(R.string.add_needs_account)
+    val account = accounts.firstOrNull { it.id == state.accountId }
+    // Palette.colorFor, the same call the overview's account buttons make, so
+    // "Gotówka" is one green in both places rather than a green and a blue.
+    val accountColor = account?.let { Palette.colorFor(it.color, it.id) }
 
     // FlowRow, not Row: three chips, one of which is a whole phrase in two
     // languages, overflow a narrow screen — and a Row does not wrap, it
@@ -341,8 +358,19 @@ private fun ContextRow(
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         ContextChip(
-            icon = { Icon(Icons.Filled.Wallet, contentDescription = null, modifier = Modifier.size(16.dp)) },
-            label = accountName,
+            icon = {
+                Icon(
+                    // The account's own icon where it has one — a card for the
+                    // card, a wallet for the cash — falling back to the generic
+                    // wallet rather than to Palette's Category catch-all.
+                    imageVector = account?.icon?.let { Palette.icon(it) } ?: Icons.Filled.Wallet,
+                    contentDescription = null,
+                    tint = accountColor ?: LocalContentColor.current,
+                    modifier = Modifier.size(16.dp),
+                )
+            },
+            label = account?.name ?: stringResource(R.string.add_needs_account),
+            accent = accountColor,
             onClick = onPickAccount,
         )
         ContextChip(
