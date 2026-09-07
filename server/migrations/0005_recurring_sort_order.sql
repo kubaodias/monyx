@@ -1,0 +1,17 @@
+-- Repeating rules get an order of their own.
+--
+-- They were listed by `starts_on, id`: the date the rule was anchored to, which
+-- is an implementation detail of the schedule and not a priority. Rent anchored
+-- on the 1st and a streaming subscription anchored on the 2nd sat next to each
+-- other because of what day of the month they happen to fall on, and there was
+-- no way to say the rent matters more — the list is short, permanent, and read
+-- far more often than it is edited, which is exactly the kind of list people
+-- want in their own order.
+--
+-- Same column, same meaning and same default as accounts.sort_order and
+-- categories.sort_order, so the client reorders it with the code it already has.
+--
+-- Old clients neither send nor understand this column. The DEFAULT is what lets
+-- them keep pushing recurring_rules rows through an INSERT that now names it;
+-- sync.ts normalize() already turns an absent sort_order into 0 for every table.
+ALTER TABLE recurring_rules ADD COLUMN sort_order INTEGER NOT NULL DEFAULT 0;

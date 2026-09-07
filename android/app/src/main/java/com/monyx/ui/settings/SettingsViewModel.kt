@@ -163,6 +163,14 @@ class SettingsViewModel(private val app: MonyxApp) : ViewModel() {
         }
     }
 
+    /** Ids, because the list on screen is a join projection. See the repository. */
+    fun reorderRecurringRules(orderedIds: List<String>) {
+        viewModelScope.launch {
+            repository.reorderRecurringRules(orderedIds)
+            SyncWorker.enqueue(app)
+        }
+    }
+
     fun addRecurringRule(draft: RuleDraft) {
         viewModelScope.launch {
             val memberId = session.memberId() ?: return@launch

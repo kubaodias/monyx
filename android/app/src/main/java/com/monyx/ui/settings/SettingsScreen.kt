@@ -244,6 +244,7 @@ fun SettingsScreen() {
                         hasAccounts = accounts.any { it.entity.archived == 0 },
                         onOpen = { editor = it?.let(RuleSeed::of) ?: RuleSeed() },
                         onDelete = viewModel::deleteRecurringRule,
+                        onReorder = viewModel::reorderRecurringRules,
                     )
                 }
 

@@ -16,7 +16,7 @@ import androidx.room.RoomDatabase
         RecurringRuleEntity::class,
         SyncStateEntity::class,
     ],
-    version = 4,
+    version = 5,
     exportSchema = true,
 )
 abstract class MonyxDatabase : RoomDatabase() {

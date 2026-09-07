@@ -31,7 +31,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AllInclusive
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ShowChart
 import androidx.compose.runtime.Composable
@@ -129,7 +128,6 @@ fun OverviewScreen(
                     accounts = state.accounts,
                     selected = state.selectedAccountIds,
                     onToggle = viewModel::toggleAccount,
-                    onClear = viewModel::clearAccountFilter,
                 )
             }
         }
@@ -418,9 +416,14 @@ private fun BreakdownCard(
  * Accounts as a filter rather than a row of read-only cards.
  *
  * The balance stays on the button, so nothing that used to be on screen is gone
- * — it just became a control. Selecting nothing means every account, which is
- * why "All" is a button and not the absence of one: an overview filtered down
- * to nothing has no honest reading.
+ * — it just became a control.
+ *
+ * Every account starts selected, and there is no longer an "All accounts"
+ * button in front of them. With two accounts it was a third button saying
+ * exactly what both of the others being on already said, and it was the first
+ * thing on the screen — a control whose only job was to undo the other
+ * controls. [selected] empty still means all, which is what the queries mean by
+ * unfiltered; it is simply drawn as every button being on.
  *
  * Hidden entirely below two accounts, where a filter can only ever be a no-op.
  *
@@ -434,39 +437,24 @@ private fun BreakdownCard(
 private fun AccountFilter(
     accounts: List<AccountBalance>,
     selected: Set<String>,
-    onToggle: (String) -> Unit,
-    onClear: () -> Unit,
+    onToggle: (String, List<String>) -> Unit,
 ) {
+    val allIds = remember(accounts) { accounts.map { it.id } }
     LazyRow(
         horizontalArrangement = Arrangement.spacedBy(10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        item {
-            AccountButton(
-                name = stringResource(R.string.overview_all_accounts),
-                // The total, which is what "all accounts" is a filter for. It
-                // keeps this button the same shape as the ones beside it —
-                // a short one among tall ones reads as a different kind of
-                // control rather than as the first of the same kind.
-                balanceMinor = accounts.sumOf { it.balanceMinor },
-                icon = Icons.Filled.AllInclusive,
-                // The theme's own accent, not a neutral: the ring is drawn in
-                // this colour, and onSurfaceVariant made the selected "all"
-                // button look outlined in black beside accounts ringed in
-                // their own quiet greens and blues.
-                color = MaterialTheme.colorScheme.primary,
-                selected = selected.isEmpty(),
-                onClick = onClear,
-            )
-        }
         items(accounts, key = { it.id }) { account ->
             AccountButton(
                 name = account.name,
                 balanceMinor = account.balanceMinor,
                 icon = Palette.icon(account.icon),
                 color = Palette.colorFor(account.color, account.id),
-                selected = account.id in selected,
-                onClick = { onToggle(account.id) },
+                // Empty is the unfiltered query, and the unfiltered query
+                // covers every account — so every button is on. See
+                // OverviewViewModel.selectedAccounts.
+                selected = selected.isEmpty() || account.id in selected,
+                onClick = { onToggle(account.id, allIds) },
             )
         }
     }

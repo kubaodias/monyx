@@ -162,8 +162,14 @@ fun AddScreen(
     }
 
     Column(modifier = Modifier.fillMaxSize()) {
-        KindSelector(selected = state.kind, onSelect = viewModel::setKind)
-
+        // Account first, then which way the money goes, then the amount.
+        //
+        // The account is the thing you check and almost never change, and it
+        // belongs where the eye lands before anything has been typed — putting
+        // Expense/Income above it made the first question on the screen the one
+        // that is already answered nine times in ten. Everything below is
+        // unchanged and still runs top to bottom in the order it is filled in:
+        // amount, category, note.
         ContextRow(
             state = state,
             accounts = accounts,
@@ -181,6 +187,8 @@ fun AddScreen(
                 )
             },
         )
+
+        KindSelector(selected = state.kind, onSelect = viewModel::setKind)
 
         AmountDisplay(amount = state.amount, onClick = { editAmount() })
 
@@ -261,6 +269,7 @@ fun AddScreen(
     if (showAccountPicker) {
         AccountPickerDialog(
             accounts = accounts,
+            selectedId = state.accountId,
             onPick = { viewModel.selectAccount(it); showAccountPicker = false },
             onDismiss = { showAccountPicker = false },
         )

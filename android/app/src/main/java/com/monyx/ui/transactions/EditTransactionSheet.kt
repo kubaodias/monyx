@@ -425,6 +425,7 @@ fun EditTransactionSheet(
     if (showAccountPicker) {
         AccountPickerDialog(
             accounts = selectableAccounts,
+            selectedId = accountId,
             onPick = { accountId = it; showAccountPicker = false },
             onDismiss = { showAccountPicker = false },
         )

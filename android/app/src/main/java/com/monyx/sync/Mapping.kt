@@ -164,6 +164,7 @@ fun RecurringRuleEntity.toRow(): JsonObject = buildJsonObject {
     putNullable(this, "ends_on", endsOn)
     put("created_by", JsonPrimitive(createdBy))
     put("created_at", JsonPrimitive(createdAt))
+    put("sort_order", JsonPrimitive(sortOrder))
     put("deleted", JsonPrimitive(deleted))
 }
 
@@ -179,6 +180,10 @@ fun JsonObject.toRecurringRule(): RecurringRuleEntity = RecurringRuleEntity(
     endsOn = str("ends_on"),
     createdBy = reqStr("created_by"),
     createdAt = long("created_at"),
+    // Absent on a row written before the column existed, which is every rule
+    // in the household until the first drag. int() answers 0, which is what
+    // the server's DEFAULT gave them anyway.
+    sortOrder = int("sort_order"),
     seq = long("seq"),
     deleted = int("deleted"),
 )

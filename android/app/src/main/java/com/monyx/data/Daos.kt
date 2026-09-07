@@ -123,6 +123,8 @@ data class RecurringRuleListItem(
     val categoryColorKey: String?,
     val accountName: String?,
     val generatedCount: Int,
+    /** Where the household dragged it. See [RecurringRuleEntity.sortOrder]. */
+    val sortOrder: Int,
     val pending: Int,
     val rejected: Int,
 )
@@ -531,13 +533,16 @@ interface MonyxDao {
                   a.name AS accountName,
                   (SELECT COUNT(*) FROM transactions t
                     WHERE t.recurringRuleId = r.id AND t.deleted = 0) AS generatedCount,
-                  r.pending, r.rejected
+                  r.sortOrder, r.pending, r.rejected
            FROM recurring_rules r
            LEFT JOIN categories c ON c.id = r.categoryId
            LEFT JOIN categories pc ON pc.id = c.parentId
            LEFT JOIN accounts   a ON a.id = r.accountId
            WHERE r.deleted = 0
-           ORDER BY r.startsOn, r.id"""
+           -- sortOrder first, then the old order as the tie-break. Every rule
+           -- written before the column existed carries 0, so a household that
+           -- has never dragged anything sees exactly the list it saw before.
+           ORDER BY r.sortOrder, r.startsOn, r.id"""
     )
     fun recurringRules(): Flow<List<RecurringRuleListItem>>
 

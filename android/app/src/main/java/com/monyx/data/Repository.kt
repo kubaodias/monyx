@@ -342,6 +342,27 @@ class MonyxRepository(private val dao: MonyxDao) {
         return id
     }
 
+    /**
+     * Writes the order the rules were dragged into. Position, not rank, exactly
+     * as [reorderAccounts] and [reorderCategories] do it: sortOrder becomes the
+     * index, so there are no gaps to run out of and no renumbering pass later.
+     *
+     * The whole list every time, because a drag moves one row and shifts every
+     * row between its old and new place — writing only the dragged one would
+     * leave two rules claiming the same position.
+     *
+     * Ids rather than entities, unlike its two siblings: the settings list is
+     * built from a join projection and does not hold the rows. Reading them back
+     * here is a handful of primary-key lookups and keeps the screen from
+     * carrying a second copy of every rule purely so it can hand it back.
+     */
+    suspend fun reorderRecurringRules(orderedIds: List<String>) {
+        val rows = orderedIds.mapIndexedNotNull { index, id ->
+            dao.recurringRule(id)?.copy(sortOrder = index, pending = 1, rejected = 0)
+        }
+        if (rows.isNotEmpty()) dao.upsertRecurringRules(rows)
+    }
+
     suspend fun updateRecurringRule(entity: RecurringRuleEntity) {
         dao.upsertRecurringRules(listOf(entity.copy(pending = 1, rejected = 0)))
     }

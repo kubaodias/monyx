@@ -25,6 +25,7 @@
     <string name="add_save_amount">Zapisz · %1$s</string>
     <string name="add_note_hint">Notatka</string>
     <string name="add_pick_category">Wybierz kategorię</string>
+    <string name="add_pick_subcategory">Podkategoria (opcjonalnie)</string>
     <string name="add_pick_account">Konto</string>
     <string name="add_saved">Zapisano</string>
     <string name="add_needs_amount">Podaj kwotę</string>
@@ -46,7 +47,6 @@
     <string name="overview_breakdown">Na co idą pieniądze</string>
     <string name="overview_recent">Ostatnie transakcje</string>
     <string name="overview_no_data">Brak wydatków w tym miesiącu</string>
-    <string name="overview_all_accounts">Wszystkie konta</string>
     <string name="overview_see_all">Zobacz wszystkie</string>
     <string name="overview_previous_month">Poprzedni miesiąc</string>
     <string name="overview_next_month">Następny miesiąc</string>

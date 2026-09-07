@@ -48,6 +48,7 @@ class PlannedTest {
         categoryColorKey = categoryColorKey,
         accountName = "Karta",
         generatedCount = 8,
+        sortOrder = 0,
         pending = 0,
         rejected = 0,
     )

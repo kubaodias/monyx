@@ -28,8 +28,32 @@ import kotlinx.coroutines.launch
  */
 data class OverviewUiState(
     val period: String,
+    /**
+     * Thirty days back, not the calendar month.
+     *
+     * "What did we earn and spend this month" is a question whose answer is
+     * worthless on the 1st and only becomes useful around the 20th — and the
+     * card resets to nearly nothing on the day the household most wants to know
+     * where it stands. A rolling window always describes a full month of
+     * living. It is the SAME window the chart on the back of this card draws,
+     * so turning the card over cannot change a number.
+     */
     val incomeMinor: Long = 0,
     val expenseMinor: Long = 0,
+    /**
+     * What is actually in the accounts, not what moved through them.
+     *
+     * This used to be income minus expenses for the month, which is a rate
+     * rather than a position: it said "we are 900 zł up in September" on a card
+     * headed Bilans, next to a strip of account buttons whose balances added up
+     * to something else entirely. The two numbers were both right and only one
+     * of them was the one being asked for.
+     *
+     * Follows the account filter, so with everything selected — the default —
+     * it is the household's total, and selecting one account narrows it to that
+     * account's own balance.
+     */
+    val balanceMinor: Long = 0,
     val breakdown: List<CategorySpend> = emptyList(),
     /** Everything still open, for the selector at the top. */
     val accounts: List<AccountBalance> = emptyList(),
@@ -42,10 +66,7 @@ data class OverviewUiState(
      *  month. Its window is NOT the month, which is why it carries its own
      *  dates and its own totals rather than reusing the ones above. */
     val trend: TrendSeries,
-) {
-    /** Balance = income - expenses for the selected month. */
-    val balanceMinor: Long get() = incomeMinor - expenseMinor
-}
+)
 
 /**
  * A state for a period nothing has loaded for yet. The trend still gets a
@@ -73,6 +94,20 @@ class OverviewViewModel(
 ) : ViewModel() {
 
     private val period = selectedMonth.period
+
+    /**
+     * Which accounts the figures cover. **Empty means every one of them**, and
+     * that is the state the screen starts in — it is not "nothing selected", it
+     * is the unfiltered query, which is a different thing from a list of every
+     * id (an archived account has no button and its transactions still belong
+     * in an unfiltered total).
+     *
+     * There used to be an "All accounts" button carrying that state explicitly.
+     * It is gone: with two accounts it was a third button that said the same
+     * thing as both of the others being on, and the strip is the first thing on
+     * the screen. Every account button is simply drawn selected while this is
+     * empty. See [toggleAccount] for what a tap does then.
+     */
     private val selectedAccounts = MutableStateFlow<Set<String>>(emptySet())
 
     @OptIn(ExperimentalCoroutinesApi::class)
@@ -80,7 +115,6 @@ class OverviewViewModel(
         .flatMapLatest { (selectedPeriod, accountIds) ->
             val window = trendWindow(selectedPeriod)
             combine(
-                repository.monthTotals(selectedPeriod, accountIds),
                 repository.spendByCategory(selectedPeriod, accountIds),
                 repository.accountBalances(),
                 repository.recentTransactions(selectedPeriod, 12, accountIds),
@@ -89,11 +123,18 @@ class OverviewViewModel(
                     Dates.iso(window.endInclusive),
                     accountIds,
                 ),
-            ) { totals, breakdown, accounts, recent, daily ->
+            ) { breakdown, accounts, recent, daily ->
                 OverviewUiState(
                     period = selectedPeriod,
-                    incomeMinor = totals.incomeMinor,
-                    expenseMinor = totals.expenseMinor,
+                    // Summed from the same rows the chart is drawn from rather
+                    // than fetched again for the month. monthTotals is no longer
+                    // asked for at all here: two queries answering one question
+                    // is how the front and the back of a card start disagreeing.
+                    incomeMinor = daily.sumOf { it.incomeMinor },
+                    expenseMinor = daily.sumOf { it.expenseMinor },
+                    balanceMinor = accounts
+                        .filter { accountIds.isEmpty() || it.id in accountIds }
+                        .sumOf { it.balanceMinor },
                     breakdown = breakdown,
                     // An archived account is not offered as a chip, but its
                     // transactions are still in every unfiltered figure above.
@@ -162,17 +203,25 @@ class OverviewViewModel(
     }
 
     /**
-     * Toggling the last selected chip off returns to "all accounts" rather than
-     * leaving an empty screen — an overview showing nothing at all is never what
-     * the tap meant.
+     * Turn one account's button on or off, given the ids of every button on
+     * screen.
+     *
+     * The list has to be passed in because the stored empty set means "all", and
+     * the first tap on a screen where everything is on has to mean "all EXCEPT
+     * this one" — with no button standing for "all", a tap on a lit button that
+     * lit every other one would be the only tap that did nothing visible.
+     *
+     * Two states collapse back to empty, and both are deliberate. Everything
+     * selected IS the unfiltered query and has to be stored as such, or an
+     * archived account's rows would silently drop out of the totals. And
+     * turning the last one off returns to all rather than leaving an empty
+     * screen — an overview showing nothing is never what the tap meant.
      */
-    fun toggleAccount(id: String) {
-        val current = selectedAccounts.value
-        selectedAccounts.value = if (id in current) current - id else current + id
-    }
-
-    fun clearAccountFilter() {
-        selectedAccounts.value = emptySet()
+    fun toggleAccount(id: String, allIds: List<String>) {
+        val all = allIds.toSet()
+        val effective = selectedAccounts.value.ifEmpty { all }
+        val next = if (id in effective) effective - id else effective + id
+        selectedAccounts.value = if (next.isEmpty() || next == all) emptySet() else next
     }
 
     companion object {

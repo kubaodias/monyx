@@ -28,6 +28,7 @@
     <string name="add_save_amount">Save · %1$s</string>
     <string name="add_note_hint">Note</string>
     <string name="add_pick_category">Pick a category</string>
+    <string name="add_pick_subcategory">Subcategory (optional)</string>
     <string name="add_pick_account">Account</string>
     <string name="add_saved">Saved</string>
     <string name="add_needs_amount">Enter an amount</string>
@@ -49,7 +50,6 @@
     <string name="overview_breakdown">Where the money goes</string>
     <string name="overview_recent">Recent transactions</string>
     <string name="overview_no_data">No spending this month</string>
-    <string name="overview_all_accounts">All accounts</string>
     <string name="overview_see_all">See all</string>
     <string name="overview_previous_month">Previous month</string>
     <string name="overview_next_month">Next month</string>

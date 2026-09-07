@@ -66,7 +66,7 @@ export const COLUMNS: Record<TableName, readonly string[]> = {
   recurring_rules: [
     "id", "household_id", "kind", "amount_minor", "account_id",
     "category_id", "note", "freq", "starts_on", "ends_on",
-    "created_by", "created_at", "seq", "deleted",
+    "created_by", "created_at", "sort_order", "seq", "deleted",
   ],
   transactions: [
     "id", "household_id", "kind", "amount_minor", "account_id",
@@ -245,6 +245,12 @@ export function validateChange(raw: unknown): ValidationResult {
         return reject("bad_created_by");
       }
       if (!isInt(row["created_at"])) return reject("bad_created_at");
+      // Absent is legal, and means 0 — the same bargain accounts.archived
+      // struck. A client built before rules could be dragged into an order
+      // still pushes them, and rejecting those would strand it.
+      if (row["sort_order"] !== undefined && !isInt(row["sort_order"])) {
+        return reject("bad_sort_order");
+      }
       break;
     }
     case "transactions": {

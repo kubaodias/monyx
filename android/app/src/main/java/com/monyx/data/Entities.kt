@@ -155,6 +155,15 @@ data class RecurringRuleEntity(
     val endsOn: String? = null,
     val createdBy: String,
     val createdAt: Long,
+    /**
+     * Where the household put this rule in the list, not when it fires.
+     *
+     * The list used to be ordered by [startsOn], which is the schedule's anchor
+     * and not a priority — rent and a streaming subscription sat in whatever
+     * order the days of the month happened to fall. Position, not rank: the
+     * index in the list, exactly as [AccountEntity.sortOrder] works.
+     */
+    val sortOrder: Int = 0,
     val seq: Long = 0,
     val deleted: Int = 0,
     val pending: Int = 0,

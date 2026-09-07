@@ -19,6 +19,9 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Wallet
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -229,11 +232,21 @@ internal fun CategoryGrid(
     }
 }
 
+/**
+ * Each account with its own icon and its own colour, the way the overview's
+ * buttons and the chip that opens this dialog both draw it.
+ *
+ * It used to be a column of bare names. An account is the one thing in this app
+ * that people recognise by colour before they read it — the strip at the top of
+ * the overview is nothing but coloured icons — and the moment of choosing one
+ * was the single place that made you read instead.
+ */
 @Composable
 internal fun AccountPickerDialog(
     accounts: List<AccountEntity>,
     onPick: (String) -> Unit,
     onDismiss: () -> Unit,
+    selectedId: String? = null,
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -241,13 +254,52 @@ internal fun AccountPickerDialog(
         text = {
             Column {
                 accounts.forEach { account ->
-                    Text(
-                        text = account.name,
+                    val color = Palette.colorFor(account.color, account.id)
+                    Row(
                         modifier = Modifier
                             .fillMaxWidth()
+                            .clip(RoundedCornerShape(12.dp))
                             .clickable { onPick(account.id) }
-                            .padding(vertical = 12.dp),
-                    )
+                            .padding(vertical = 10.dp, horizontal = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(36.dp)
+                                .clip(CircleShape)
+                                .background(color.copy(alpha = 0.16f)),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Icon(
+                                imageVector = account.icon?.let { Palette.icon(it) }
+                                    ?: Icons.Filled.Wallet,
+                                contentDescription = null,
+                                tint = color,
+                                modifier = Modifier.size(20.dp),
+                            )
+                        }
+                        Text(
+                            text = account.name,
+                            modifier = Modifier.weight(1f),
+                            fontWeight = if (account.id == selectedId) {
+                                FontWeight.SemiBold
+                            } else {
+                                FontWeight.Normal
+                            },
+                        )
+                        // Which one is already on the transaction. Without it
+                        // the dialog is a list of options with no answer in it,
+                        // and the chip that opened it is now behind a scrim.
+                        if (account.id == selectedId) {
+                            Icon(
+                                imageVector = Icons.Filled.Check,
+                                contentDescription = null,
+                                tint = color,
+                                modifier = Modifier.size(20.dp),
+                            )
+                        }
+                    }
                 }
             }
         },

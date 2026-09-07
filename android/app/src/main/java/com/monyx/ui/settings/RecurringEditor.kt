@@ -139,6 +139,26 @@ fun RecurringEditor(
     val amountMinor = Money.parseToMinor(amountText)
     val chosen = ofKind.firstOrNull { it.id == categoryId }
 
+    // Family first, then — only if that family has one — the subcategory.
+    //
+    // One flat row of every category put "Dom i ogród" and "Transport > Paliwo"
+    // side by side as equals, which is not what they are: nothing on screen said
+    // Paliwo belonged to Transport, and the row grew a line every time anybody
+    // added a subcategory anywhere. Two steps say the shape out loud, and the
+    // second one is optional in the honest sense — filing the rent under "Dom i
+    // ogród" and stopping there is a complete answer.
+    //
+    // There is still ONE stored value. [rootId] is derived from it rather than
+    // held beside it: two pieces of state for one choice is how a picker ends up
+    // showing a parent selected and a child from a different family.
+    val roots = remember(ofKind) { ofKind.filter { it.parentId == null }.sortedBy { it.sortOrder } }
+    val rootId = remember(ofKind, categoryId) {
+        categoryId?.let { id -> ofKind.firstOrNull { it.id == id }?.parentId ?: id }
+    }
+    val children = remember(ofKind, rootId) {
+        rootId?.let { r -> ofKind.filter { it.parentId == r }.sortedBy { it.sortOrder } }.orEmpty()
+    }
+
     // A subcategory takes its parent's colour unless it has one of its own,
     // the same rule the keypad and the edit dialog draw these circles by.
     val colorOf: (CategoryEntity) -> Color = remember(categories) {
@@ -285,11 +305,33 @@ fun RecurringEditor(
             Spacer(Modifier.height(16.dp))
             FieldLabel(stringResource(R.string.add_pick_category))
             CategoryPicker(
-                categories = ofKind,
-                selectedId = categoryId,
+                categories = roots,
+                // The root is lit whether the rule is filed on the root itself
+                // or on one of its children — otherwise choosing Paliwo would
+                // leave the step above it looking unanswered.
+                selectedId = rootId,
                 colorOf = colorOf,
+                // Straight to the root, dropping any subcategory: picking a new
+                // family cannot keep the old family's child.
                 onSelect = { categoryId = it },
             )
+
+            if (children.isNotEmpty()) {
+                Spacer(Modifier.height(16.dp))
+                FieldLabel(stringResource(R.string.add_pick_subcategory))
+                CategoryPicker(
+                    categories = children,
+                    // Null while the rule sits on the parent itself, so nothing
+                    // is lit and the step reads as genuinely unanswered rather
+                    // than as answered with the first option.
+                    selectedId = categoryId.takeIf { it != rootId },
+                    colorOf = colorOf,
+                    // Tapping the lit one puts the rule back on the parent.
+                    // Optional has to be undoable or it is just a second
+                    // required step with a softer label.
+                    onSelect = { categoryId = if (it == categoryId) rootId else it },
+                )
+            }
 
             Spacer(Modifier.height(16.dp))
             FieldLabel(stringResource(R.string.add_pick_account))

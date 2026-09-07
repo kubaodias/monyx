@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
@@ -26,6 +27,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -57,6 +60,7 @@ fun RecurringSection(
     hasAccounts: Boolean,
     onOpen: (RecurringRuleListItem?) -> Unit,
     onDelete: (String) -> Unit,
+    onReorder: (List<String>) -> Unit,
 ) {
     var deleting by remember { mutableStateOf<RecurringRuleListItem?>(null) }
 
@@ -79,9 +83,20 @@ fun RecurringSection(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         } else {
-            rules.forEach { rule ->
+            // Long press and drag, the same gesture accounts and categories
+            // already take. The list was ordered by the schedule's anchor date,
+            // which is not a priority: rent and a streaming subscription sat
+            // next to each other purely because of what day of the month they
+            // fall on. It is short, permanent and read far more often than it is
+            // edited — exactly the kind of list people want in their own order.
+            ReorderableColumn(
+                items = rules,
+                keyOf = { it.id },
+                onReorder = { ordered -> onReorder(ordered.map { it.id }) },
+            ) { rule, dragging ->
                 RuleRow(
                     rule = rule,
+                    dragging = dragging,
                     onEdit = { onOpen(rule) },
                     onDelete = { deleting = rule },
                 )
@@ -123,6 +138,7 @@ fun RecurringSection(
 @Composable
 private fun RuleRow(
     rule: RecurringRuleListItem,
+    dragging: Boolean,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
 ) {
@@ -145,8 +161,16 @@ private fun RuleRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            // Picked up: shaded and rounded, so the row following the finger is
+            // obviously not one of the ones holding still. Same treatment as an
+            // account row being dragged.
+            .clip(RoundedCornerShape(14.dp))
+            .background(
+                if (dragging) MaterialTheme.colorScheme.surfaceVariant else Color.Transparent,
+            )
+            // A short tap edits; ReorderableColumn takes the long one.
             .clickable(onClick = onEdit)
-            .padding(vertical = 8.dp),
+            .padding(vertical = 8.dp, horizontal = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(
