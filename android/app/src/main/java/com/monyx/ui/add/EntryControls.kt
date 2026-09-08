@@ -21,8 +21,8 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.EditNote
 import androidx.compose.material.icons.filled.Wallet
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -30,17 +30,14 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -86,14 +83,40 @@ import java.time.ZoneOffset
  * more: an icon that appears and disappears next to the largest number on the
  * screen is a second thing to read where the number was already the target,
  * and every screen that shows this figure opens the keys when it is tapped.
+ *
+ * @param action a control on the left of the figure, or null for none. Null on
+ *   the add screen — that screen's way out of the keypad is picking a category,
+ *   which it is about to do anyway. The edit sheet passes the note button here,
+ *   because a row opened for editing already HAS its category: tapping the
+ *   amount there put the keys up over the note with nothing on screen that
+ *   would take them down again, and a transfer has no grid to tap at all.
  */
 @Composable
-internal fun AmountDisplay(amount: AmountInput, onClick: () -> Unit) {
-    Column(
+internal fun AmountDisplay(
+    amount: AmountInput,
+    onClick: () -> Unit,
+    action: (@Composable () -> Unit)? = null,
+) {
+    Row(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick)
             .padding(horizontal = 20.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.Bottom,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        // Its own clickable wins over the row's, so the one control on this
+        // line that does not mean "type the amount" does not have to be outside
+        // the line to say so.
+        action?.let { Box(modifier = Modifier.padding(bottom = 10.dp)) { it() } }
+        AmountFigure(amount = amount, modifier = Modifier.weight(1f))
+    }
+}
+
+@Composable
+private fun AmountFigure(amount: AmountInput, modifier: Modifier = Modifier) {
+    Column(
+        modifier = modifier,
         horizontalAlignment = Alignment.End,
     ) {
         // The running total, not just the sign: "60,00 +" while the second
@@ -160,22 +183,28 @@ internal fun ContextChip(
 }
 
 /**
- * The categories, two levels deep, one level at a time.
+ * The categories, and — once one is chosen — its subcategories below them.
  *
- * It used to be one flat grid: every root followed by its children, so a
- * household with eleven families and their subcategories put fifty circles on
- * screen and "Paliwo" sat beside "Dom i ogród" as an equal. Nothing said which
- * belonged to which, and finding the one you wanted meant reading the whole
- * grid rather than aiming at it.
+ * It was one flat grid: every root followed by its children, so a household
+ * with eleven families put fifty circles on screen and "Paliwo" sat beside "Dom
+ * i ogród" as an equal, with nothing saying which belonged to which.
  *
- * So: the roots, and tapping one opens its children. Tapping a root also FILES
- * on that root — "Dom i ogród" and nothing further is a complete answer, and
- * making people pick a leaf they do not want is how a category tree fills up
- * with "Inne". The subcategory step is genuinely optional; the header at the
- * top of it goes back.
+ * Then it was a drill-down, which said the shape out loud but took the roots
+ * away to do it: choosing the wrong family meant a trip back out through a
+ * header, and the grid you were aiming at moved under your thumb between the
+ * first tap and the second.
  *
- * [openRootId] is derived state, reset whenever the list itself changes — which
- * is what a kind switch does, since expense and income are different lists.
+ * So both, stacked. The roots never move. Choosing one opens a second block
+ * under a rule, and the two blocks are visibly different things rather than one
+ * long list. The subcategory step is optional in the honest sense — filing on
+ * "Dom i ogród" and stopping there is a complete answer, and tapping the lit
+ * child again puts it back on the parent.
+ *
+ * Which family is open is not state. It is read off the selection: the chosen
+ * category, or its parent if the chosen one is a child. Two pieces of state for
+ * one choice is how a picker ends up showing a parent from one family and a
+ * child from another — and it is why this used to stay three taps deep in
+ * whatever the last saved transaction was filed under.
  */
 @Composable
 internal fun CategoryGrid(
@@ -184,7 +213,6 @@ internal fun CategoryGrid(
     colorOf: (CategoryEntity) -> Color,
     onSelect: (String) -> Unit,
     modifier: Modifier = Modifier,
-    footer: (@Composable () -> Unit)? = null,
 ) {
     val roots = remember(categories) {
         categories.filter { it.parentId == null }.sortedBy { it.sortOrder }
@@ -195,22 +223,9 @@ internal fun CategoryGrid(
             .groupBy { it.parentId }
     }
 
-    // Opened where the current selection already lives, so arriving at an
-    // edit whose category is "Transport > Paliwo" lands on the step that has
-    // Paliwo lit rather than on the roots with nothing to show for it.
-    var openRootId by remember(categories) {
-        mutableStateOf(categories.firstOrNull { it.id == selectedId }?.parentId)
-    }
-    // Cleared selection closes the family. The selection is only ever cleared
-    // from outside — a saved transaction resetting the screen, or a kind switch
-    // — and both of those mean "start again", which the next person to open
-    // this screen expects to see at the roots rather than three taps deep in
-    // whatever the last transaction was filed under. Nothing in the grid itself
-    // can clear it: tapping a category always sets one.
-    LaunchedEffect(selectedId) { if (selectedId == null) openRootId = null }
-
-    val openRoot = roots.firstOrNull { it.id == openRootId }
-    val shown = if (openRoot == null) roots else childrenOf[openRoot.id].orEmpty()
+    val selected = categories.firstOrNull { it.id == selectedId }
+    val openRootId = selected?.let { it.parentId ?: it.id }
+    val children = openRootId?.let { childrenOf[it] }.orEmpty()
 
     LazyVerticalGrid(
         columns = GridCells.Fixed(4),
@@ -222,145 +237,123 @@ internal fun CategoryGrid(
         horizontalArrangement = Arrangement.spacedBy(4.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        if (openRoot != null) {
-            item(key = "up", span = { GridItemSpan(maxLineSpan) }) {
-                SubcategoryHeader(
-                    root = openRoot,
-                    color = colorOf(openRoot),
-                    onBack = { openRootId = null },
+        items(roots, key = { it.id }) { category ->
+            CategoryCell(
+                category = category,
+                color = colorOf(category),
+                selected = category.id == selectedId,
+                // The family whose children are showing below, when the choice
+                // itself is one of those children. A ring rather than a fill:
+                // it is not the answer, it is where the answer came from.
+                open = category.id == openRootId && category.id != selectedId,
+                onClick = { onSelect(category.id) },
+            )
+        }
+        if (openRootId != null && children.isNotEmpty()) {
+            item(key = "split", span = { GridItemSpan(maxLineSpan) }) {
+                SubcategorySplit()
+            }
+            items(children, key = { it.id }) { category ->
+                CategoryCell(
+                    category = category,
+                    color = colorOf(category),
+                    selected = category.id == selectedId,
+                    open = false,
+                    // Tapping the lit one goes back to the parent. Optional has
+                    // to be undoable or it is a second required step with a
+                    // softer label.
+                    onClick = { onSelect(if (category.id == selectedId) openRootId else category.id) },
                 )
             }
-        }
-        items(shown, key = { it.id }) { category ->
-            val color = colorOf(category)
-            val selected = category.id == selectedId
-            // fillMaxWidth, or the cell is only as wide as its widest child and
-            // sits at the start of the grid slot: "Dom" made a narrow column
-            // with the icon centred over three letters, "Zakupy spożywcze" made
-            // a column the full width of the slot, and the icons in one row
-            // stopped lining up with each other.
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable {
-                        onSelect(category.id)
-                        // Filed on the root AND opened, in one tap. The two are
-                        // not alternatives: the answer is recorded immediately,
-                        // and refining it is offered rather than demanded.
-                        if (childrenOf[category.id].orEmpty().isNotEmpty()) {
-                            openRootId = category.id
-                        }
-                    },
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(48.dp)
-                        .clip(CircleShape)
-                        .background(if (selected) color else color.copy(alpha = 0.16f))
-                        .then(
-                            if (selected) {
-                                Modifier.border(2.dp, color, CircleShape)
-                            } else {
-                                Modifier
-                            },
-                        ),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(
-                        imageVector = Palette.icon(category.icon),
-                        contentDescription = null,
-                        tint = if (selected) Color.White else color,
-                        modifier = Modifier.size(22.dp),
-                    )
-                }
-                Spacer(Modifier.height(4.dp))
-                Text(
-                    text = category.name,
-                    fontSize = 11.sp,
-                    // 11sp default leading is ~15sp, which makes a wrapped name
-                    // look like two separate labels rather than one over two
-                    // lines. Two lines is the floor, not a failure: a narrow
-                    // screen cannot fit "Dom i ogród" beside three other
-                    // columns, and truncating to "Dom i o…" loses the word that
-                    // distinguishes it from "Dom".
-                    lineHeight = 13.sp,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                    // Centring the Column centres the text BLOCK; it says
-                    // nothing about the lines inside it. Without this,
-                    // "Zakupy spożywcze" wraps to two lines whose width is set
-                    // by the longer one, and the short line hangs off its left
-                    // edge — under the icon by accident rather than by design.
-                    textAlign = TextAlign.Center,
-                    color = MaterialTheme.colorScheme.onBackground,
-                    fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
-                )
-            }
-        }
-        // Inside the scroll, not below it. A note is wanted on maybe one
-        // transaction in ten, and a field pinned under the grid charges every
-        // other one 56dp of category space for it — while the keypad is up
-        // there is barely a row and a half left to charge. Down here it costs
-        // nothing until somebody scrolls past the categories looking for it,
-        // which is exactly when they want it.
-        if (footer != null) {
-            item(key = "footer", span = { GridItemSpan(maxLineSpan) }) { footer() }
         }
     }
 }
 
-/**
- * Which family is open, and the way back out of it.
- *
- * The root is drawn selected-looking because it IS selected — opening it filed
- * the transaction there. The arrow is the only control: tapping the name would
- * be ambiguous between "go back" and "keep this one", and the second of those
- * has already happened.
- */
+/** One circle and its name, the shape both halves of the grid are made of. */
 @Composable
-private fun SubcategoryHeader(root: CategoryEntity, color: Color, onBack: () -> Unit) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
-            .clickable(onClick = onBack)
-            .padding(horizontal = 4.dp, vertical = 4.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+private fun CategoryCell(
+    category: CategoryEntity,
+    color: Color,
+    selected: Boolean,
+    open: Boolean,
+    onClick: () -> Unit,
+) {
+    // fillMaxWidth, or the cell is only as wide as its widest child and sits at
+    // the start of the grid slot: "Dom" made a narrow column with the icon
+    // centred over three letters, "Zakupy spożywcze" made a column the full
+    // width of the slot, and the icons in one row stopped lining up.
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
     ) {
-        Icon(
-            Icons.AutoMirrored.Filled.ArrowBack,
-            contentDescription = stringResource(R.string.add_pick_category),
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.size(20.dp),
-        )
         Box(
-            modifier = Modifier.size(28.dp).clip(CircleShape).background(color),
+            modifier = Modifier
+                .size(48.dp)
+                .clip(CircleShape)
+                .background(if (selected) color else color.copy(alpha = 0.16f))
+                .then(
+                    if (selected || open) {
+                        Modifier.border(2.dp, color, CircleShape)
+                    } else {
+                        Modifier
+                    },
+                ),
             contentAlignment = Alignment.Center,
         ) {
             Icon(
-                imageVector = Palette.icon(root.icon),
+                imageVector = Palette.icon(category.icon),
                 contentDescription = null,
-                tint = Color.White,
-                modifier = Modifier.size(16.dp),
+                tint = if (selected) Color.White else color,
+                modifier = Modifier.size(22.dp),
             )
         }
+        Spacer(Modifier.height(4.dp))
         Text(
-            text = root.name,
-            fontSize = 13.sp,
-            fontWeight = FontWeight.SemiBold,
-            maxLines = 1,
+            text = category.name,
+            fontSize = 11.sp,
+            // 11sp default leading is ~15sp, which makes a wrapped name look
+            // like two separate labels rather than one over two lines. Two
+            // lines is the floor, not a failure: a narrow screen cannot fit
+            // "Dom i ogród" beside three other columns, and truncating to
+            // "Dom i o…" loses the word that distinguishes it from "Dom".
+            lineHeight = 13.sp,
+            maxLines = 2,
             overflow = TextOverflow.Ellipsis,
+            // Centring the Column centres the text BLOCK; it says nothing about
+            // the lines inside it. Without this, "Zakupy spożywcze" wraps to two
+            // lines whose width is set by the longer one, and the short line
+            // hangs off its left edge — under the icon by accident.
+            textAlign = TextAlign.Center,
             color = MaterialTheme.colorScheme.onBackground,
+            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
         )
+    }
+}
+
+/**
+ * The rule between the families and the family that is open.
+ *
+ * Without it the children read as a fifth row of roots — same circles, same
+ * size, no boundary — and the grid grows a row every time somebody adds a
+ * subcategory anywhere. A line and a word are enough to say these are the
+ * inside of the one above.
+ */
+@Composable
+private fun SubcategorySplit() {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(top = 4.dp, bottom = 2.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
         Text(
             text = stringResource(R.string.add_pick_subcategory),
             fontSize = 11.sp,
+            fontWeight = FontWeight.Medium,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
+        HorizontalDivider(modifier = Modifier.weight(1f))
     }
 }
 

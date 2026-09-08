@@ -205,40 +205,44 @@ fun AddScreen(
                 }
             },
             modifier = Modifier.weight(1f),
-            // Below the categories, inside their scroll, always there.
-            //
-            // It used to be a sibling of the grid, and gated: no amount, no
-            // category or keypad up meant no field at all. That bought the grid
-            // 56dp back, and cost anyone who wanted a note the ability to find
-            // one — a control that is only present after two other answers is a
-            // control you have to already know about. Down here it takes no
-            // space from the categories at all; you scroll past the last row and
-            // it is there, with the keypad still up if that is where you were.
-            footer = {
-                OutlinedTextField(
-                    value = state.note,
-                    onValueChange = viewModel::setNote,
-                    label = { Text(stringResource(R.string.add_note_hint)) },
-                    singleLine = true,
-                    // A note is a sentence fragment ("Zakupy na weekend"), so
-                    // the keyboard opens shifted. A hint only: shift still wins
-                    // for "iPhone".
-                    keyboardOptions = KeyboardOptions(
-                        capitalization = KeyboardCapitalization.Sentences,
-                    ),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 4.dp, vertical = 4.dp)
-                        // Tapping it takes the keypad down: the keys and the
-                        // note are both bottom-of-screen inputs and only one of
-                        // them can be the one being answered. Tapping the amount
-                        // comes back the other way, and editAmount() drops this
-                        // field's focus first so the system keyboard goes with
-                        // it.
-                        .onFocusChanged { if (it.isFocused) editing = Editing.Note },
-                )
-            },
         )
+
+        // Last, lowest, and behind the calculator until the calculator is done.
+        //
+        // The default screen is icons and keys: a note is wanted on maybe one
+        // transaction in ten, and a field between the grid and the keypad
+        // charges the other nine 56dp of category space for it. The keypad
+        // standing down is what reveals it, so the space it takes is space that
+        // was just freed — and it lands directly above Save, a whole grid away
+        // from the subcategories, which is where the last thing you type
+        // belongs.
+        //
+        // It is also the same field as the edit sheet's, down to the padding.
+        // Two screens that both mean "anything to add?" have to look the same
+        // or the second one reads as a different question.
+        if (editing != Editing.Amount) {
+            OutlinedTextField(
+                value = state.note,
+                onValueChange = viewModel::setNote,
+                label = { Text(stringResource(R.string.add_note_hint)) },
+                singleLine = true,
+                // A note is a sentence fragment ("Zakupy na weekend"), so the
+                // keyboard opens shifted. A hint only: shift still wins for
+                // "iPhone".
+                keyboardOptions = KeyboardOptions(
+                    capitalization = KeyboardCapitalization.Sentences,
+                ),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 12.dp, vertical = 4.dp)
+                    // The keys and the note are both bottom-of-screen inputs and
+                    // only one of them can be the one being answered. Tapping
+                    // the amount comes back the other way, and editAmount()
+                    // drops this field's focus first so the system keyboard goes
+                    // with it.
+                    .onFocusChanged { if (it.isFocused) editing = Editing.Note },
+            )
+        }
 
         if (editing == Editing.Amount) {
             Keypad(
