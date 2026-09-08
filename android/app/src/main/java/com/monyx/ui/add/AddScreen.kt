@@ -50,8 +50,13 @@ import com.monyx.ui.settings.RuleSeed
 import com.monyx.ui.theme.Palette
 
 /**
- * Launching the app must land directly on the numeric keypad. Type the amount,
- * tap a category, tap save. Account, date and author come from defaults.
+ * The keypad, first thing. Type the amount, tap a category, tap save. Account,
+ * date and author come from defaults.
+ *
+ * It is no longer what the app opens on — that is the summary now, because
+ * opening a ledger is a question more often than it is an entry — but it is one
+ * tap from anywhere in the bottom bar and zero from the launcher long-press,
+ * and nothing below this line changes because of that.
  *
  * Target: two taps plus the amount, under five seconds from unlocking the phone.
  * Anything that stretches that — an animation, a save confirmation, a

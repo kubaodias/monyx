@@ -10,7 +10,11 @@
   the rule stops being checkable.
 -->
 <resources>
-    <string name="app_name">Monyx</string>
+    <!-- The launcher label, and the fallback title on a push with no title of
+         its own. Polish only: the app is Monyx everywhere it is written down,
+         and "Portfel" on the home screen because that is what the family calls
+         the thing they are opening. -->
+    <string name="app_name">Portfel</string>
 
     <!-- Navigation -->
     <string name="nav_overview">Przegląd</string>

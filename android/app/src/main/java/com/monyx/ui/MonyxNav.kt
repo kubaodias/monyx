@@ -373,10 +373,16 @@ private fun MainScaffold(
     ) { padding ->
         NavHost(
             navController = navController,
-            // Launching the app lands directly on the numeric keypad. This
-            // is the single thing that determines whether the family is still
-            // using this in a month.
-            startDestination = startDestination ?: Destinations.ADD,
+            // Launching the app lands on the summary: where the money went
+            // this month, what is left, what was entered last. Opening a ledger
+            // is a question far more often than it is an entry, and the keypad
+            // answered the rarer one by putting a blank amount in front of
+            // somebody who came to look something up.
+            //
+            // Entering is still one tap — the middle of the bottom bar — and
+            // zero from the home screen: the launcher long-press shortcut
+            // passes start=add, which is what `startDestination` carries here.
+            startDestination = startDestination ?: Destinations.OVERVIEW,
             // consumeWindowInsets, THEN imePadding. The window is edge to edge,
             // so `adjustResize` in the manifest does nothing on API 30+ and the
             // keyboard simply draws over the bottom of the screen — which is
