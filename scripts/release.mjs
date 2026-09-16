@@ -80,13 +80,18 @@ const commit = execFileSync("git", ["rev-parse", "--short", "HEAD"], { cwd: ROOT
 
 // ---- 2. build --------------------------------------------------------------
 
+// Gradle AND apksigner need it. On macOS the /usr/bin/java stub answers "Unable
+// to locate a Java Runtime" rather than failing over to anything, so JAVA_HOME
+// has to reach every child that runs Java, not just the build.
+const javaHome = process.env.JAVA_HOME ?? join(homedir(), ".local/jdks/temurin-21.jdk/Contents/Home");
+const javaEnv = { ...process.env, JAVA_HOME: javaHome, PATH: `${join(javaHome, "bin")}:${process.env.PATH}` };
+
 if (!flag("--skip-build")) {
   step("assembleRelease");
-  const javaHome = process.env.JAVA_HOME ?? join(homedir(), ".local/jdks/temurin-21.jdk/Contents/Home");
   execFileSync("./gradlew", ["--quiet", ":app:assembleRelease"], {
     cwd: ANDROID,
     stdio: "inherit",
-    env: { ...process.env, JAVA_HOME: javaHome },
+    env: javaEnv,
   });
 }
 
@@ -118,7 +123,7 @@ function apksigner() {
   die(`apksigner not found under ${tools}`);
 }
 
-const certs = execFileSync(apksigner(), ["verify", "--print-certs", apkPath], { encoding: "utf8" });
+const certs = execFileSync(apksigner(), ["verify", "--print-certs", apkPath], { encoding: "utf8", env: javaEnv });
 const digests = [...certs.matchAll(/certificate SHA-256 digest: ([0-9a-f]{64})/g)].map((m) => m[1]);
 if (digests.length !== 1 || digests[0] !== RELEASE_CERT_SHA256) {
   die(`APK is not signed with the release certificate (got ${digests.join(", ") || "none"})`);
