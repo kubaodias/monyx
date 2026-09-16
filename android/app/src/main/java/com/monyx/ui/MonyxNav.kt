@@ -399,7 +399,14 @@ private fun MainScaffold(
                 AddScreen(
                     viewModel = addViewModel,
                     memberId = memberId,
-                    onSaved = { SyncWorker.enqueue(app) },
+                    // Straight to the ledger, unfiltered, so the row just
+                    // entered is on screen as proof it landed. Both saves come
+                    // through here: a repeating rule materialises its first
+                    // occurrence before calling back, so there is a row to see.
+                    onSaved = {
+                        SyncWorker.enqueue(app)
+                        selectTab(Destinations.TRANSACTIONS)
+                    },
                 )
             }
             composable(Destinations.OVERVIEW) {
