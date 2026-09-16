@@ -24,3 +24,6 @@ server/telnyx-env.d.ts
 # Local backups / exports
 *.sql.gz
 backups/
+
+# Secrets
+.wallet.token
