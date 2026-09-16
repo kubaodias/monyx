@@ -261,4 +261,28 @@
     <string name="voice_partial_finish">Zrozumiano tylko część — dokończ tutaj</string>
     <string name="voice_stop">Zakończ słuchanie</string>
     <string name="voice_save_failed">Nie udało się zapisać</string>
+
+    <!-- Aktualizacja z poziomu aplikacji -->
+    <string name="update_title">Dostępna aktualizacja</string>
+    <string name="update_size">%1$s MB</string>
+    <string name="update_install">Aktualizuj</string>
+    <string name="update_later">Później</string>
+    <string name="update_retry">Spróbuj ponownie</string>
+    <string name="update_open_settings">Otwórz ustawienia</string>
+    <string name="update_downloading">Pobieranie… %1$d%%</string>
+    <string name="update_installing">Potwierdź instalację w oknie systemowym</string>
+    <string name="update_permission">Aby zaktualizować, zezwól tej aplikacji na instalowanie aplikacji. Wystarczy zrobić to raz.</string>
+    <string name="update_error_offline">Nie udało się pobrać aktualizacji. Sprawdź połączenie.</string>
+    <string name="update_error_unavailable">Aktualizacja jest teraz niedostępna. Spróbuj później.</string>
+    <string name="update_error_corrupt">Pobrany plik jest uszkodzony, więc nie został zainstalowany.</string>
+    <string name="update_error_not_this_app">Pobrany plik nie jest poprawną aktualizacją tej aplikacji, więc nie został zainstalowany.</string>
+    <string name="update_error_cancelled">Instalacja anulowana.</string>
+    <string name="update_error_install_failed">Android nie mógł zainstalować aktualizacji.</string>
+    <string name="settings_update_check">Sprawdź aktualizacje</string>
+    <string name="settings_update_checking">Sprawdzanie…</string>
+    <string name="settings_update_up_to_date">Masz najnowszą wersję</string>
+    <string name="settings_update_available">Dostępna jest wersja %1$s (%2$d)</string>
+    <string name="settings_update_show">Pokaż aktualizację</string>
+    <string name="settings_update_check_failed">Nie udało się sprawdzić aktualizacji</string>
+    <string name="settings_update_debug">Wersje debug nie aktualizują się same</string>
 </resources>

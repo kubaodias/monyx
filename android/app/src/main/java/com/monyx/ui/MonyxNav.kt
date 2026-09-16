@@ -72,6 +72,7 @@ import com.monyx.ui.settings.SettingsScreen
 import com.monyx.ui.theme.MonyxMark
 import com.monyx.ui.theme.Palette
 import com.monyx.ui.transactions.TransactionsScreen
+import com.monyx.ui.update.UpdateDialog
 import com.monyx.voice.EdgeNoteWriter
 import com.monyx.voice.RepositoryVoiceLedger
 import com.monyx.voice.SpeechListener
@@ -478,6 +479,9 @@ private fun MainScaffold(
             )
         },
     )
+
+    // Last, so it draws above the voice sheet if both are ever up at once.
+    UpdateDialog()
 }
 
 /**

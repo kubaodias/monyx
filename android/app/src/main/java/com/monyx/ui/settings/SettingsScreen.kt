@@ -81,6 +81,7 @@ import com.monyx.BuildConfig
 import com.monyx.Locales
 import com.monyx.MonyxApp
 import com.monyx.R
+import com.monyx.update.UpdateState
 import com.monyx.data.Dates
 import com.monyx.data.MemberEntity
 import com.monyx.ui.theme.Palette
@@ -554,12 +555,58 @@ private fun LanguageRow(label: String, selected: Boolean, onSelect: () -> Unit) 
 
 @Composable
 private fun BuildIdentitySection() {
+    val app = LocalContext.current.applicationContext as MonyxApp
+    val updater = app.updater
+    val state by updater.state.collectAsStateWithLifecycle()
+
     SectionCard(title = stringResource(R.string.settings_app_version)) {
         Text(
             stringResource(R.string.settings_build, BuildConfig.VERSION_NAME, BuildConfig.VERSION_CODE),
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
+        if (!updater.enabled) {
+            Text(
+                stringResource(R.string.settings_update_debug),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            return@SectionCard
+        }
+        val offered = when (val s = state) {
+            is UpdateState.Available -> s.update
+            is UpdateState.NeedsPermission -> s.update
+            is UpdateState.Downloading -> s.update
+            is UpdateState.Installing -> s.update
+            is UpdateState.Failed -> s.update
+            else -> null
+        }
+        when {
+            offered != null -> Text(
+                stringResource(R.string.settings_update_available, offered.versionName, offered.versionCode),
+                style = MaterialTheme.typography.bodySmall,
+            )
+            state is UpdateState.UpToDate -> Text(
+                stringResource(R.string.settings_update_up_to_date),
+                style = MaterialTheme.typography.bodySmall,
+            )
+            state is UpdateState.CheckFailed -> Text(
+                stringResource(R.string.settings_update_check_failed),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.error,
+            )
+        }
+        if (offered != null) {
+            TextButton(onClick = updater::showPrompt) { Text(stringResource(R.string.settings_update_show)) }
+        } else {
+            TextButton(onClick = updater::checkNow, enabled = state !is UpdateState.Checking) {
+                Text(
+                    stringResource(
+                        if (state is UpdateState.Checking) R.string.settings_update_checking else R.string.settings_update_check,
+                    ),
+                )
+            }
+        }
     }
 }
 

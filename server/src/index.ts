@@ -13,9 +13,10 @@ import {
   undeliveredAlerts,
   type PendingAlert,
 } from "./budgets.ts";
-import { allHouseholds, forHousehold, type HouseholdDb } from "./db.ts";
+import { allHouseholds, forHousehold, releaseByCode, releasesAfter, type HouseholdDb } from "./db.ts";
 import { sendBudgetAlert, type DeviceToken } from "./fcm.ts";
 import { parseNoteInput, suggestNote } from "./note.ts";
+import { describeUpdate, parseVersionCode, presign } from "./releases.ts";
 import { DEFAULT_PULL_LIMIT, pull, push } from "./sync.ts";
 import { currentPeriod, localDate, periodOf } from "./schema.ts";
 import {
@@ -211,6 +212,28 @@ async function handleVoiceNote(req: Request, session: SessionLike): Promise<Resp
   return json(await suggestNote(input, env.TELNYX ?? null));
 }
 
+/**
+ * Two routes, not one, because they are asked at different moments. The check
+ * runs on every launch and must stay cheap and never fail loudly; the URL is
+ * minted only when somebody taps Update, so the five-minute window starts then
+ * and a phone that never updates never holds one.
+ */
+async function handleLatest(url: URL): Promise<Response> {
+  const current = parseVersionCode(url.searchParams.get("version_code"));
+  if (current === null) return fail(400, "bad_version_code");
+  return json({ update: describeUpdate(await releasesAfter(current)) });
+}
+
+async function handleDownload(url: URL, nowMs: number): Promise<Response> {
+  const code = parseVersionCode(url.searchParams.get("version_code"));
+  if (code === null) return fail(400, "bad_version_code");
+  const row = await releaseByCode(code);
+  if (!row) return fail(404, "no_such_release");
+  const download = await presign(row.object_key, env.TELNYX ?? null, nowMs);
+  if (!download) return fail(503, "download_unavailable");
+  return json(download);
+}
+
 async function handleCron(req: Request, nowMs: number): Promise<Response> {
   let expected: string;
   try {
@@ -404,6 +427,12 @@ export default {
       }
       if (path === "/voice/note" && req.method === "POST") {
         return await handleVoiceNote(req, session);
+      }
+      if (path === "/app/latest" && req.method === "GET") {
+        return await handleLatest(url);
+      }
+      if (path === "/app/download" && req.method === "GET") {
+        return await handleDownload(url, nowMs);
       }
 
       return fail(404, "not_found");

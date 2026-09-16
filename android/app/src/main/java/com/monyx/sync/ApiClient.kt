@@ -56,6 +56,10 @@ object Api {
         .readTimeout(5, TimeUnit.SECONDS)
         .build()
 
+    private val downloadClient = client.newBuilder()
+        .readTimeout(60, TimeUnit.SECONDS)
+        .build()
+
     class ApiException(val status: Int, val code: String) : Exception("HTTP $status: $code")
 
     private fun execute(request: Request): String {
@@ -111,6 +115,45 @@ object Api {
 
     fun pull(token: String, since: Long, limit: Int = 500): PullResponse =
         json.decodeFromString(get("/sync/pull?since=$since&limit=$limit", token))
+
+    /** Whether a newer release is published. `update` is null when this is the newest. */
+    fun latestRelease(token: String, versionCode: Int): LatestReleaseResponse =
+        json.decodeFromString(get("/app/latest?version_code=$versionCode", token))
+
+    /**
+     * A five-minute URL to one release's APK. Asked for when somebody taps
+     * Update, never at launch, so the window starts when the download does.
+     */
+    fun releaseDownload(token: String, versionCode: Int): ReleaseDownload =
+        json.decodeFromString(get("/app/download?version_code=$versionCode", token))
+
+    /**
+     * Streams a presigned URL into [target], reporting bytes as they land.
+     *
+     * No bearer header: the URL carries its own token, and the storage host is not
+     * ours to hand a session to. A longer read timeout than the API calls, since
+     * a stalled mobile connection mid-APK is ordinary.
+     */
+    fun download(url: String, target: java.io.File, onBytes: (Long) -> Unit) {
+        val request = Request.Builder().url(url).get().build()
+        downloadClient.newCall(request).execute().use { response ->
+            if (!response.isSuccessful) throw ApiException(response.code, "download_http_${response.code}")
+            val body = response.body ?: throw ApiException(response.code, "download_empty")
+            body.byteStream().use { input ->
+                target.outputStream().use { output ->
+                    val buffer = ByteArray(64 * 1024)
+                    var total = 0L
+                    while (true) {
+                        val read = input.read(buffer)
+                        if (read < 0) break
+                        output.write(buffer, 0, read)
+                        total += read
+                        onBytes(total)
+                    }
+                }
+            }
+        }
+    }
 
     /**
      * A second opinion on a spoken note, or null.
@@ -194,4 +237,31 @@ data class PullResponse(
     val seq: Long,
     @SerialName("has_more") val hasMore: Boolean,
     @SerialName("last_backup_at") val lastBackupAt: Long? = null,
+)
+
+@Serializable
+data class ReleaseNote(
+    @SerialName("version_code") val versionCode: Int,
+    @SerialName("version_name") val versionName: String,
+    val notes: String,
+    @SerialName("published_at") val publishedAt: Long,
+)
+
+@Serializable
+data class AvailableUpdate(
+    @SerialName("version_code") val versionCode: Int,
+    @SerialName("version_name") val versionName: String,
+    @SerialName("size_bytes") val sizeBytes: Long,
+    val sha256: String,
+    /** Every release newer than this phone's, newest first. */
+    val notes: List<ReleaseNote> = emptyList(),
+)
+
+@Serializable
+data class LatestReleaseResponse(val update: AvailableUpdate? = null)
+
+@Serializable
+data class ReleaseDownload(
+    val url: String,
+    @SerialName("expires_at") val expiresAt: Long,
 )

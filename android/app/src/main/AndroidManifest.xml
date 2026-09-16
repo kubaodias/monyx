@@ -12,6 +12,10 @@
          (RecognizerIntent) would need no permission of ours and cannot express
          a hold. -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <!-- Updating from inside the app. Not a runtime permission: the first
+         install sends the user to "Install unknown apps" for this app once, and
+         the system confirms every install after that regardless. -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 
     <!-- Do not delete this. It is invisible and it is load-bearing: with
          targetSdk 30 or above, package visibility filtering hides every
@@ -40,6 +44,10 @@
              and DataStore to the cloud and restore them onto a NEW phone,
              session token included. Two devices would then share one `devices`
              row, so revoking one revokes both. -->
+
+        <receiver
+            android:name=".update.InstallResultReceiver"
+            android:exported="false" />
 
         <activity
             android:name=".MainActivity"

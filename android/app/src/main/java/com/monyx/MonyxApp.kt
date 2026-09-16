@@ -8,12 +8,14 @@ import com.monyx.data.MonyxDatabase
 import com.monyx.data.MonyxRepository
 import com.monyx.sync.Session
 import com.monyx.ui.SelectedMonth
+import com.monyx.update.Updater
 
 class MonyxApp : Application() {
 
     val database by lazy { MonyxDatabase.get(this) }
     val repository by lazy { MonyxRepository(database.dao()) }
     val session by lazy { Session(this) }
+    val updater by lazy { Updater(this, session) }
 
     /**
      * Held here because it has to outlive every ViewModel that reads it. Three

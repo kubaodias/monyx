@@ -110,3 +110,48 @@ export async function resolveSession(
     .bind(sessionToken)
     .first<SessionRow>();
 }
+
+/** A published Android release, as stored. See migrations/0006_app_releases.sql. */
+export interface ReleaseRow {
+  version_code: number;
+  version_name: string;
+  object_key: string;
+  sha256: string;
+  size_bytes: number;
+  notes: string;
+  published_at: number;
+}
+
+/**
+ * Exception four: releases belong to the app, not to a household, so there is
+ * no household to scope them to. Newest first, and only those newer than what
+ * the phone already runs — the route shows every skipped version's notes, not
+ * just the latest one's.
+ */
+export async function releasesAfter(
+  versionCode: number,
+  db: SqlDatabase = binding(),
+): Promise<ReleaseRow[]> {
+  const { results } = await db
+    .prepare(
+      "SELECT version_code, version_name, object_key, sha256, size_bytes, notes, published_at " +
+        "FROM app_releases WHERE version_code > ? ORDER BY version_code DESC LIMIT 20",
+    )
+    .bind(versionCode)
+    .all<ReleaseRow>();
+  return results;
+}
+
+/** Exception four, again: one release by its exact version code, or null. */
+export async function releaseByCode(
+  versionCode: number,
+  db: SqlDatabase = binding(),
+): Promise<ReleaseRow | null> {
+  return db
+    .prepare(
+      "SELECT version_code, version_name, object_key, sha256, size_bytes, notes, published_at " +
+        "FROM app_releases WHERE version_code = ?",
+    )
+    .bind(versionCode)
+    .first<ReleaseRow>();
+}

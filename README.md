@@ -199,6 +199,21 @@ APK whose versionCode is lower than the installed one**, so a bad release cannot
 be rolled back without an uninstall. Settings shows `versionName (versionCode)`
 so "which build do you have?" is answerable over the phone.
 
+### Publishing an update
+
+```sh
+node scripts/release.mjs --notes "Po zapisaniu otwiera się lista transakcji."
+node scripts/release.mjs --notes-file notes.txt --dry-run   # every check, no upload
+```
+
+Builds the release, checks it is signed with the release certificate, uploads it
+to the private `monyx-releases` bucket, reads it back and compares sha256, and
+only then writes the `app_releases` row. Installed release builds offer it on
+their next launch; Settings › Advanced can check on demand. **The tree must be
+committed first** — versionCode is the commit count. Withdraw a release by
+deleting its row. See
+[ADR 0020](docs/decisions/0020-the-app-updates-itself-and-asks-first.md).
+
 ### The release keystore
 
 `android/keystore.properties` (git-ignored) points at `~/.monyx/monyx-release.jks`.

@@ -62,6 +62,9 @@ class MainActivity : AppCompatActivity() {
                         app.repository.materializeRecurring()
                         SyncWorker.enqueue(this@MainActivity)
                         SyncWorker.schedulePeriodic(this@MainActivity)
+                        // After the sync, and quiet: a prompt appears only if
+                        // there is something newer, never a spinner or an error.
+                        app.updater.checkOnLaunch()
                     }
                 }
 
