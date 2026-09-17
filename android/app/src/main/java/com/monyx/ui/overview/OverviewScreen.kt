@@ -3,6 +3,7 @@ package com.monyx.ui.overview
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -77,43 +78,11 @@ import kotlinx.coroutines.launch
 @Composable
 fun OverviewScreen(
     onOpenTransactions: (categoryId: String?, period: String?) -> Unit,
-    onSyncRequested: () -> Unit,
 ) {
     val app = LocalContext.current.applicationContext as MonyxApp
     val viewModel: OverviewViewModel = viewModel(factory = OverviewViewModel.factory(app.repository, app.selectedMonth))
     val state by viewModel.uiState.collectAsStateWithLifecycle()
-    val categories by viewModel.categories.collectAsStateWithLifecycle()
-    val accounts by viewModel.accounts.collectAsStateWithLifecycle()
     val history by viewModel.history.collectAsStateWithLifecycle()
-    val scope = rememberCoroutineScope()
-
-    // The row somebody tapped, loaded whole. Null closes the editor.
-    var editing by remember { mutableStateOf<TransactionEntity?>(null) }
-
-    editing?.let { original ->
-        EditTransactionSheet(
-            original = original,
-            categories = categories,
-            accounts = accounts,
-            onDismiss = { editing = null },
-            onSave = { edit ->
-                viewModel.saveEdit(
-                    original = original,
-                    amountMinor = edit.amountMinor,
-                    categoryId = edit.categoryId,
-                    accountId = edit.accountId,
-                    note = edit.note,
-                    occurredAtMs = edit.occurredAtMs,
-                    onSaved = onSyncRequested,
-                )
-                editing = null
-            },
-            onDelete = { id ->
-                viewModel.deleteTransaction(id, onSyncRequested)
-                editing = null
-            },
-        )
-    }
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -154,19 +123,6 @@ fun OverviewScreen(
                 // Tapping a bar moves the whole screen to that month, which is
                 // the same thing the switcher at the top does.
                 onSelectMonth = viewModel::setPeriod,
-            )
-        }
-        item {
-            RecentSection(
-                recent = state.recent,
-                // The row's own id, which this used to throw away: every row in
-                // the list navigated to the same unfiltered month, so tapping
-                // the third and the ninth did exactly the same thing. It opens
-                // that transaction's editor, here, without a tab switch —
-                // leaving the overview would lose the place somebody tapped
-                // from. "See all" is the one that is meant to navigate.
-                onOpenTransaction = { id -> scope.launch { editing = viewModel.load(id) } },
-                onSeeAll = { onOpenTransactions(null, state.period) },
             )
         }
     }
@@ -412,6 +368,10 @@ private fun BreakdownCard(
     onSelectMonth: (String) -> Unit,
 ) {
     var showHistory by rememberSaveable { mutableStateOf(false) }
+    // Turning a card over is somewhere you went, so Back is the way out of it.
+    // Without this the gesture leaves the Overview entirely and the card is
+    // still showing its back when you come back to the tab.
+    BackHandler(enabled = showHistory) { showHistory = false }
     // Ids, so a category hidden in one month's data stays hidden when the
     // window moves under it. Saveable as a list because a Set is not.
     var hiddenIds by rememberSaveable { mutableStateOf(listOf<String>()) }
@@ -460,6 +420,13 @@ private fun BreakdownCard(
                     onToggle = { id ->
                         hiddenIds = if (id in hidden) hiddenIds - id else hiddenIds + id
                     },
+                    // All or nothing, from whichever state the legend is in:
+                    // with anything hidden it puts everything back, and only
+                    // from a full chart does it clear it.
+                    onToggleAll = {
+                        hiddenIds = if (hidden.isEmpty()) history.categories.map { it.id } else emptyList()
+                    },
+                    onCategoryClick = onCategoryClick,
                     onSelectMonth = onSelectMonth,
                 )
             } else {
@@ -490,6 +457,8 @@ private fun HistoryFace(
     history: CategoryHistory,
     hidden: Set<String>,
     onToggle: (String) -> Unit,
+    onToggleAll: () -> Unit,
+    onCategoryClick: (String) -> Unit,
     onSelectMonth: (String) -> Unit,
 ) {
     if (history.isEmpty) {
@@ -511,21 +480,13 @@ private fun HistoryFace(
         hidden = hidden,
         onSelectMonth = onSelectMonth,
     )
-    // The pale bar on the right needs saying in words once; the alpha alone
-    // reads as "less was spent" to anyone who has not been told otherwise.
-    if (history.months.lastOrNull()?.partial == true) {
-        Spacer(modifier = Modifier.height(8.dp))
-        Text(
-            text = stringResource(R.string.overview_history_partial),
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-    }
     Spacer(modifier = Modifier.height(20.dp))
     CategoryHistoryLegend(
         categories = history.categories,
         hidden = hidden,
         onToggle = onToggle,
+        onToggleAll = onToggleAll,
+        onOpen = onCategoryClick,
     )
 }
 
@@ -641,115 +602,3 @@ private fun AccountButton(
     }
 }
 
-@Composable
-private fun RecentSection(
-    recent: List<TransactionListItem>,
-    onOpenTransaction: (String) -> Unit,
-    onSeeAll: () -> Unit,
-) {
-    Column {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(
-                text = stringResource(R.string.overview_recent),
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold,
-            )
-            TextButton(onClick = onSeeAll) {
-                Text(text = stringResource(R.string.overview_see_all))
-            }
-        }
-        Spacer(modifier = Modifier.height(4.dp))
-        if (recent.isEmpty()) {
-            Box(
-                modifier = Modifier.fillMaxWidth().padding(vertical = 24.dp),
-                contentAlignment = Alignment.Center,
-            ) {
-                Text(
-                    text = stringResource(R.string.transactions_empty),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        } else {
-            // Dated delimiters rather than a date on every row: the same day
-            // heading the full history uses, so a list of twelve rows reads as
-            // days rather than as an undated pile.
-            val grouped = remember(recent) { recent.groupBy { it.occurredOn }.toList() }
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                grouped.forEach { (day, items) ->
-                    Text(
-                        text = Dates.dayLabel(day),
-                        style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(top = 6.dp),
-                    )
-                    items.forEach { tx ->
-                        TransactionRow(tx = tx, onClick = { onOpenTransaction(tx.id) })
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun TransactionRow(tx: TransactionListItem, onClick: () -> Unit) {
-    // Keyed on the category's family, never on the transaction: keyed on the
-    // row id a colourless category came out a different colour on every line.
-    val color = Palette.colorFor(tx.categoryColor, tx.categoryColorKey ?: tx.id)
-    Card(
-        shape = RoundedCornerShape(18.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
-    ) {
-        Row(modifier = Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
-            Box(
-                modifier = Modifier
-                    .size(44.dp)
-                    .clip(CircleShape)
-                    .background(color.copy(alpha = 0.18f)),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(
-                    imageVector = Palette.icon(tx.categoryIcon),
-                    contentDescription = null,
-                    tint = color,
-                )
-            }
-            Spacer(modifier = Modifier.width(14.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = tx.categoryName ?: tx.transferAccountName
-                        ?: stringResource(R.string.common_none),
-                    style = MaterialTheme.typography.bodyLarge,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                if (!tx.note.isNullOrBlank()) {
-                    Text(
-                        text = tx.note,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
-            }
-            Spacer(modifier = Modifier.width(12.dp))
-            Text(
-                text = Money.formatSigned(tx.amountMinor, tx.kind),
-                style = MaterialTheme.typography.bodyLarge,
-                fontWeight = FontWeight.SemiBold,
-                color = when (tx.kind) {
-                    "income" -> MaterialTheme.colorScheme.primary
-                    "expense" -> MaterialTheme.colorScheme.error
-                    else -> MaterialTheme.colorScheme.onSurface
-                },
-            )
-        }
-    }
-}

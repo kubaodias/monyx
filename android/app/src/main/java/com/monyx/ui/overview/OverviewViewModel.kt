@@ -5,13 +5,9 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.monyx.data.AccountBalance
-import com.monyx.data.AccountEntity
-import com.monyx.data.CategoryEntity
 import com.monyx.data.CategorySpend
 import com.monyx.data.Dates
 import com.monyx.data.MonyxRepository
-import com.monyx.data.TransactionEntity
-import com.monyx.data.TransactionListItem
 import com.monyx.ui.SelectedMonth
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -21,7 +17,6 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
-import kotlinx.coroutines.launch
 
 /**
  * Everything the Overview screen (Przegląd) shows for one selected month:
@@ -60,9 +55,6 @@ data class OverviewUiState(
     val accounts: List<AccountBalance> = emptyList(),
     /** Empty means every account. Never a list of all ids — see the repository. */
     val selectedAccountIds: Set<String> = emptySet(),
-    /** The selected month's transactions, newest first — NOT the newest rows in
-     *  the database. Stepping back a month must not keep showing today's. */
-    val recent: List<TransactionListItem> = emptyList(),
     /** The back of the balance card: thirty days ending inside the selected
      *  month. Its window is NOT the month, which is why it carries its own
      *  dates and its own totals rather than reusing the ones above. */
@@ -122,13 +114,12 @@ class OverviewViewModel(
             combine(
                 repository.spendByCategory(selectedPeriod, accountIds),
                 repository.accountBalances(),
-                repository.recentTransactions(selectedPeriod, 12, accountIds),
                 repository.dailyTotals(
                     Dates.iso(window.start),
                     Dates.iso(window.endInclusive),
                     accountIds,
                 ),
-            ) { breakdown, accounts, recent, daily ->
+            ) { breakdown, accounts, daily ->
                 OverviewUiState(
                     period = selectedPeriod,
                     // Summed from the same rows the chart is drawn from rather
@@ -145,7 +136,6 @@ class OverviewViewModel(
                     // transactions are still in every unfiltered figure above.
                     accounts = accounts.filter { it.archived == 0 },
                     selectedAccountIds = accountIds,
-                    recent = recent,
                     trend = trendSeries(daily, window.start, window.endInclusive),
                 )
             }
@@ -181,53 +171,6 @@ class OverviewViewModel(
             started = SharingStarted.WhileSubscribed(5_000),
             initialValue = emptyHistory(period.value),
         )
-
-    /** For the editor a recent row opens. Both kinds and every account it
-     *  might already sit on, which is what EditTransactionSheet expects. */
-    val categories: StateFlow<List<CategoryEntity>> = repository.categories()
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
-
-    val accounts: StateFlow<List<AccountEntity>> = repository.accounts()
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
-
-    /** The recent list is a projection, not the row. */
-    suspend fun load(id: String): TransactionEntity? = repository.transaction(id)
-
-    /**
-     * The same write History makes, through the same fold, so the two screens
-     * cannot disagree about what an edit is. Sync arrives as a lambda rather
-     * than a Context — nothing in this ViewModel knows WorkManager exists.
-     */
-    fun saveEdit(
-        original: TransactionEntity,
-        amountMinor: Long,
-        categoryId: String?,
-        accountId: String,
-        note: String,
-        occurredAtMs: Long,
-        onSaved: () -> Unit,
-    ) {
-        viewModelScope.launch {
-            repository.updateTransaction(
-                MonyxRepository.applyEdit(
-                    original = original,
-                    amountMinor = amountMinor,
-                    categoryId = categoryId,
-                    accountId = accountId,
-                    note = note,
-                    occurredAtMs = occurredAtMs,
-                ),
-            )
-            onSaved()
-        }
-    }
-
-    fun deleteTransaction(id: String, onDeleted: () -> Unit) {
-        viewModelScope.launch {
-            repository.deleteTransaction(id)
-            onDeleted()
-        }
-    }
 
     fun setPeriod(period: String) {
         selectedMonth.set(period)

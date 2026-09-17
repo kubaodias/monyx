@@ -14,27 +14,34 @@
 
 <table>
   <tr>
-    <td align="center" width="20%"><img src="docs/screenshots/add.png" alt="Adding an expense on the built-in keypad" width="100%"></td>
-    <td align="center" width="20%"><img src="docs/screenshots/overview.png" alt="Monthly overview with a category breakdown" width="100%"></td>
-    <td align="center" width="20%"><img src="docs/screenshots/history.png" alt="Transaction history with search and filters" width="100%"></td>
-    <td align="center" width="20%"><img src="docs/screenshots/budget.png" alt="Monthly plan and per-category budgets" width="100%"></td>
-    <td align="center" width="20%"><img src="docs/screenshots/settings.png" alt="Accounts and categories in settings" width="100%"></td>
+    <td align="center" width="16%"><img src="docs/screenshots/overview.png" alt="Monthly summary with account filters, balance and a category breakdown" width="100%"></td>
+    <td align="center" width="16%"><img src="docs/screenshots/trends.png" alt="Twelve months of spending as stacked bars, by category" width="100%"></td>
+    <td align="center" width="16%"><img src="docs/screenshots/add.png" alt="Adding an expense on the built-in keypad" width="100%"></td>
+    <td align="center" width="16%"><img src="docs/screenshots/history.png" alt="Transaction history with search and filters" width="100%"></td>
+    <td align="center" width="16%"><img src="docs/screenshots/budget.png" alt="Monthly plan and per-category budgets" width="100%"></td>
+    <td align="center" width="16%"><img src="docs/screenshots/settings.png" alt="Accounts and categories in settings" width="100%"></td>
   </tr>
   <tr>
-    <td align="center"><b>Add</b><br>the launch screen</td>
-    <td align="center"><b>Overview</b><br>where the money goes</td>
+    <td align="center"><b>Summary</b><br>the launch screen</td>
+    <td align="center"><b>12 months</b><br>the same card, turned over</td>
+    <td align="center"><b>Add</b><br>keypad and calculator</td>
     <td align="center"><b>History</b><br>search and filter</td>
     <td align="center"><b>Budget</b><br>plan and limits</td>
     <td align="center"><b>Settings</b><br>accounts, categories</td>
   </tr>
 </table>
 
-The app opens straight onto the keypad, because entering an expense is the one
-thing that decides whether a household is still using this in a month. There is
-no system keyboard in that flow: the grid is the amount field, which is also
-what makes the calculator possible — `60 +` stays on screen while the second
-operand is typed, instead of the running total vanishing the moment you press
-an operator.
+The app opens on the summary, and Add is one tap away in the middle of the bar
+— or zero from the home screen, where the launcher's long-press shortcut goes
+straight to the keypad. It used to open on the keypad itself, which answered
+"I just spent something" perfectly and put a blank amount in front of everybody
+who had come to look something up instead. Saving lands on the ledger, with the
+row just entered on screen as proof it went in.
+
+There is no system keyboard in the add flow: the grid is the amount field, which
+is also what makes the calculator possible — `60 +` stays on screen while the
+second operand is typed, instead of the running total vanishing the moment you
+press an operator.
 
 Committing the expense is a button of its own, the width of the screen, with the
 amount already on it. It used to be a filled tick in the corner of the keypad —
@@ -47,8 +54,8 @@ The keypad puts itself away. Tap a category or the note and it goes; tap the
 amount and it comes back, taking the system keyboard with it. It is a quarter
 of the screen that means nothing once the figure is typed, and it used to sit
 there through the category tap and underneath the note's own keyboard. The
-amount grows a small dialpad glyph while it is hidden, because it is the way
-back and nothing else would say so.
+figure is its own way back — it is the largest thing on the screen and it is
+what you would reach for to change the number anyway.
 
 The date can be in the future. An expense has already happened, which is true
 of a receipt and false of the standing order leaving on Friday — and a
@@ -79,6 +86,13 @@ dragging along it walks the month. Every day is a vertex even when nothing
 happened on it, and the line is never smoothed, because a curve fitted between
 two points invents balances the household never had.
 
+Above both cards is the account strip, when there is more than one account:
+each account a button carrying its own balance, every one of them on to start
+with, and tapping one narrows every figure on the screen to it. There is no
+"All accounts" button in front of them — with two accounts it was a third button
+saying what both of the others being on already said, and it was the first thing
+on the screen.
+
 The breakdown card turns over too, from this month's pie to twelve months of
 stacked bars — one bar a month, split into the categories that made it up, with
 money up the side and the month being shown highlighted. Tapping a bar selects
@@ -100,21 +114,47 @@ one you were just looking at. They are not three questions about three months.
 They are three views of one: what it cost, what it went on, and what it was
 meant to cost.
 
-A transaction is tapped to edit it, on History and in the Overview's recent
-list alike, and the editor holds Delete behind a confirmation. There used to be
+History is the month, searchable, filtered by account and by category, and
+pulled down to sync. Its days carry their own subtotal, and the two days anybody
+actually recognises say so: "17 September (today)", "16 September (yesterday)" —
+after the date rather than instead of it, because the date is what the eye scans
+the list by. Turning on Planned adds what the repeating rules are about to
+write, faded and untappable, so the rent leaving on the 5th is visible before it
+leaves; it is offered for this month and next, since further out the projection
+stops being a fact about money and becomes arithmetic.
+
+Money moved between accounts is a transfer, a row type of its own: it has no
+category, it is drawn differently, and it never enters a spending figure
+anywhere in the app — moving money is not spending it.
+
+A transaction is tapped to edit it, and the editor holds Delete behind a
+confirmation. There used to be
 a sheet in front of it whose whole content was two buttons, Edit and Delete —
 the tap that opened a menu now opens the thing the menu led to. The Overview's
 rows were worse than an extra tap: they all navigated to the same unfiltered
-month, so tapping the third and the ninth did the same thing. The editor is also
-where a row says it is still waiting to sync, or that the server refused it.
+month, so tapping the third and the ninth did the same thing. The editor is the
+add screen — the same keypad, the same category grid, the same chips — because
+writing a row and correcting one are the same job. It is also where a row says
+it is still waiting to sync: a cloud beside the delete icon, which explains
+itself when tapped rather than spending a line of the sheet saying so. A row the
+server refused keeps its line, because that one changes how you read everything
+under it.
 
-Its category row shows one level at a time: the parents, and then one family
-once a parent with children is tapped, with the parent itself leading its own
-family because "Dom" is somewhere people file to and not only a heading. It
-opens on the family the row is already in. The date is a calendar with no
-floor and no ceiling — the future included, because the standing order leaving
-on Friday has not happened yet either — and no text field to type 03.09.2026
-into.
+Its category grid keeps the parents on screen and opens the chosen one's
+children below them, under a heading that says the subcategory is optional —
+"Dom" is somewhere people file to and not only a heading, so filing to it is
+never more than one tap. The roots never move while a family is open, which is
+what makes the second tap safe to skip. The date is a calendar with no floor and
+no ceiling — the future included, because the standing order leaving on Friday
+has not happened yet either — and no text field to type 03.09.2026 into. It has
+a Today button, because a calendar scrolled to March has no other way home.
+
+Budget is a month's plan and its envelopes. The plan is what there is to spend;
+under it every category with a limit shows what it has taken out of that limit
+and what is left, going red past it, and the card at the top says how much of
+the plan is still unassigned. A limit carries forward until it is changed, so a
+household sets one once rather than every month. Android permitting, it says
+before you go over rather than after.
 
 The arrows are for a neighbouring month. For any other, the title opens a
 picker — a year, twelve months under it, and one button back to the present.
@@ -126,9 +166,16 @@ it is the tab you are on. A green glyph among four grey glyphs is still a
 glyph; this is the thing the app exists for. Hold it instead of tapping and it
 takes dictation — see [Voice](#voice).
 
+The app updates itself. A release build asks on launch when a newer version
+exists, showing the release notes of every version skipped and its size, and
+downloads and installs after a yes — Settings › Advanced can also check on
+demand and says which build is installed. Debug builds never offer anything.
+
 Interface English, category names Polish: the names are rows that sync to every
 device, so they are data the family owns, not translated copy. Switching the
-interface language does not rename anyone's categories.
+interface language does not rename anyone's categories. The app itself is called
+Portfel on a Polish phone, which is the one piece of the name that IS translated
+copy — it is a label on a launcher icon, not a row anybody owns.
 
 Captured on an emulator against a local database of demo data — not the
 family's own numbers.
@@ -148,13 +195,16 @@ monyx/
 - Node ≥ 22.5 (for `node:sqlite` and `node --test`)
 - `telnyx-edge` CLI ≥ 0.5.0 — below that the `sqldb` surface differs
 - JDK 17+ and the Android SDK (platform 35, build-tools 35) for the app
+- `JAVA_HOME` and `ANDROID_HOME` exported — Gradle, `apksigner` and the release
+  script all need them, and macOS's `/usr/bin/java` stub answers "Unable to
+  locate a Java Runtime" rather than falling back to anything
 
 ## Server
 
 ```sh
 cd server
 npm install
-npm test          # 51 tests: the sync protocol and the budget alert path
+npm test          # 103 tests: sync, auth, budgets, voice, notes, releases
 npm run typecheck
 telnyx-edge ship  # deploy
 ```
@@ -217,19 +267,28 @@ so "which build do you have?" is answerable over the phone.
 ```sh
 node scripts/release.mjs --notes "Po zapisaniu otwiera się lista transakcji."
 node scripts/release.mjs --notes-file notes.txt --dry-run   # every check, no upload
+node scripts/release.mjs --notes-file notes.txt --skip-build  # reuse the built APK
 ```
+
+Needs `TELNYX_API_KEY`, or a `~/.telnyx-edge/config.toml` from `telnyx-edge
+login`; `--db` names a database other than `monyx`.
 
 Builds the release, checks it is signed with the release certificate, uploads it
 to the private `monyx-releases` bucket, reads it back and compares sha256, and
 only then writes the `app_releases` row. Installed release builds offer it on
 their next launch; Settings › Advanced can check on demand. **The tree must be
-committed first** — versionCode is the commit count. Withdraw a release by
-deleting its row. See
+committed first** — versionCode is the commit count — and a versionCode at or
+below the published latest is refused, because no phone could install it.
+Withdraw a release by deleting its row. See
 [ADR 0020](docs/decisions/0020-the-app-updates-itself-and-asks-first.md).
 
 ### The release keystore
 
 `android/keystore.properties` (git-ignored) points at `~/.monyx/monyx-release.jks`.
+
+The release script pins that certificate's SHA-256 (`RELEASE_CERT_SHA256` in
+`scripts/release.mjs`) and refuses to publish anything signed with another key,
+so rotating the keystore means editing that constant in the same commit.
 
 **Back up both the keystore and its password somewhere that survives a laptop
 dying.** Android refuses an update signed with a different key than the installed
