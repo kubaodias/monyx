@@ -29,12 +29,20 @@ data class HistoryCategory(
     val color: String?,
     val totalMinor: Long,
     /**
-     * Divided by the COMPLETED months in the window, never by twelve.
+     * Divided by the months the ledger actually covers — never by twelve.
      *
-     * The month being lived is a partial figure — on the 3rd it is two days of
+     * Two months are left out of that count, for two different reasons. The
+     * month being lived is a partial figure — on the 3rd it is two days of
      * spending — and dividing by a month that is one tenth over drags every
-     * average down a little further every time you open the screen. The bar for
-     * it is still drawn; it just does not get a vote in the average.
+     * average down a little further every time the screen is opened. And a
+     * month from before the household started keeping the ledger is not a month
+     * it spent nothing in, it is a month there is no answer for: a family three
+     * months in would otherwise see every average quartered, which is the kind
+     * of wrong that looks plausible.
+     *
+     * A month that HAS other spending in it but none in this category counts
+     * for the full month, because that is a real zero — the category genuinely
+     * cost nothing that month.
      */
     val averageMinor: Long,
 )
@@ -111,21 +119,28 @@ fun categoryHistory(
         )
     }
 
-    // Completed months only, and at least one — in a window whose every month is
-    // the current one or later there is nothing to average over, and the total
-    // is the honest answer rather than a division by zero.
-    val completed = periods.count { it < currentPeriod }.coerceAtLeast(1)
+    // The months anything at all was spent in — the ledger's own extent, which
+    // is not the same as the window's.
+    val withData = kept.map { it.period }.toSet()
+    val completed = periods.filter { it < currentPeriod && it in withData }
+
+    // A household whose only data is the month it is still living has no
+    // completed month to average over. Rather than a column of zeros, the
+    // months it does have answer for themselves — one month in, "the average"
+    // and "this month" are the same claim anyway.
+    val counted = completed.ifEmpty { periods.filter { it in withData } }.toSet()
+    val divisor = counted.size.coerceAtLeast(1)
 
     val categories = kept
         .groupBy { it.categoryId }
         .map { (id, spends) ->
-            val completedTotal = spends.filter { it.period < currentPeriod }.sumOf { it.spentMinor }
+            val countedTotal = spends.filter { it.period in counted }.sumOf { it.spentMinor }
             HistoryCategory(
                 id = id,
                 name = spends.first().name,
                 color = spends.first().color,
                 totalMinor = spends.sumOf { it.spentMinor },
-                averageMinor = completedTotal / completed,
+                averageMinor = countedTotal / divisor,
             )
         }
         .sortedByDescending { it.averageMinor }

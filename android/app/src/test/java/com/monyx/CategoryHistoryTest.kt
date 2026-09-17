@@ -100,28 +100,66 @@ class CategoryHistoryTest {
     // ------------------------------------------------------------ the average
 
     @Test
-    fun `the average divides by the completed months, not by twelve`() {
-        // Eleven completed months in the window; 1 100 zł spread across them is
-        // 100 zł a month, whatever the eleven months it was spread over.
+    fun `the average divides by the months the ledger covers, not by twelve`() {
+        // Three months of ledger, one of them the month still running: the
+        // divisor is the two completed months that have data, never twelve.
+        // A household three months in would otherwise see every average
+        // quartered — the number is a claim about a normal month.
         val history = categoryHistory(
-            rows = listOf(spend("2026-07", "food", 110000)),
+            rows = listOf(
+                spend("2026-07", "food", 90000),
+                spend("2026-08", "food", 110000),
+                spend("2026-09", "food", 40000),
+            ),
             periods = historyWindow("2026-09", today),
             selectedPeriod = "2026-09",
             today = today,
         )
-        assertEquals(10000L, history.categories.single().averageMinor)
+        assertEquals(100000L, history.categories.single().averageMinor)
+    }
+
+    @Test
+    fun `a month with other spending but none of this category counts as a zero`() {
+        // August is a real zero for fuel — the ledger was being kept and
+        // nothing went on it — so fuel averages 200 over the two months, not
+        // 400 over the one it appears in.
+        val history = categoryHistory(
+            rows = listOf(
+                spend("2026-07", "fuel", 40000),
+                spend("2026-07", "food", 50000),
+                spend("2026-08", "food", 50000),
+            ),
+            periods = historyWindow("2026-09", today),
+            selectedPeriod = "2026-09",
+            today = today,
+        )
+        assertEquals(20000L, history.categories.single { it.id == "fuel" }.averageMinor)
+    }
+
+    @Test
+    fun `a household whose only month is the one it is living gets that month`() {
+        // No completed month to average over. A column of zeros would be worse
+        // than the partial figure, which is the only answer there is.
+        val history = categoryHistory(
+            rows = listOf(spend("2026-09", "food", 30000)),
+            periods = historyWindow("2026-09", today),
+            selectedPeriod = "2026-09",
+            today = today,
+        )
+        assertEquals(30000L, history.categories.single().averageMinor)
     }
 
     @Test
     fun `the month still running does not drag the average down`() {
+        val base = listOf(spend("2026-07", "food", 90000), spend("2026-08", "food", 110000))
         val withoutCurrent = categoryHistory(
-            rows = listOf(spend("2026-07", "food", 110000)),
+            rows = base,
             periods = historyWindow("2026-09", today),
             selectedPeriod = "2026-09",
             today = today,
         ).categories.single().averageMinor
         val withCurrent = categoryHistory(
-            rows = listOf(spend("2026-07", "food", 110000), spend("2026-09", "food", 500)),
+            rows = base + spend("2026-09", "food", 500),
             periods = historyWindow("2026-09", today),
             selectedPeriod = "2026-09",
             today = today,

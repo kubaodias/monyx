@@ -98,10 +98,15 @@ stacked bars — one bar a month, split into the categories that made it up, wit
 money up the side and the month being shown highlighted. Tapping a bar selects
 that month for the whole screen, so the chart is the switcher as well as the
 history. The legend below it keeps its rows and changes its number: what each
-category costs in an average month, divided by the COMPLETED months in the
-window, because a September three days old would otherwise drag every average
-down a little further every morning. That month's bar is drawn pale for the same
-reason. Tapping a row there hides the category instead of opening it — the whole
+category costs in an average month, divided by the months the ledger actually
+covers — not by twelve. Two kinds of month are left out, for two different
+reasons: the one being lived, because a September three days old would drag
+every average down a little further every morning, and any month from before the
+household started keeping the ledger, because that is not a month it spent
+nothing in, it is a month there is no answer for. A family three months in would
+otherwise see every average quartered. A month WITH other spending and none in
+this category still counts, because that is a real zero. The month still running
+is drawn pale for the same reason it is left out of the count. Tapping a row there hides the category instead of opening it — the whole
 question the view exists for is "what does the year look like without the
 holiday", and the answer is a shape, so it has to be the same shape with one
 colour taken out of it.
