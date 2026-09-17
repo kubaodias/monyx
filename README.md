@@ -79,6 +79,19 @@ dragging along it walks the month. Every day is a vertex even when nothing
 happened on it, and the line is never smoothed, because a curve fitted between
 two points invents balances the household never had.
 
+The breakdown card turns over too, from this month's pie to twelve months of
+stacked bars — one bar a month, split into the categories that made it up, with
+money up the side and the month being shown highlighted. Tapping a bar selects
+that month for the whole screen, so the chart is the switcher as well as the
+history. The legend below it keeps its rows and changes its number: what each
+category costs in an average month, divided by the COMPLETED months in the
+window, because a September three days old would otherwise drag every average
+down a little further every morning. That month's bar is drawn pale for the same
+reason. Tapping a row there hides the category instead of opening it — the whole
+question the view exists for is "what does the year look like without the
+holiday", and the answer is a shape, so it has to be the same shape with one
+colour taken out of it.
+
 One month, an arrow either side, and the same control in the same place on
 Overview, History and Budget — showing the same month on all three. Stepping
 back to March on the overview and then opening the budget used to show

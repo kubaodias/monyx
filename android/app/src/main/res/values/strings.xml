@@ -48,6 +48,12 @@
     <string name="overview_expenses">Expenses</string>
     <string name="overview_balance">Balance</string>
     <string name="overview_breakdown">Where the money goes</string>
+    <string name="overview_breakdown_history">Spending over 12 months</string>
+    <string name="overview_show_history">Show the last 12 months</string>
+    <string name="overview_show_breakdown">Back to this month</string>
+    <string name="overview_history_average">Average per month</string>
+    <string name="overview_history_partial">The last bar is the month still running.</string>
+    <string name="overview_history_empty">Nothing spent in the last 12 months</string>
     <string name="overview_recent">Recent transactions</string>
     <string name="overview_no_data">No spending this month</string>
     <string name="overview_see_all">See all</string>

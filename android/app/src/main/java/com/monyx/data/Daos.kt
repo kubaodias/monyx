@@ -15,6 +15,21 @@ data class CategorySpend(
     val spentMinor: Long,
 )
 
+/**
+ * One category's spending in one month, for the twelve-month history.
+ *
+ * The same rollup [CategorySpend] does — subcategories fold into their parent —
+ * with the month it happened in, so a category is one series across the window
+ * rather than twelve separate answers.
+ */
+data class MonthlyCategorySpend(
+    val period: String,
+    val categoryId: String,
+    val name: String,
+    val color: String?,
+    val spentMinor: Long,
+)
+
 /** A resolved budget for one period: the limit in effect plus the spend against it. */
 data class BudgetUsage(
     val categoryId: String,
@@ -354,6 +369,42 @@ interface MonyxDao {
            ORDER BY spentMinor DESC"""
     )
     fun spendByCategory(period: String, allAccounts: Int, accountIds: List<String>): Flow<List<CategorySpend>>
+
+    /**
+     * The same breakdown, month by month across a range of periods.
+     *
+     * One query for the whole window rather than twelve for one month each:
+     * the chart is a shape, and a shape assembled from twelve separately
+     * arriving flows redraws twelve times and reflows its y axis on every one
+     * of them.
+     *
+     * Months with no spending simply do not come back — SQLite cannot invent a
+     * row for a month nothing happened in — so the caller fills the gaps. A bar
+     * chart with the empty months missing would space August and October as
+     * neighbours and read as a month that never existed.
+     */
+    @Query(
+        """SELECT substr(t.occurredOn, 1, 7)  AS period,
+                  COALESCE(p.id, c.id)        AS categoryId,
+                  COALESCE(p.name, c.name)    AS name,
+                  COALESCE(p.color, c.color)  AS color,
+                  SUM(t.amountMinor)          AS spentMinor
+           FROM transactions t
+           JOIN categories c ON c.id = t.categoryId
+           LEFT JOIN categories p ON p.id = c.parentId
+           WHERE t.deleted = 0 AND t.kind = 'expense'
+             AND substr(t.occurredOn, 1, 7) >= :fromPeriod
+             AND substr(t.occurredOn, 1, 7) <= :toPeriod
+             AND (:allAccounts = 1 OR t.accountId IN (:accountIds))
+           GROUP BY period, COALESCE(p.id, c.id)
+           ORDER BY period"""
+    )
+    fun spendByCategoryPerMonth(
+        fromPeriod: String,
+        toPeriod: String,
+        allAccounts: Int,
+        accountIds: List<String>,
+    ): Flow<List<MonthlyCategorySpend>>
 
     /**
      * Income and expense per day over a date range, both ends inclusive.
