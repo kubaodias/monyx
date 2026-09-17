@@ -157,14 +157,29 @@ class OverviewViewModel(
      *
      * Follows the account filter, so flipping the card cannot quietly widen
      * what is being counted.
+     *
+     * The budget limits it draws over the bars do NOT follow that filter,
+     * because they cannot: a limit is the household's, and there is no such
+     * thing as the grocery budget for the current account. So with an account
+     * filter on, the limits are dropped rather than drawn over a fraction of
+     * the spending — a household line above one account's bars would read as
+     * comfortably under budget every month of the year.
      */
     @OptIn(ExperimentalCoroutinesApi::class)
     val history: StateFlow<CategoryHistory> = combine(period, selectedAccounts, ::Pair)
         .flatMapLatest { (selectedPeriod, accountIds) ->
             val periods = historyWindow(selectedPeriod)
-            repository
-                .spendByCategoryPerMonth(periods.first(), periods.last(), accountIds)
-                .map { rows -> categoryHistory(rows, periods, selectedPeriod) }
+            combine(
+                repository.spendByCategoryPerMonth(periods.first(), periods.last(), accountIds),
+                repository.budgetLimitsThrough(periods.last()),
+            ) { rows, limits ->
+                categoryHistory(
+                    rows = rows,
+                    periods = periods,
+                    selectedPeriod = selectedPeriod,
+                    budgets = if (accountIds.isEmpty()) limits else emptyList(),
+                )
+            }
         }
         .stateIn(
             scope = viewModelScope,

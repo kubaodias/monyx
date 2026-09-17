@@ -58,6 +58,7 @@
     <string name="overview_history_hide_one">Ukryj: %1$s</string>
     <string name="overview_history_show_one">Pokaż: %1$s</string>
     <string name="overview_history_empty">Brak wydatków w ostatnich 12 miesiącach</string>
+    <string name="overview_history_budget">Budżet</string>
     <string name="overview_no_data">Brak wydatków w tym miesiącu</string>
     <string name="overview_previous_month">Poprzedni miesiąc</string>
     <string name="overview_next_month">Następny miesiąc</string>

@@ -44,6 +44,31 @@ data class BudgetUsage(
     val spentMinor: Long,
 )
 
+/**
+ * One row of the budgets table, for the limit line on the twelve-month chart.
+ *
+ * Unresolved on purpose. [MonyxDao.budgetUsage] answers "the limit in effect in
+ * THIS month" in SQL, but the chart asks it of twelve months at once, and twelve
+ * correlated subqueries to say "the newest row at or before each period" is a
+ * query nobody will be able to read in a year. The rows come out raw and
+ * [com.monyx.ui.overview.limitsPerMonth] carries them forward once, in Kotlin,
+ * where the rule can be unit-tested.
+ *
+ * Which is why [deleted] is carried rather than filtered: clearing a limit
+ * writes a tombstone, and a tombstone is the newest row for that month — it has
+ * to stop the inheritance, not be skipped so the limit before it lives on.
+ */
+data class BudgetLimit(
+    val id: String,
+    val period: String,
+    val categoryId: String,
+    /** The category the bars stack under: the parent, or the category itself. */
+    val rollupId: String,
+    val limitMinor: Long,
+    val deleted: Int,
+    val seq: Long,
+)
+
 data class MonthTotals(val incomeMinor: Long, val expenseMinor: Long)
 
 /**
@@ -476,6 +501,27 @@ interface MonyxDao {
            ORDER BY c.sortOrder, c.name"""
     )
     fun budgetUsage(period: String): Flow<List<BudgetUsage>>
+
+    /**
+     * Every budget row up to [toPeriod], for the chart's limit line.
+     *
+     * Not bounded below: a limit set two years ago and never touched since is
+     * the limit in effect this month, so cutting the rows at the window's first
+     * month would lose exactly the households that budget once and leave it.
+     * The table holds one row per category per CHANGE, so this is small.
+     *
+     * Deleted rows included — see [BudgetLimit].
+     */
+    @Query(
+        """SELECT b.id AS id, b.period AS period, b.categoryId AS categoryId,
+                  COALESCE(c.parentId, c.id) AS rollupId,
+                  b.limitMinor AS limitMinor, b.deleted AS deleted, b.seq AS seq
+           FROM budgets b
+           JOIN categories c ON c.id = b.categoryId AND c.deleted = 0
+           WHERE b.period <= :toPeriod
+           ORDER BY b.period, b.seq, b.id"""
+    )
+    fun budgetLimitsThrough(toPeriod: String): Flow<List<BudgetLimit>>
 
     @Query(
         """SELECT b.* FROM budgets b

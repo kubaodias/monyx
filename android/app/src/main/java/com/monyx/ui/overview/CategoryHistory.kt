@@ -1,5 +1,6 @@
 package com.monyx.ui.overview
 
+import com.monyx.data.BudgetLimit
 import com.monyx.data.Dates
 import com.monyx.data.MonthlyCategorySpend
 import java.time.LocalDate
@@ -13,10 +14,34 @@ data class HistoryMonth(
     val byCategory: Map<String, Long>,
     /** Still being lived, so its bar is not comparable with the others. */
     val partial: Boolean,
+    /**
+     * The limit in effect this month, per category — already carried forward.
+     * Empty for a month before the household set its first budget, and for a
+     * month whose every limit has since been cleared.
+     */
+    val budgetByCategory: Map<String, Long> = emptyMap(),
 ) {
     /** The bar's height, once the hidden categories are taken out of it. */
     fun totalMinor(visible: Set<String>): Long =
         byCategory.entries.filter { it.key in visible }.sumOf { it.value }
+
+    /**
+     * Where the limit line sits over this bar, or null for no line at all.
+     *
+     * Hiding a category takes its limit out of the line as well as its colour
+     * out of the bar, because the line's whole job is to be comparable with the
+     * bar under it — a full household limit drawn over three categories' worth
+     * of spending would say "well under budget" every month, which is a
+     * reassuring way to be wrong.
+     *
+     * Null rather than zero when everything budgeted is hidden: a line along
+     * the floor is a claim that nothing may be spent, and there is a real
+     * difference between a limit of nothing and no limit.
+     */
+    fun budgetMinor(hidden: Set<String>): Long? {
+        val kept = budgetByCategory.filterKeys { it !in hidden }
+        return if (kept.isEmpty()) null else kept.values.sum()
+    }
 }
 
 /**
@@ -103,10 +128,12 @@ fun categoryHistory(
     periods: List<String>,
     selectedPeriod: String,
     today: LocalDate = Dates.today(),
+    budgets: List<BudgetLimit> = emptyList(),
 ): CategoryHistory {
     val currentPeriod = Dates.periodOf(today)
     val inWindow = periods.toSet()
     val kept = rows.filter { it.period in inWindow }
+    val limits = limitsPerMonth(budgets, periods)
 
     val months = periods.map { p ->
         HistoryMonth(
@@ -116,6 +143,7 @@ fun categoryHistory(
             // it is half lived, a future one because it holds only whatever has
             // been dated forward into it.
             partial = p >= currentPeriod,
+            budgetByCategory = limits[p].orEmpty(),
         )
     }
 
@@ -146,6 +174,51 @@ fun categoryHistory(
         .sortedByDescending { it.averageMinor }
 
     return CategoryHistory(months = months, categories = categories, selectedPeriod = selectedPeriod)
+}
+
+/**
+ * The limit in effect in each of [periods], per category, from the raw budget
+ * rows — the same carry-forward rule the budget screen resolves in SQL for one
+ * month at a time.
+ *
+ * Three things this has to get right, all of which look identical on a chart
+ * once they are wrong:
+ *
+ * A limit holds from its month **onward** until another row supersedes it, so
+ * most months on the chart have no row of their own and inherit one. Clearing a
+ * limit writes a tombstone, and inheritance stops there rather than skipping
+ * back to the row before it. And two rows can exist for one category and month
+ * — the server resolves an upsert onto a row that keeps its own id, so the next
+ * pull brings the same budget back under a second id — which is why the newest
+ * seq wins here, exactly as it does in budgetUsage: summing both would quietly
+ * double a household's limit.
+ *
+ * Limits are then rolled up to the categories the bars are stacked from. A limit
+ * on a parent already covers its subcategories, so when Home has one, a limit on
+ * Home > Repairs is a sub-limit inside it and adding the two would count the
+ * same money twice; with no limit on Home, its children's limits are the only
+ * answer there is and they add up.
+ */
+internal fun limitsPerMonth(
+    rows: List<BudgetLimit>,
+    periods: List<String>,
+): Map<String, Map<String, Long>> {
+    if (rows.isEmpty() || periods.isEmpty()) return emptyMap()
+    val byCategory = rows
+        .groupBy { it.categoryId }
+        .mapValues { (_, list) -> list.sortedWith(compareBy({ it.period }, { it.seq }, { it.id })) }
+
+    return periods.associateWith { period ->
+        val inEffect = byCategory.values.mapNotNull { history ->
+            history.lastOrNull { it.period <= period }
+                ?.takeIf { it.deleted == 0 && it.limitMinor > 0L }
+        }
+        val rolledUpAtParent = inEffect.filter { it.categoryId == it.rollupId }.map { it.rollupId }.toSet()
+        inEffect
+            .filterNot { it.categoryId != it.rollupId && it.rollupId in rolledUpAtParent }
+            .groupBy { it.rollupId }
+            .mapValues { (_, limits) -> limits.sumOf { it.limitMinor } }
+    }
 }
 
 /**

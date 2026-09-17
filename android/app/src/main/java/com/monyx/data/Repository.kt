@@ -45,6 +45,10 @@ class MonyxRepository(private val dao: MonyxDao) {
 
     fun budgetUsage(period: String) = dao.budgetUsage(period)
 
+    /** Raw budget rows for the history chart's limit line. No account filter:
+     *  a limit belongs to the household, not to an account. */
+    fun budgetLimitsThrough(toPeriod: String) = dao.budgetLimitsThrough(toPeriod)
+
     fun recentTransactions(period: String = "", limit: Int = 8, accountIds: Set<String> = emptySet()) =
         dao.recentTransactions(period, limit, allAccounts(accountIds), accountIds.toList())
 

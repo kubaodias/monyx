@@ -32,6 +32,7 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
@@ -83,7 +84,13 @@ fun CategoryHistoryChart(
         val ids = visible.map { it.id }.toSet()
         history.months.map { it.totalMinor(ids) }
     }
-    val ticks = remember(totals) { axisTicks(totals.maxOrNull() ?: 0L) }
+    val budgets = remember(history.months, hidden) { history.months.map { it.budgetMinor(hidden) } }
+    // The axis clears the line as well as the bars. A budget drawn off the top
+    // of the chart is worse than no budget at all: the months under it look
+    // like the months over it.
+    val ticks = remember(totals, budgets) {
+        axisTicks(maxOf(totals.maxOrNull() ?: 0L, budgets.filterNotNull().maxOrNull() ?: 0L))
+    }
     val ceiling = ticks.last().coerceAtLeast(1L)
 
     val measurer = rememberTextMeasurer()
@@ -110,6 +117,7 @@ fun CategoryHistoryChart(
     }
 
     val gridColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.18f)
+    val budgetColor = MaterialTheme.colorScheme.error
     val highlightColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.10f)
     val monthNames = remember(history.months) { history.months.map { shortMonth(it.period) } }
     val count = history.months.size
@@ -195,6 +203,35 @@ fun CategoryHistoryChart(
                     plotBottom + 4.dp.toPx(),
                 ),
             )
+        }
+
+        // The budget, last, so it is never buried under a bar that overshoots
+        // it — the crossing is the whole point of the line.
+        val points = budgets.mapIndexed { index, budget ->
+            budget?.let {
+                Offset(
+                    plotLeft + slot * index + slot / 2f,
+                    plotBottom - plotHeight * (it.toFloat() / ceiling.toFloat()),
+                )
+            }
+        }
+        points.forEachIndexed { index, point ->
+            if (point == null) return@forEachIndexed
+            val next = points.getOrNull(index + 1)
+            if (next != null) {
+                drawLine(
+                    color = budgetColor,
+                    start = point,
+                    end = next,
+                    strokeWidth = 2.dp.toPx(),
+                    cap = StrokeCap.Round,
+                )
+            }
+            // A month with no month beside it would otherwise draw nothing at
+            // all: the first budget a household ever sets is one point wide.
+            if (next == null && points.getOrNull(index - 1) == null) {
+                drawCircle(color = budgetColor, radius = 2.5f.dp.toPx(), center = point)
+            }
         }
     }
 }
