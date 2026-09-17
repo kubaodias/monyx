@@ -53,11 +53,12 @@
     <string name="overview_show_history">Pokaż ostatnie 12 miesięcy</string>
     <string name="overview_show_breakdown">Wróć do tego miesiąca</string>
     <string name="overview_history_average">Średnio na miesiąc</string>
-    <string name="overview_history_partial">Ostatni słupek to miesiąc, który jeszcze trwa.</string>
+    <string name="overview_history_hide_all">Ukryj wszystkie</string>
+    <string name="overview_history_show_all">Pokaż wszystkie</string>
+    <string name="overview_history_hide_one">Ukryj: %1$s</string>
+    <string name="overview_history_show_one">Pokaż: %1$s</string>
     <string name="overview_history_empty">Brak wydatków w ostatnich 12 miesiącach</string>
-    <string name="overview_recent">Ostatnie transakcje</string>
     <string name="overview_no_data">Brak wydatków w tym miesiącu</string>
-    <string name="overview_see_all">Zobacz wszystkie</string>
     <string name="overview_previous_month">Poprzedni miesiąc</string>
     <string name="overview_next_month">Następny miesiąc</string>
     <string name="month_picker_open">Wybierz miesiąc</string>

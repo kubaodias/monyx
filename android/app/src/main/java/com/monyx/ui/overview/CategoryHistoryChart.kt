@@ -10,10 +10,16 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -198,63 +204,116 @@ fun CategoryHistoryChart(
  *
  * The same rows as the pie chart's legend and a different number in them — the
  * average across the window rather than this month's figure — because the chart
- * above is a year and a row saying what September cost would be answering a
+ * above is a year, and a row saying what September cost would be answering a
  * question nothing on screen is asking.
  *
- * A tap hides the category instead of opening its transactions. That is the
- * same gesture meaning two things in two modes, which is only safe because the
- * result is immediate and on screen: the row dims and its colour leaves every
- * bar. The ledger is one tap away through the pie chart, which is where a tap
- * has always meant "show me these".
+ * A tap still opens that category's transactions, exactly as it does on the
+ * pie: the row means the same thing on both faces of the card, which is the
+ * only reason a legend can change what it counts without becoming a different
+ * control. Hiding is the eye at the end of the row, and it is deliberately a
+ * separate target — taking a colour out of the chart and going to look at the
+ * rows behind it are different intentions, and a single tap cannot be both.
+ *
+ * Show all / Hide all sits in the header, because isolating one category out of
+ * eight is otherwise seven taps.
  */
 @Composable
 fun CategoryHistoryLegend(
     categories: List<HistoryCategory>,
     hidden: Set<String>,
     onToggle: (String) -> Unit,
+    onToggleAll: () -> Unit,
+    onOpen: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Column(modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        Row(modifier = Modifier.fillMaxWidth()) {
+    Column(modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Text(
                 text = stringResource(R.string.overview_history_average),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.weight(1f),
             )
+            // One control rather than two, because the two are never both
+            // useful: with a full chart the only move is to clear it, and with
+            // anything hidden the move anyone reaches for is to get it all back.
+            Text(
+                text = stringResource(
+                    if (hidden.isEmpty()) {
+                        R.string.overview_history_hide_all
+                    } else {
+                        R.string.overview_history_show_all
+                    },
+                ),
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier
+                    .clip(MaterialTheme.shapes.small)
+                    .clickable(onClick = onToggleAll)
+                    .padding(horizontal = 6.dp, vertical = 2.dp),
+            )
         }
         categories.forEach { category ->
             val isHidden = category.id in hidden
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable { onToggle(category.id) }
-                    // Dimmed, not struck through or removed: a hidden category
-                    // has to stay exactly where it was, or the row under the
-                    // finger moves up into its place and the next tap hides
-                    // something nobody meant to touch.
-                    .alpha(if (isHidden) 0.38f else 1f),
+                modifier = Modifier.fillMaxWidth(),
             ) {
-                Box(
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier
-                        .size(10.dp)
-                        .clip(CircleShape)
-                        .background(Palette.colorFor(category.color, category.id)),
-                )
-                Spacer(modifier = Modifier.width(10.dp))
-                Text(
-                    text = category.name,
-                    style = MaterialTheme.typography.bodyMedium,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f),
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(
-                    text = Money.format(category.averageMinor),
-                    style = MaterialTheme.typography.bodyMedium,
-                )
+                        .weight(1f)
+                        .clip(MaterialTheme.shapes.small)
+                        .clickable { onOpen(category.id) }
+                        // Dimmed, never removed or reordered: a hidden category
+                        // has to stay exactly where it was, or the row under
+                        // the finger moves up into its place and the next tap
+                        // lands on something nobody meant to touch.
+                        .alpha(if (isHidden) 0.38f else 1f)
+                        .padding(vertical = 6.dp),
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(10.dp)
+                            .clip(CircleShape)
+                            .background(Palette.colorFor(category.color, category.id)),
+                    )
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Text(
+                        text = category.name,
+                        style = MaterialTheme.typography.bodyMedium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f),
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = Money.format(category.averageMinor),
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                }
+                IconButton(
+                    onClick = { onToggle(category.id) },
+                    modifier = Modifier.size(36.dp),
+                ) {
+                    Icon(
+                        imageVector = if (isHidden) {
+                            Icons.Filled.VisibilityOff
+                        } else {
+                            Icons.Filled.Visibility
+                        },
+                        contentDescription = stringResource(
+                            if (isHidden) {
+                                R.string.overview_history_show_one
+                            } else {
+                                R.string.overview_history_hide_one
+                            },
+                            category.name,
+                        ),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(18.dp),
+                    )
+                }
             }
         }
     }
