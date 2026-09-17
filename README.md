@@ -31,156 +31,42 @@
   </tr>
 </table>
 
-The app opens on the summary, and Add is one tap away in the middle of the bar
-— or zero from the home screen, where the launcher's long-press shortcut goes
-straight to the keypad. It used to open on the keypad itself, which answered
-"I just spent something" perfectly and put a blank amount in front of everybody
-who had come to look something up instead. Saving lands on the ledger, with the
-row just entered on screen as proof it went in.
+The app opens on the summary. Add is in the middle of the bottom bar, or one
+long-press on the launcher icon from the home screen; saving lands on the ledger
+with the new row on screen.
 
-There is no system keyboard in the add flow: the grid is the amount field, which
-is also what makes the calculator possible — `60 +` stays on screen while the
-second operand is typed, instead of the running total vanishing the moment you
-press an operator.
+- **Summary** — the month's balance, income and expenses, filtered by account.
+  Tapping the balance turns the card over to show the last thirty days as a line.
+  The breakdown card has two faces as well: this month as a pie, or the last
+  twelve months as stacked bars by category, where tapping a bar moves the whole
+  screen to that month and the legend gives each category's monthly average —
+  averaged over the months the ledger actually covers — and hides it from the
+  chart.
+- **Add** — a keypad that is also a calculator, a note, any date including the
+  future, and *Make it repeat* to turn the row being typed into a repeating rule.
+- **History** — the month, searchable, filtered by account and category, pulled
+  down to sync. Today and yesterday are labelled as such, and *Planned* shows
+  what the repeating rules are about to write.
+- **Budget** — what there is to spend this month, per-category limits that carry
+  forward until changed, and a warning before a limit is passed rather than after.
+- **Settings** — accounts, categories (two levels, dragged into order), repeating
+  rules, language, backup health and the update check.
 
-Committing the expense is a button of its own, the width of the screen, with the
-amount already on it. It used to be a filled tick in the corner of the keypad —
-exactly where a calculator puts `=`, so the key that ended the entry and the key
-that ended the sum were the same shape in the same place. The tick is honestly
-`=` now, and when the button cannot save it names what is still missing instead
-of sitting there grey.
+One month switcher, the same control in the same place on Summary, History and
+Budget: three views of one month, not three months. The arrows step to a
+neighbour; the title opens a picker for anything else.
 
-The keypad puts itself away. Tap a category or the note and it goes; tap the
-amount and it comes back, taking the system keyboard with it. It is a quarter
-of the screen that means nothing once the figure is typed, and it used to sit
-there through the category tap and underneath the note's own keyboard. The
-figure is its own way back — it is the largest thing on the screen and it is
-what you would reach for to change the number anyway.
+Money moved between accounts is a transfer — no category, and never counted as
+spending anywhere. A transaction is tapped to edit it; the editor is the add
+screen again, with Delete behind a confirmation and the row's sync state on it.
 
-The date can be in the future. An expense has already happened, which is true
-of a receipt and false of the standing order leaving on Friday — and a
-household budget is as much about what is coming as what went.
-
-Beside the account and the date is *Make it repeat*, which hands the half-typed
-transaction to the rule editor with everything already filled in. Rent gets
-typed by hand once before anyone thinks "this happens every month"; catching
-that thought here is the difference between setting up a rule and going to
-Settings to set one up. It creates one thing, not two — the rule's first
-occurrence is the transaction you were typing.
-
-Accounts and categories are dragged into order in Settings, and the keypad's
-grid, the budget list and the breakdown all follow. They were sorting by
-`sortOrder` from the first schema; nothing had ever written it.
-
-Tapping the balance turns the card over, and the three figures on it do not
-change — the back adds the path, not a second opinion. The line is the month's
-balance arriving: payday is the step up, and the long grind down to the next one
-is the month being lived. It restarts on the 1st, so the last point on the line
-is the number printed on the front; the thirty days reach back into the month
-before, drawn as their own run with a break at the turn, because a balance does
-not slide from last month's total down to zero overnight. Green above break-even,
-red below, cut at the zero line rather than coloured by wherever the month
-happens to end — a month that dipped under and recovered says so. Touching the
-line answers what the balance was on that evening and what moved on the day;
-dragging along it walks the month. Every day is a vertex even when nothing
-happened on it, and the line is never smoothed, because a curve fitted between
-two points invents balances the household never had.
-
-Above both cards is the account strip, when there is more than one account:
-each account a button carrying its own balance, every one of them on to start
-with, and tapping one narrows every figure on the screen to it. There is no
-"All accounts" button in front of them — with two accounts it was a third button
-saying what both of the others being on already said, and it was the first thing
-on the screen.
-
-The breakdown card turns over too, from this month's pie to twelve months of
-stacked bars — one bar a month, split into the categories that made it up, with
-money up the side and the month being shown highlighted. Tapping a bar selects
-that month for the whole screen, so the chart is the switcher as well as the
-history. The legend below it keeps its rows and changes its number: what each
-category costs in an average month, divided by the months the ledger actually
-covers — not by twelve. Two kinds of month are left out, for two different
-reasons: the one being lived, because a September three days old would drag
-every average down a little further every morning, and any month from before the
-household started keeping the ledger, because that is not a month it spent
-nothing in, it is a month there is no answer for. A family three months in would
-otherwise see every average quartered. A month WITH other spending and none in
-this category still counts, because that is a real zero. The month still running
-is drawn pale for the same reason it is left out of the count. Tapping a row there hides the category instead of opening it — the whole
-question the view exists for is "what does the year look like without the
-holiday", and the answer is a shape, so it has to be the same shape with one
-colour taken out of it.
-
-One month, an arrow either side, and the same control in the same place on
-Overview, History and Budget — showing the same month on all three. Stepping
-back to March on the overview and then opening the budget used to show
-September: the identical control, in the identical place, disagreeing with the
-one you were just looking at. They are not three questions about three months.
-They are three views of one: what it cost, what it went on, and what it was
-meant to cost.
-
-History is the month, searchable, filtered by account and by category, and
-pulled down to sync. Its days carry their own subtotal, and the two days anybody
-actually recognises say so: "17 September (today)", "16 September (yesterday)" —
-after the date rather than instead of it, because the date is what the eye scans
-the list by. Turning on Planned adds what the repeating rules are about to
-write, faded and untappable, so the rent leaving on the 5th is visible before it
-leaves; it is offered for this month and next, since further out the projection
-stops being a fact about money and becomes arithmetic.
-
-Money moved between accounts is a transfer, a row type of its own: it has no
-category, it is drawn differently, and it never enters a spending figure
-anywhere in the app — moving money is not spending it.
-
-A transaction is tapped to edit it, and the editor holds Delete behind a
-confirmation. There used to be
-a sheet in front of it whose whole content was two buttons, Edit and Delete —
-the tap that opened a menu now opens the thing the menu led to. The Overview's
-rows were worse than an extra tap: they all navigated to the same unfiltered
-month, so tapping the third and the ninth did the same thing. The editor is the
-add screen — the same keypad, the same category grid, the same chips — because
-writing a row and correcting one are the same job. It is also where a row says
-it is still waiting to sync: a cloud beside the delete icon, which explains
-itself when tapped rather than spending a line of the sheet saying so. A row the
-server refused keeps its line, because that one changes how you read everything
-under it.
-
-Its category grid keeps the parents on screen and opens the chosen one's
-children below them, under a heading that says the subcategory is optional —
-"Dom" is somewhere people file to and not only a heading, so filing to it is
-never more than one tap. The roots never move while a family is open, which is
-what makes the second tap safe to skip. The date is a calendar with no floor and
-no ceiling — the future included, because the standing order leaving on Friday
-has not happened yet either — and no text field to type 03.09.2026 into. It has
-a Today button, because a calendar scrolled to March has no other way home.
-
-Budget is a month's plan and its envelopes. The plan is what there is to spend;
-under it every category with a limit shows what it has taken out of that limit
-and what is left, going red past it, and the card at the top says how much of
-the plan is still unassigned. A limit carries forward until it is changed, so a
-household sets one once rather than every month. Android permitting, it says
-before you go over rather than after.
-
-The arrows are for a neighbouring month. For any other, the title opens a
-picker — a year, twelve months under it, and one button back to the present.
-The present month keeps a ring in the grid even while another is chosen, so it
-always says where now is relative to what is on screen.
-
-Add is the only filled shape in the bottom bar, and it is filled whether or not
-it is the tab you are on. A green glyph among four grey glyphs is still a
-glyph; this is the thing the app exists for. Hold it instead of tapping and it
-takes dictation — see [Voice](#voice).
-
-The app updates itself. A release build asks on launch when a newer version
-exists, showing the release notes of every version skipped and its size, and
-downloads and installs after a yes — Settings › Advanced can also check on
-demand and says which build is installed. Debug builds never offer anything.
+Release builds offer their own updates: on launch when a newer version exists,
+with the notes of every version skipped, or on demand from Settings › Advanced.
 
 Interface English, category names Polish: the names are rows that sync to every
 device, so they are data the family owns, not translated copy. Switching the
-interface language does not rename anyone's categories. The app itself is called
-Portfel on a Polish phone, which is the one piece of the name that IS translated
-copy — it is a label on a launcher icon, not a row anybody owns.
+interface language does not rename anyone's categories, though the app itself is
+called Portfel on a Polish phone.
 
 Captured on an emulator against a local database of demo data — not the
 family's own numbers.
@@ -367,30 +253,14 @@ button, and that path only ever reads.
 ### Adding by voice — on the phone
 
 Hold the Add tab in the bottom bar until it buzzes, then say "dodaj 200 na
-transport" or "add 200 to Transport". Let go whenever you like — the phone
-stops listening when the sentence ends, not when the finger does. The row is
-written and a sheet shows the row it wrote — amount, category, account, day and
-note. Every one of those is a tap into the editor, so the field that is wrong is
-also the way to fix it, and there is no separate "edit" button. **Anuluj** takes
-the row back, with an Undo of its own if that was the mis-tap.
+transport" or "add 200 to Transport". The row is written and a sheet shows what
+it wrote — amount, category, account, day and note — with every field a tap into
+the editor, and **Anuluj** takes it back. Corrections can be spoken too: "ma być
+250", "zmień kategorię na zakupy".
 
-"150 zł na zakupy w Biedronce" saves 150,00 against Zakupy spożywcze with the
-note *Biedronka*: once the amount, the date and the category have claimed their
-words, whatever is left over is the note. It is bookkeeping rather than a list
-of shops — and "dodaj 200 na transport" has only filler left over, so it gets
-none. A preposition of place is dropped along with the case ending it put on the
-word after it, from a small table of the endings shops actually have; anything
-the table does not know is written down exactly as it was heard.
-
-It can be corrected by voice too: hold the microphone on the sheet and say
-"anuluj", "ma być 250", "zmień kategorię na zakupy". A sentence about the
-purchase rather than about one of its fields becomes the note — "te zakupy były
-w lidlu" writes that down and leaves the category alone — and "notatka …"
-anywhere, including in the first breath, is always a note.
-
-Say nothing and it gives up after three seconds. Anything it could not do — not
-understood, nothing heard, no speech pack for the language — says so and then
-takes itself away; there is no message here that has to be dismissed by hand.
+Whatever is left once the amount, the date and the category have claimed their
+words becomes the note: "150 zł na zakupy w Biedronce" files 150,00 under Zakupy
+spożywcze with the note *Biedronka*.
 
 **The transaction never leaves the phone to be understood.** Speech is Android's
 own `SpeechRecognizer`, asked to prefer the on-device pack; the parse is a few
