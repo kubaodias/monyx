@@ -105,7 +105,7 @@ data class TransactionEdit(
  * ledger two people share does not go through on one tap, and the row it
  * removes may be one the other person entered.
  *
- * The pending and rejected badges came across from the dialog. They are sync
+ * The pending icon and rejected badge came across from the dialog. They are sync
  * state and this is the only screen that shows it — a row the server refused
  * has to be visible somewhere.
  *
@@ -142,6 +142,7 @@ fun EditTransactionSheet(
     var showAccountPicker by remember { mutableStateOf(false) }
     var showDatePicker by remember { mutableStateOf(false) }
     var confirmDelete by remember { mutableStateOf(false) }
+    var explainPending by remember { mutableStateOf(false) }
 
     val focusManager = LocalFocusManager.current
     val keyboard = LocalSoftwareKeyboardController.current
@@ -273,6 +274,17 @@ fun EditTransactionSheet(
                     style = MaterialTheme.typography.titleMedium,
                     modifier = Modifier.weight(1f),
                 )
+                // Sync state as an icon beside the delete: it is rarely worth a
+                // line of its own, and a tap explains it for whoever wonders.
+                if (original.pending == 1) {
+                    IconButton(onClick = { explainPending = true }) {
+                        Icon(
+                            imageVector = Icons.Filled.CloudUpload,
+                            contentDescription = stringResource(R.string.transactions_pending),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
                 IconButton(onClick = { confirmDelete = true }) {
                     Icon(
                         imageVector = Icons.Filled.Delete,
@@ -282,16 +294,9 @@ fun EditTransactionSheet(
                 }
             }
 
-            // Sync state, and the only place it is visible. Above the fields
-            // rather than below them: "the server refused this" changes how you
-            // read everything under it.
-            if (original.pending == 1) {
-                StatusRow(
-                    icon = Icons.Filled.CloudUpload,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    text = stringResource(R.string.transactions_pending),
-                )
-            }
+            // A refusal, unlike a pending upload, keeps its line. Above the
+            // fields rather than below them: "the server refused this" changes
+            // how you read everything under it.
             if (original.rejected == 1) {
                 StatusRow(
                     icon = Icons.Filled.ErrorOutline,
@@ -497,6 +502,20 @@ fun EditTransactionSheet(
             selected = date,
             onPick = { date = it; showDatePicker = false },
             onDismiss = { showDatePicker = false },
+        )
+    }
+
+    if (explainPending) {
+        AlertDialog(
+            onDismissRequest = { explainPending = false },
+            icon = { Icon(Icons.Filled.CloudUpload, contentDescription = null) },
+            title = { Text(stringResource(R.string.transactions_pending)) },
+            text = { Text(stringResource(R.string.transactions_pending_explanation)) },
+            confirmButton = {
+                TextButton(onClick = { explainPending = false }) {
+                    Text(stringResource(android.R.string.ok))
+                }
+            },
         )
     }
 

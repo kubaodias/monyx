@@ -23,7 +23,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.CloudUpload
 import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.Repeat
 import androidx.compose.material.icons.filled.Schedule
@@ -397,8 +396,16 @@ private fun DayGroup(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
+            // Today and yesterday say so after the date rather than instead of
+            // it: the date is what the eye scans down the list by.
+            val date = Dates.dayLabel(day)
             Text(
-                text = Dates.dayLabel(day),
+                text = when (day) {
+                    Dates.today().toString() -> stringResource(R.string.transactions_day_today, date)
+                    Dates.today().minusDays(1).toString() ->
+                        stringResource(R.string.transactions_day_yesterday, date)
+                    else -> date
+                },
                 style = MaterialTheme.typography.labelLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -522,15 +529,6 @@ private fun TransactionRow(
                         } else {
                             stringResource(R.string.recurring_from_rule)
                         },
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(14.dp),
-                    )
-                }
-                if (item.pending == 1) {
-                    Spacer(Modifier.width(6.dp))
-                    Icon(
-                        imageVector = Icons.Filled.CloudUpload,
-                        contentDescription = stringResource(R.string.transactions_pending),
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.size(14.dp),
                     )

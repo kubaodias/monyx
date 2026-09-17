@@ -80,6 +80,9 @@
     <string name="transactions_deleted">Deleted</string>
     <string name="transactions_undo">Undo</string>
     <string name="transactions_pending">Waiting to sync</string>
+    <string name="transactions_pending_explanation">This transaction is saved on this phone but has not reached the server yet, so it is not visible on other devices. It will be sent automatically next time the app is online.</string>
+    <string name="transactions_day_today">%1$s (today)</string>
+    <string name="transactions_day_yesterday">%1$s (yesterday)</string>
     <string name="transactions_rejected">Rejected by the server</string>
     <string name="transactions_delete_confirm_title">Delete this transaction?</string>
     <string name="transactions_delete_confirm_message">This cannot be undone.</string>
