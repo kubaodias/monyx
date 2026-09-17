@@ -79,6 +79,9 @@
     <string name="transactions_deleted">Usunięto</string>
     <string name="transactions_undo">Cofnij</string>
     <string name="transactions_pending">Czeka na wysłanie</string>
+    <string name="transactions_pending_explanation">Ta transakcja jest zapisana na tym telefonie, ale nie dotarła jeszcze na serwer, więc nie widać jej na innych urządzeniach. Zostanie wysłana automatycznie, gdy aplikacja będzie online.</string>
+    <string name="transactions_day_today">%1$s (dzisiaj)</string>
+    <string name="transactions_day_yesterday">%1$s (wczoraj)</string>
     <string name="transactions_rejected">Odrzucona przez serwer</string>
     <string name="transactions_delete_confirm_title">Usunąć transakcję?</string>
     <string name="transactions_delete_confirm_message">Tej operacji nie można cofnąć.</string>
