@@ -480,6 +480,26 @@ private fun HistoryFace(
         hidden = hidden,
         onSelectMonth = onSelectMonth,
     )
+    // Only where there is a line to explain. A household that has never set a
+    // limit is not told about a red line it cannot see.
+    if (history.months.any { it.budgetMinor(hidden) != null }) {
+        Spacer(modifier = Modifier.height(10.dp))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(
+                modifier = Modifier
+                    .width(14.dp)
+                    .height(2.dp)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.error),
+            )
+            Spacer(modifier = Modifier.width(6.dp))
+            Text(
+                text = stringResource(R.string.overview_history_budget),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
     Spacer(modifier = Modifier.height(20.dp))
     CategoryHistoryLegend(
         categories = history.categories,

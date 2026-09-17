@@ -57,6 +57,7 @@
     <string name="overview_history_hide_one">Hide %1$s</string>
     <string name="overview_history_show_one">Show %1$s</string>
     <string name="overview_history_empty">Nothing spent in the last 12 months</string>
+    <string name="overview_history_budget">Budget</string>
     <string name="overview_no_data">No spending this month</string>
     <string name="overview_previous_month">Previous month</string>
     <string name="overview_next_month">Next month</string>

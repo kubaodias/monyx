@@ -1,5 +1,6 @@
 package com.monyx
 
+import com.monyx.data.BudgetLimit
 import com.monyx.data.MonthlyCategorySpend
 import com.monyx.ui.overview.HISTORY_MONTHS
 import com.monyx.ui.overview.axisTicks
@@ -231,6 +232,139 @@ class CategoryHistoryTest {
     @Test
     fun `small amounts do not get an axis in thousands`() {
         assertEquals(listOf(0L, 4000L, 8000L, 12000L), axisTicks(10000))
+    }
+
+    // ------------------------------------------------------- the budget line
+
+    private fun limit(
+        period: String,
+        categoryId: String,
+        minor: Long,
+        parent: String? = null,
+        deleted: Int = 0,
+        seq: Long = 1,
+    ) = BudgetLimit(
+        id = "$categoryId:$period:$seq",
+        period = period,
+        categoryId = categoryId,
+        rollupId = parent ?: categoryId,
+        limitMinor = minor,
+        deleted = deleted,
+        seq = seq,
+    )
+
+    private fun historyWith(budgets: List<BudgetLimit>, selected: String = "2026-09") =
+        categoryHistory(
+            rows = listOf(spend("2026-09", "food", 40000)),
+            periods = historyWindow(selected, today),
+            selectedPeriod = selected,
+            today = today,
+            budgets = budgets,
+        )
+
+    @Test
+    fun `a limit holds in every month after the one it was set in`() {
+        val months = historyWith(listOf(limit("2026-07", "food", 90000))).months
+        assertNull(months.first { it.period == "2026-06" }.budgetMinor(emptySet()))
+        assertEquals(90000L, months.first { it.period == "2026-07" }.budgetMinor(emptySet()))
+        assertEquals(90000L, months.last().budgetMinor(emptySet()))
+    }
+
+    @Test
+    fun `a newer limit supersedes the one before it`() {
+        val months = historyWith(
+            listOf(limit("2026-07", "food", 90000), limit("2026-08", "food", 120000)),
+        ).months
+        assertEquals(90000L, months.first { it.period == "2026-07" }.budgetMinor(emptySet()))
+        assertEquals(120000L, months.first { it.period == "2026-08" }.budgetMinor(emptySet()))
+    }
+
+    @Test
+    fun `clearing a limit stops it rather than falling back to the older one`() {
+        // The tombstone is the newest row, and it carries no limit. Skipping it
+        // would resurrect a limit the household deliberately removed.
+        val months = historyWith(
+            listOf(
+                limit("2026-07", "food", 90000),
+                limit("2026-08", "food", 0, deleted = 1),
+            ),
+        ).months
+        assertEquals(90000L, months.first { it.period == "2026-07" }.budgetMinor(emptySet()))
+        assertNull(months.first { it.period == "2026-08" }.budgetMinor(emptySet()))
+        assertNull(months.last().budgetMinor(emptySet()))
+    }
+
+    @Test
+    fun `a limit set before the window still applies inside it`() {
+        val months = historyWith(listOf(limit("2023-01", "food", 90000))).months
+        assertEquals(90000L, months.first().budgetMinor(emptySet()))
+    }
+
+    @Test
+    fun `two rows for one budget count once`() {
+        // The same limit under two ids — the server keeps its own row id on an
+        // upsert, so the next pull lands a second local row. Summing them would
+        // double the household's budget for good.
+        val months = historyWith(
+            listOf(
+                limit("2026-07", "food", 90000, seq = 4),
+                limit("2026-07", "food", 95000, seq = 9),
+            ),
+        ).months
+        assertEquals(95000L, months.last().budgetMinor(emptySet()))
+    }
+
+    @Test
+    fun `limits add up across categories`() {
+        val months = historyWith(
+            listOf(limit("2026-07", "food", 90000), limit("2026-07", "fuel", 45000)),
+        ).months
+        assertEquals(135000L, months.last().budgetMinor(emptySet()))
+    }
+
+    @Test
+    fun `a limit on the parent covers its subcategories`() {
+        // Home is 1 600 and Home > Repairs is 400 inside it, not beside it.
+        val months = historyWith(
+            listOf(
+                limit("2026-07", "home", 160000),
+                limit("2026-07", "repairs", 40000, parent = "home"),
+            ),
+        ).months
+        assertEquals(160000L, months.last().budgetMinor(emptySet()))
+    }
+
+    @Test
+    fun `subcategory limits add up when the parent has none`() {
+        val months = historyWith(
+            listOf(
+                limit("2026-07", "repairs", 40000, parent = "home"),
+                limit("2026-07", "garden", 20000, parent = "home"),
+            ),
+        ).months
+        assertEquals(60000L, months.last().budgetMinor(emptySet()))
+    }
+
+    @Test
+    fun `hiding a category takes its limit out of the line`() {
+        val months = historyWith(
+            listOf(limit("2026-07", "food", 90000), limit("2026-07", "fuel", 45000)),
+        ).months
+        assertEquals(45000L, months.last().budgetMinor(setOf("food")))
+    }
+
+    @Test
+    fun `hiding everything budgeted leaves no line at all`() {
+        // Not a line along the floor: no limit and a limit of nothing are
+        // different claims, and only one of them is true here.
+        val months = historyWith(listOf(limit("2026-07", "food", 90000))).months
+        assertNull(months.last().budgetMinor(setOf("food")))
+    }
+
+    @Test
+    fun `no budgets means no line`() {
+        val months = historyWith(emptyList()).months
+        assertTrue(months.all { it.budgetMinor(emptySet()) == null })
     }
 
     // -------------------------------------------------------------- the taps

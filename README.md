@@ -15,7 +15,7 @@
 <table>
   <tr>
     <td align="center" width="16%"><img src="docs/screenshots/overview.png" alt="Monthly summary with account filters, balance and a category breakdown" width="100%"></td>
-    <td align="center" width="16%"><img src="docs/screenshots/trends.png" alt="Twelve months of spending as stacked bars, by category" width="100%"></td>
+    <td align="center" width="16%"><img src="docs/screenshots/trends.png" alt="Twelve months of spending as stacked bars by category, with the budget as a red line over them" width="100%"></td>
     <td align="center" width="16%"><img src="docs/screenshots/add.png" alt="Adding an expense on the built-in keypad" width="100%"></td>
     <td align="center" width="16%"><img src="docs/screenshots/history.png" alt="Transaction history with search and filters" width="100%"></td>
     <td align="center" width="16%"><img src="docs/screenshots/budget.png" alt="Monthly plan and per-category budgets" width="100%"></td>
@@ -38,10 +38,11 @@ with the new row on screen.
 - **Summary** — the month's balance, income and expenses, filtered by account.
   Tapping the balance turns the card over to show the last thirty days as a line.
   The breakdown card has two faces as well: this month as a pie, or the last
-  twelve months as stacked bars by category, where tapping a bar moves the whole
-  screen to that month and the legend gives each category's monthly average —
-  averaged over the months the ledger actually covers — and hides it from the
-  chart.
+  twelve months as stacked bars by category, with the budget drawn over them as
+  a red line so a month that went over is one you can see. Tapping a bar moves
+  the whole screen to that month, and the legend gives each category's monthly
+  average — averaged over the months the ledger actually covers — and hides it
+  from the chart.
 - **Add** — a keypad that is also a calculator, a note, any date including the
   future, and *Make it repeat* to turn the row being typed into a repeating rule.
 - **History** — the month, searchable, filtered by account and category, pulled
