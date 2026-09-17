@@ -41,6 +41,27 @@ object Money {
     /** "1 324,00" — no currency symbol, for compact rows. */
     fun format(minor: Long): String = synchronized(this) { plain().format(minor / 100.0) }
 
+    /**
+     * "1 324" — whole złoty, no currency, for a chart axis.
+     *
+     * The grosze are noise on a gridline: four axis labels carrying ",00" are
+     * eight characters of nothing, and they widen the gutter that the chart
+     * itself has to fit beside.
+     */
+    fun formatWhole(minor: Long): String = synchronized(this) { whole().format(minor / 100) }
+
+    private var cachedWholeLocale: Locale? = null
+    private var cachedWhole: NumberFormat? = null
+
+    private fun whole(): NumberFormat {
+        val locale = Locale.getDefault()
+        cachedWhole?.let { if (cachedWholeLocale == locale) return it }
+        val fresh = NumberFormat.getIntegerInstance(locale)
+        cachedWholeLocale = locale
+        cachedWhole = fresh
+        return fresh
+    }
+
     /** "1 324,00 zł" — the full form. */
     fun formatWithCurrency(minor: Long): String = "${format(minor)} $CURRENCY"
 

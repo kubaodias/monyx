@@ -27,11 +27,14 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.PieChart
 import androidx.compose.material.icons.filled.ShowChart
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -81,6 +84,7 @@ fun OverviewScreen(
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val categories by viewModel.categories.collectAsStateWithLifecycle()
     val accounts by viewModel.accounts.collectAsStateWithLifecycle()
+    val history by viewModel.history.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
 
     // The row somebody tapped, loaded whole. Null closes the editor.
@@ -142,10 +146,14 @@ fun OverviewScreen(
         item {
             BreakdownCard(
                 breakdown = state.breakdown,
+                history = history,
                 // A slice is a question — "what made up that 340 zł?" — so it
                 // opens that category's transactions for the month on screen,
                 // not for today.
                 onCategoryClick = { categoryId -> onOpenTransactions(categoryId, state.period) },
+                // Tapping a bar moves the whole screen to that month, which is
+                // the same thing the switcher at the top does.
+                onSelectMonth = viewModel::setPeriod,
             )
         }
         item {
@@ -382,34 +390,143 @@ private fun SummaryStat(label: String, amountMinor: Long, tint: Color) {
     }
 }
 
+/**
+ * Where the money goes this month, and — turned over — where it has been going
+ * all year.
+ *
+ * One card with two faces rather than a second card below it, because the two
+ * answer the same question over different spans, and because the legend is the
+ * same list of categories either way: in the pie it says what each cost this
+ * month and opens its transactions, in the history it says what each costs in
+ * an average month and takes it in and out of the chart.
+ *
+ * Which face is showing survives a rotation but not the tab being left, which
+ * is the right lifetime for a lens: coming back to the Overview should show the
+ * month, since that is what every other card on the screen is showing.
+ */
 @Composable
 private fun BreakdownCard(
     breakdown: List<CategorySpend>,
+    history: CategoryHistory,
     onCategoryClick: (String) -> Unit,
+    onSelectMonth: (String) -> Unit,
 ) {
+    var showHistory by rememberSaveable { mutableStateOf(false) }
+    // Ids, so a category hidden in one month's data stays hidden when the
+    // window moves under it. Saveable as a list because a Set is not.
+    var hiddenIds by rememberSaveable { mutableStateOf(listOf<String>()) }
+    val hidden = hiddenIds.toSet()
     Card(
         shape = RoundedCornerShape(24.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
     ) {
         Column(modifier = Modifier.fillMaxWidth().padding(24.dp)) {
-            Text(
-                text = stringResource(R.string.overview_breakdown),
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold,
-            )
-            Spacer(modifier = Modifier.height(16.dp))
-            val slices = breakdown.map { spend ->
-                PieSlice(
-                    id = spend.categoryId,
-                    label = spend.name,
-                    amountMinor = spend.spentMinor,
-                    color = Palette.colorFor(spend.color, spend.categoryId),
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = stringResource(
+                        if (showHistory) R.string.overview_breakdown_history else R.string.overview_breakdown,
+                    ),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.weight(1f),
                 )
+                // The only sign the card has a back, and the same bargain the
+                // balance card makes with its little chart glyph: 24dp in the
+                // corner, showing what you would get rather than what you have.
+                IconButton(
+                    onClick = { showHistory = !showHistory },
+                    modifier = Modifier.size(32.dp),
+                ) {
+                    Icon(
+                        imageVector = if (showHistory) Icons.Filled.PieChart else Icons.Filled.BarChart,
+                        contentDescription = stringResource(
+                            if (showHistory) {
+                                R.string.overview_show_breakdown
+                            } else {
+                                R.string.overview_show_history
+                            },
+                        ),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(20.dp),
+                    )
+                }
             }
-            PieChart(slices = slices, onSliceClick = onCategoryClick)
+            Spacer(modifier = Modifier.height(16.dp))
+            if (showHistory) {
+                HistoryFace(
+                    history = history,
+                    hidden = hidden,
+                    onToggle = { id ->
+                        hiddenIds = if (id in hidden) hiddenIds - id else hiddenIds + id
+                    },
+                    onSelectMonth = onSelectMonth,
+                )
+            } else {
+                val slices = breakdown.map { spend ->
+                    PieSlice(
+                        id = spend.categoryId,
+                        label = spend.name,
+                        amountMinor = spend.spentMinor,
+                        color = Palette.colorFor(spend.color, spend.categoryId),
+                    )
+                }
+                PieChart(slices = slices, onSliceClick = onCategoryClick)
+            }
         }
     }
+}
+
+/**
+ * The back of the breakdown card: the bars, then the legend they are made of.
+ *
+ * Hiding every category is allowed and leaves an empty grid rather than being
+ * refused. It is one tap to undo, it is visibly what was asked for, and the
+ * alternative — a last row that will not turn off — is a control that lies
+ * about being a control.
+ */
+@Composable
+private fun HistoryFace(
+    history: CategoryHistory,
+    hidden: Set<String>,
+    onToggle: (String) -> Unit,
+    onSelectMonth: (String) -> Unit,
+) {
+    if (history.isEmpty) {
+        Box(
+            modifier = Modifier.fillMaxWidth().height(160.dp),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(
+                text = stringResource(R.string.overview_history_empty),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        return
+    }
+
+    CategoryHistoryChart(
+        history = history,
+        hidden = hidden,
+        onSelectMonth = onSelectMonth,
+    )
+    // The pale bar on the right needs saying in words once; the alpha alone
+    // reads as "less was spent" to anyone who has not been told otherwise.
+    if (history.months.lastOrNull()?.partial == true) {
+        Spacer(modifier = Modifier.height(8.dp))
+        Text(
+            text = stringResource(R.string.overview_history_partial),
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+    Spacer(modifier = Modifier.height(20.dp))
+    CategoryHistoryLegend(
+        categories = history.categories,
+        hidden = hidden,
+        onToggle = onToggle,
+    )
 }
 
 /**

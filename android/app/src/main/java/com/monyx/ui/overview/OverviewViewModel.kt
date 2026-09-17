@@ -19,6 +19,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
@@ -80,6 +81,10 @@ private fun emptyState(period: String): OverviewUiState {
         trend = trendSeries(emptyList(), window.start, window.endInclusive),
     )
 }
+
+/** A window with its months but no spending in them yet, for the first frame. */
+private fun emptyHistory(period: String): CategoryHistory =
+    categoryHistory(emptyList(), historyWindow(period), period)
 
 /**
  * Joins the app's [SelectedMonth] against the repository's reactive queries.
@@ -149,6 +154,32 @@ class OverviewViewModel(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5_000),
             initialValue = emptyState(period.value),
+        )
+
+    /**
+     * The back of the breakdown card: twelve months of spending by category.
+     *
+     * Its own flow rather than a fifth source folded into [uiState], because it
+     * is a different window — twelve months against one — and because the card
+     * it feeds is usually turned to the pie chart. WhileSubscribed means the
+     * query is live only while the Overview is on screen, and a screen that is
+     * showing the pie is still cheap: one grouped query over a year of rows.
+     *
+     * Follows the account filter, so flipping the card cannot quietly widen
+     * what is being counted.
+     */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    val history: StateFlow<CategoryHistory> = combine(period, selectedAccounts, ::Pair)
+        .flatMapLatest { (selectedPeriod, accountIds) ->
+            val periods = historyWindow(selectedPeriod)
+            repository
+                .spendByCategoryPerMonth(periods.first(), periods.last(), accountIds)
+                .map { rows -> categoryHistory(rows, periods, selectedPeriod) }
+        }
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5_000),
+            initialValue = emptyHistory(period.value),
         )
 
     /** For the editor a recent row opens. Both kinds and every account it
