@@ -17,6 +17,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
 
 /**
  * Everything the Overview screen (Przegląd) shows for one selected month:
@@ -88,9 +89,46 @@ private fun emptyHistory(period: String): CategoryHistory =
 class OverviewViewModel(
     private val repository: MonyxRepository,
     private val selectedMonth: SelectedMonth,
+    private val hiddenCategories: HiddenCategories,
 ) : ViewModel() {
 
     private val period = selectedMonth.period
+
+    /**
+     * The categories this phone keeps off the twelve-month chart, from disk.
+     *
+     * It starts empty for the frame or two DataStore takes to answer, so the
+     * chart draws whole and then loses the hidden categories rather than the
+     * other way round. That is the right way round: a chart that starts empty
+     * and fills in looks broken, one that starts full looks like what it is.
+     */
+    val hidden: StateFlow<Set<String>> = hiddenCategories.flow
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5_000),
+            initialValue = emptySet(),
+        )
+
+    fun toggleHidden(id: String) {
+        viewModelScope.launch { hiddenCategories.toggle(id) }
+    }
+
+    /**
+     * Hide all, or show all — from whatever the categories on screen are doing,
+     * never from the stored set.
+     *
+     * The distinction is real now that the set outlives the screen: it can hold
+     * ids for categories nobody has spent on in a year, and a control reading
+     * those would offer "Show all" over a list where everything is already
+     * showing. Show all clears the stored set outright, stale ids included,
+     * which is the only housekeeping this preference will ever get.
+     */
+    fun toggleAllHidden(ids: List<String>) {
+        viewModelScope.launch {
+            val anyHidden = ids.any { it in hidden.value }
+            hiddenCategories.set(if (anyHidden) emptySet() else ids.toSet())
+        }
+    }
 
     /**
      * Which accounts the figures cover. **Empty means every one of them**, and
@@ -214,8 +252,12 @@ class OverviewViewModel(
     }
 
     companion object {
-        fun factory(repository: MonyxRepository, selectedMonth: SelectedMonth) = viewModelFactory {
-            initializer { OverviewViewModel(repository, selectedMonth) }
+        fun factory(
+            repository: MonyxRepository,
+            selectedMonth: SelectedMonth,
+            hiddenCategories: HiddenCategories,
+        ) = viewModelFactory {
+            initializer { OverviewViewModel(repository, selectedMonth, hiddenCategories) }
         }
     }
 }

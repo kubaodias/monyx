@@ -42,7 +42,8 @@ with the new row on screen.
   a red line so a month that went over is one you can see. Tapping a bar moves
   the whole screen to that month, and the legend gives each category's monthly
   average — averaged over the months the ledger actually covers — and hides it
-  from the chart.
+  from the chart. What is hidden sinks to the bottom of the list and stays
+  hidden on that phone alone, across launches.
 - **Add** — a keypad that is also a calculator, a note, any date including the
   future, and *Make it repeat* to turn the row being typed into a repeating rule.
 - **History** — the month, searchable, filtered by account and category, pulled

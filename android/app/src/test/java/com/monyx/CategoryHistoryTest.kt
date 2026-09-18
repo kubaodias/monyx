@@ -3,9 +3,11 @@ package com.monyx
 import com.monyx.data.BudgetLimit
 import com.monyx.data.MonthlyCategorySpend
 import com.monyx.ui.overview.HISTORY_MONTHS
+import com.monyx.ui.overview.HistoryCategory
 import com.monyx.ui.overview.axisTicks
 import com.monyx.ui.overview.categoryHistory
 import com.monyx.ui.overview.historyWindow
+import com.monyx.ui.overview.legendOrder
 import com.monyx.ui.overview.monthIndexAt
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -365,6 +367,68 @@ class CategoryHistoryTest {
     fun `no budgets means no line`() {
         val months = historyWith(emptyList()).months
         assertTrue(months.all { it.budgetMinor(emptySet()) == null })
+    }
+
+    // ------------------------------------------------------ the legend order
+
+    private fun categoriesOf(vararg pairs: Pair<String, Long>) =
+        pairs.map { (id, average) ->
+            HistoryCategory(
+                id = id,
+                name = id,
+                color = null,
+                totalMinor = average * 12,
+                averageMinor = average,
+            )
+        }
+
+    @Test
+    fun `visible categories come first, dearest first`() {
+        val ordered = legendOrder(
+            categoriesOf("home" to 160000, "food" to 90000, "fuel" to 45000),
+            hidden = emptySet(),
+        )
+        assertEquals(listOf("home", "food", "fuel"), ordered.map { it.id })
+    }
+
+    @Test
+    fun `hidden categories sink below every visible one`() {
+        // Home is the dearest thing the household has and it goes to the
+        // bottom: the list's job is the chart, and it is not on the chart.
+        val ordered = legendOrder(
+            categoriesOf("home" to 160000, "food" to 90000, "fuel" to 45000),
+            hidden = setOf("home"),
+        )
+        assertEquals(listOf("food", "fuel", "home"), ordered.map { it.id })
+    }
+
+    @Test
+    fun `the hidden ones are themselves in order`() {
+        val ordered = legendOrder(
+            categoriesOf("home" to 160000, "food" to 90000, "fuel" to 45000, "fun" to 30000),
+            hidden = setOf("fuel", "home"),
+        )
+        assertEquals(listOf("food", "fun", "home", "fuel"), ordered.map { it.id })
+    }
+
+    @Test
+    fun `an id for a category that is not on the list changes nothing`() {
+        // The stored set outlives the window it was made in, so it can name a
+        // category nobody has spent on in a year.
+        val categories = categoriesOf("food" to 90000, "fuel" to 45000)
+        assertEquals(
+            categories.map { it.id },
+            legendOrder(categories, hidden = setOf("boat")).map { it.id },
+        )
+    }
+
+    @Test
+    fun `hiding everything keeps the list and its order`() {
+        val ordered = legendOrder(
+            categoriesOf("home" to 160000, "food" to 90000),
+            hidden = setOf("home", "food"),
+        )
+        assertEquals(listOf("home", "food"), ordered.map { it.id })
     }
 
     // -------------------------------------------------------------- the taps

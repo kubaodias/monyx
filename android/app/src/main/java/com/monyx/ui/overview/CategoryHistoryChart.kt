@@ -251,6 +251,9 @@ fun CategoryHistoryChart(
  * separate target — taking a colour out of the chart and going to look at the
  * rows behind it are different intentions, and a single tap cannot be both.
  *
+ * What is hidden sinks to the bottom and stays hidden on this phone until it is
+ * turned back on, across launches. [categories] arrives already in that order.
+ *
  * Show all / Hide all sits in the header, because isolating one category out of
  * eight is otherwise seven taps.
  */
@@ -276,7 +279,10 @@ fun CategoryHistoryLegend(
             // anything hidden the move anyone reaches for is to get it all back.
             Text(
                 text = stringResource(
-                    if (hidden.isEmpty()) {
+                    // Asked of the rows on screen, not of the stored set, which
+                    // outlives them and can name categories this window has
+                    // never heard of.
+                    if (categories.none { it.id in hidden }) {
                         R.string.overview_history_hide_all
                     } else {
                         R.string.overview_history_show_all
@@ -302,10 +308,11 @@ fun CategoryHistoryLegend(
                         .weight(1f)
                         .clip(MaterialTheme.shapes.small)
                         .clickable { onOpen(category.id) }
-                        // Dimmed, never removed or reordered: a hidden category
-                        // has to stay exactly where it was, or the row under
-                        // the finger moves up into its place and the next tap
-                        // lands on something nobody meant to touch.
+                        // Dimmed and sunk to the bottom of the list, never
+                        // removed — see legendOrder. The cost is that the row
+                        // under the finger moves when the eye is tapped, so
+                        // hiding two categories in a row is two deliberate
+                        // taps rather than two quick ones in the same place.
                         .alpha(if (isHidden) 0.38f else 1f)
                         .padding(vertical = 6.dp),
                 ) {

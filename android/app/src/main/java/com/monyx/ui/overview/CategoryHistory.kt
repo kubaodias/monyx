@@ -177,6 +177,25 @@ fun categoryHistory(
 }
 
 /**
+ * The legend's order: what is on the chart first, dearest first, then what has
+ * been hidden from it, also dearest first.
+ *
+ * The rows used to keep their place when hidden, on the grounds that a list
+ * which reorders under the finger is a list where the next tap lands on
+ * something nobody meant to touch. Sinking them wins anyway, because hiding is
+ * now remembered across sessions: a household that permanently hides two
+ * categories would otherwise open the screen forever afterwards onto two dimmed
+ * rows sitting in the middle of the list it actually reads.
+ *
+ * Hidden rows are sunk, never dropped. They are the only way back — a category
+ * with no row has no eye to turn on again.
+ */
+fun legendOrder(categories: List<HistoryCategory>, hidden: Set<String>): List<HistoryCategory> =
+    categories.sortedWith(
+        compareBy<HistoryCategory> { it.id in hidden }.thenByDescending { it.averageMinor },
+    )
+
+/**
  * The limit in effect in each of [periods], per category, from the raw budget
  * rows — the same carry-forward rule the budget screen resolves in SQL for one
  * month at a time.
