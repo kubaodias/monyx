@@ -216,8 +216,44 @@ class CategoryHistoryTest {
         val ticks = axisTicks(220000)
         assertEquals(0L, ticks.first())
         assertTrue("${ticks.last()} must clear 2 200 zł", ticks.last() >= 220000)
-        // 0, 1 000, 2 000, 3 000 — a step somebody can read the bars against.
-        assertEquals(listOf(0L, 100000L, 200000L, 300000L), ticks)
+        // 0, 750, 1 500, 2 250 — a step somebody can read the bars against,
+        // and a ceiling that sits just above them rather than a third higher.
+        assertEquals(listOf(0L, 75000L, 150000L, 225000L), ticks)
+    }
+
+    @Test
+    fun `hiding half the spending moves the ceiling`() {
+        // The ladder used to run ...4, 5, 10, so every total between five and
+        // ten times a power of ten drew the same axis: 15 000 and 30 000 both
+        // topped out at 30 000. Hiding a category halved the bars and the chart
+        // did not move, which is what it was reported as — a frozen axis.
+        val whole = axisTicks(2_990_000)
+        val halved = axisTicks(1_500_000)
+        assertTrue(
+            "30 000 zł and 15 000 zł must not draw the same ceiling",
+            whole.last() != halved.last(),
+        )
+        assertTrue(halved.last() >= 1_500_000)
+    }
+
+    @Test
+    fun `hiding always moves the ceiling, at every size`() {
+        // The property the frozen axis broke, swept from 1 zł to 100 000 zł:
+        // halve what is on the chart and the ceiling must come down. Checked
+        // across the whole range because the old gap was invisible until the
+        // household's totals happened to land inside it.
+        var amount = 100L
+        while (amount <= 10_000_000L) {
+            val top = axisTicks(amount).last()
+            assertTrue("$amount overflows its axis $top", top >= amount)
+            // 1.5x is the ladder's widest rung, 1 to 1.5, and its worst case.
+            assertTrue("$amount leaves too much air under $top", top <= amount * 3 / 2)
+            assertTrue(
+                "halving $amount left the ceiling at $top",
+                axisTicks(amount / 2).last() < top,
+            )
+            amount += 700L
+        }
     }
 
     @Test
