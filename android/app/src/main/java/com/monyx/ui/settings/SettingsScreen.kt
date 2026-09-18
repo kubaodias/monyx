@@ -306,6 +306,24 @@ fun SettingsScreen() {
  * @param myMemberId from the session. Null while enrolment is still landing,
  *   and then nothing is marked — better unmarked than marked wrong.
  */
+/**
+ * You first, then everyone else in the order they joined.
+ *
+ * Two different reasons in one list. Your own row is the one you come here to
+ * find — it carries the tint that says which of several identical names is this
+ * phone — so it goes where the eye lands. The rest read as the household's own
+ * history: who was here first, who arrived later. Alphabetical, which is what
+ * this used to be, is a fact about spelling and reshuffled the whole list every
+ * time somebody was renamed.
+ *
+ * [members] is expected in join order already; this only lifts one row out of
+ * it. sortedBy is stable, so the rest keep that order untouched — and while
+ * [myMemberId] is still null on a cold start nothing moves at all, so the list
+ * does not jump under a finger when the id finally lands.
+ */
+internal fun memberOrder(members: List<MemberEntity>, myMemberId: String?): List<MemberEntity> =
+    members.sortedBy { if (it.id == myMemberId) 0 else 1 }
+
 @Composable
 private fun MembersSection(members: List<MemberEntity>, myMemberId: String?) {
     SectionCard(title = stringResource(R.string.settings_members), icon = Icons.Filled.Groups) {
@@ -316,7 +334,8 @@ private fun MembersSection(members: List<MemberEntity>, myMemberId: String?) {
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         } else {
-            members.forEach { member ->
+            val ordered = remember(members, myMemberId) { memberOrder(members, myMemberId) }
+            ordered.forEach { member ->
                 val isMe = member.id == myMemberId
                 val youLabel = stringResource(R.string.settings_member_you)
                 Row(
@@ -431,7 +450,7 @@ private fun SyncSection(lastSyncAt: Long, rejectedCount: Int, onSyncNow: () -> U
     SectionCard(title = stringResource(R.string.settings_sync), icon = Icons.Filled.Sync) {
         Text(
             if (lastSyncAt > 0) {
-                stringResource(R.string.settings_last_sync, Dates.dayLabel(Dates.localDate(lastSyncAt)))
+                stringResource(R.string.settings_last_sync, Dates.dayTimeLabel(lastSyncAt))
             } else {
                 stringResource(R.string.settings_never_synced)
             },

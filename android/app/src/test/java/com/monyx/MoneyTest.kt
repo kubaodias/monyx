@@ -191,6 +191,27 @@ class DatesTest {
         assertEquals(-4599L, Money.parseToMinor(Money.formatForEditing(-4599)))
     }
 
+    /**
+     * The sync row's label. The date alone was useless on the day it mattered
+     * most — "Last sync: 18 September", read on the 18th, answers nothing.
+     */
+    @Test
+    fun `the sync label carries the time of day, in the interface language`() {
+        val evening = 1789763460000L // 18 Sep 2026, 22:31 Warsaw
+        assertEquals("18 września, 22:31", withLocale("pl-PL") { Dates.dayTimeLabel(evening) })
+        assertTrue(
+            withLocale("en-GB") { Dates.dayTimeLabel(evening) }.startsWith("18 September, "),
+        )
+    }
+
+    @Test
+    fun `the sync label is read in Warsaw, whatever the phone's language`() {
+        // 07:05 Warsaw is 06:05 UTC — a label built in UTC would say the wrong
+        // hour on every sync, and be a day out on the ones just after midnight.
+        val morning = 1767593100000L
+        assertEquals("5 stycznia, 07:05", withLocale("pl-PL") { Dates.dayTimeLabel(morning) })
+    }
+
     @Test
     fun `month and day labels follow the interface language`() {
         assertEquals("August 2026", withLocale("en-GB") { Dates.monthLabel("2026-08") })

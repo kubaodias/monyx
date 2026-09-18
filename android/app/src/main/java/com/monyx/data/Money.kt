@@ -6,6 +6,7 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import java.time.format.FormatStyle
 import java.util.Locale
 
 /**
@@ -221,6 +222,34 @@ object Dates {
             }
         }
         return LocalDate.parse(occurredOn).format(formatter)
+    }
+
+    private var timeLocale: Locale? = null
+    private var cachedTime: DateTimeFormatter? = null
+
+    /**
+     * "18 września, 22:31" — a day with the time of day on it.
+     *
+     * For the sync row, which needs both. "Last sync: 18 September", read on
+     * the 18th, tells you nothing you had not already assumed — and the whole
+     * reason to look at it is to find out whether it ran a minute ago or this
+     * morning, which is exactly the part the date alone leaves out.
+     *
+     * The time format is the locale's, not a hard-coded 24 hours: the same
+     * build reads as 22:31 in Polish and 10:31 pm in English.
+     */
+    fun dayTimeLabel(epochMs: Long): String {
+        val zoned = Instant.ofEpochMilli(epochMs).atZone(ZONE)
+        val formatter = synchronized(this) {
+            val locale = Locale.getDefault()
+            cachedTime?.takeIf { timeLocale == locale } ?: run {
+                DateTimeFormatter.ofLocalizedTime(FormatStyle.SHORT).withLocale(locale).also {
+                    timeLocale = locale
+                    cachedTime = it
+                }
+            }
+        }
+        return "${dayLabel(zoned.toLocalDate().format(ISO))}, ${zoned.format(formatter)}"
     }
 
     /** Polish month names are lowercase; a heading wants them capitalised. */
