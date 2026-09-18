@@ -71,6 +71,7 @@ import com.monyx.ui.theme.Palette
 fun CategoryHistoryChart(
     history: CategoryHistory,
     hidden: Set<String>,
+    budgetHidden: Boolean,
     onSelectMonth: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -84,7 +85,9 @@ fun CategoryHistoryChart(
         val ids = visible.map { it.id }.toSet()
         history.months.map { it.totalMinor(ids) }
     }
-    val budgets = remember(history.months, hidden) { history.months.map { it.budgetMinor(hidden) } }
+    val budgets = remember(history.months, hidden, budgetHidden) {
+        if (budgetHidden) emptyList() else history.months.map { it.budgetMinor(hidden) }
+    }
     // The axis clears the line as well as the bars. A budget drawn off the top
     // of the chart is worse than no budget at all: the months under it look
     // like the months over it.
@@ -117,7 +120,10 @@ fun CategoryHistoryChart(
     }
 
     val gridColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.18f)
-    val budgetColor = MaterialTheme.colorScheme.error
+    // Softened, because it is a reference and not a reading: at full strength a
+    // saturated red line over the bars reads as an alarm on every month it
+    // crosses, including the ones that came in under it.
+    val budgetColor = MaterialTheme.colorScheme.error.copy(alpha = 0.55f)
     val highlightColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.10f)
     val monthNames = remember(history.months) { history.months.map { shortMonth(it.period) } }
     val count = history.months.size
@@ -207,6 +213,7 @@ fun CategoryHistoryChart(
 
         // The budget, last, so it is never buried under a bar that overshoots
         // it — the crossing is the whole point of the line.
+        if (budgets.size != count) return@Canvas
         val points = budgets.mapIndexed { index, budget ->
             budget?.let {
                 Offset(

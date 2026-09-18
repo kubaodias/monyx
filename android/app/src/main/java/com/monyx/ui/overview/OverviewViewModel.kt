@@ -89,7 +89,7 @@ private fun emptyHistory(period: String): CategoryHistory =
 class OverviewViewModel(
     private val repository: MonyxRepository,
     private val selectedMonth: SelectedMonth,
-    private val hiddenCategories: HiddenCategories,
+    private val chartPreferences: ChartPreferences,
 ) : ViewModel() {
 
     private val period = selectedMonth.period
@@ -102,7 +102,7 @@ class OverviewViewModel(
      * other way round. That is the right way round: a chart that starts empty
      * and fills in looks broken, one that starts full looks like what it is.
      */
-    val hidden: StateFlow<Set<String>> = hiddenCategories.flow
+    val hidden: StateFlow<Set<String>> = chartPreferences.hidden
         .stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5_000),
@@ -110,7 +110,23 @@ class OverviewViewModel(
         )
 
     fun toggleHidden(id: String) {
-        viewModelScope.launch { hiddenCategories.toggle(id) }
+        viewModelScope.launch { chartPreferences.toggle(id) }
+    }
+
+    /**
+     * Whether the budget line is drawn, remembered like the hidden categories
+     * and for the same reason: a household that does not budget by the month
+     * should not have to dismiss the line every time it opens the chart.
+     */
+    val budgetHidden: StateFlow<Boolean> = chartPreferences.budgetHidden
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5_000),
+            initialValue = false,
+        )
+
+    fun toggleBudgetLine() {
+        viewModelScope.launch { chartPreferences.toggleBudget() }
     }
 
     /**
@@ -126,7 +142,7 @@ class OverviewViewModel(
     fun toggleAllHidden(ids: List<String>) {
         viewModelScope.launch {
             val anyHidden = ids.any { it in hidden.value }
-            hiddenCategories.set(if (anyHidden) emptySet() else ids.toSet())
+            chartPreferences.set(if (anyHidden) emptySet() else ids.toSet())
         }
     }
 
@@ -255,9 +271,9 @@ class OverviewViewModel(
         fun factory(
             repository: MonyxRepository,
             selectedMonth: SelectedMonth,
-            hiddenCategories: HiddenCategories,
+            chartPreferences: ChartPreferences,
         ) = viewModelFactory {
-            initializer { OverviewViewModel(repository, selectedMonth, hiddenCategories) }
+            initializer { OverviewViewModel(repository, selectedMonth, chartPreferences) }
         }
     }
 }
