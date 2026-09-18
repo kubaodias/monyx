@@ -58,6 +58,15 @@ fun PieChart(
     slices: List<PieSlice>,
     modifier: Modifier = Modifier,
     onSliceClick: (String) -> Unit = {},
+    /**
+     * Drawn between the donut and the legend under it.
+     *
+     * A slot rather than a fixed control, because what belongs there is the
+     * caller's business: the breakdown card puts its average/month switch here,
+     * where it sits below the picture and above the numbers it labels. Empty by
+     * default, so every other caller is unaffected.
+     */
+    betweenChartAndLegend: @Composable () -> Unit = {},
 ) {
     val total = slices.sumOf { it.amountMinor }
 
@@ -124,6 +133,8 @@ fun PieChart(
         }
 
         Spacer(modifier = Modifier.height(20.dp))
+
+        betweenChartAndLegend()
 
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
             slices.forEach { slice ->

@@ -630,7 +630,7 @@ private fun ChangelogDialog(
                                 }
                             }
                             Text(
-                                Dates.dayLabel(Dates.localDate(release.publishedAt)),
+                                Dates.fullDayLabel(Dates.localDate(release.publishedAt)),
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
@@ -650,7 +650,9 @@ private fun ChangelogDialog(
             }
         },
         confirmButton = {
-            TextButton(onClick = onDismiss) { Text(stringResource(R.string.budget_cancel)) }
+            // "Close", not "Cancel". There is nothing here to cancel — the
+            // dialog only reads.
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.settings_changelog_close)) }
         },
     )
 }

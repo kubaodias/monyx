@@ -224,6 +224,30 @@ object Dates {
         return LocalDate.parse(occurredOn).format(formatter)
     }
 
+    private var yearLocale: Locale? = null
+    private var cachedYearDay: DateTimeFormatter? = null
+
+    /**
+     * "18 września 2026" — a date with its year on it.
+     *
+     * [dayLabel] leaves the year off, which is right for a ledger showing one
+     * month: everything on screen is already in it. A changelog is the opposite
+     * — it reaches back as far as the releases do, and "18 września" in a list
+     * spanning years is a date you cannot place.
+     */
+    fun fullDayLabel(occurredOn: String): String {
+        val formatter = synchronized(this) {
+            val locale = Locale.getDefault()
+            cachedYearDay?.takeIf { yearLocale == locale } ?: run {
+                DateTimeFormatter.ofPattern("d MMMM yyyy", locale).also {
+                    yearLocale = locale
+                    cachedYearDay = it
+                }
+            }
+        }
+        return LocalDate.parse(occurredOn).format(formatter)
+    }
+
     private var timeLocale: Locale? = null
     private var cachedTime: DateTimeFormatter? = null
 

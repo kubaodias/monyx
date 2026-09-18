@@ -488,11 +488,17 @@ private fun BreakdownCard(
                         )
                     }
                 }
-                PieChart(slices = slices, onSliceClick = onCategoryClick)
-                // Under the chart, matching the other face: the picture first,
-                // then what it is a picture of.
-                Spacer(modifier = Modifier.height(16.dp))
-                AmountToggle(showsMonth = showsMonth, onSelect = onSelectAmountMode)
+                PieChart(
+                    slices = slices,
+                    onSliceClick = onCategoryClick,
+                    // Below the donut, above the rows it labels — the same
+                    // place it takes on the other face. At the very bottom it
+                    // was past the end of the list it governs.
+                    betweenChartAndLegend = {
+                        AmountToggle(showsMonth = showsMonth, onSelect = onSelectAmountMode)
+                        Spacer(modifier = Modifier.height(16.dp))
+                    },
+                )
             }
         }
     }

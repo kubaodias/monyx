@@ -265,11 +265,12 @@ fun TransactionsScreen(
                 }
             }
 
-            // What the rows below add up to. The question people come to this
-            // screen with is almost never "which coffees were they" — it is "how
-            // much went on coffee", and until now the only way to answer it was
-            // to add the day headers up by hand.
-            if (transactions.isNotEmpty()) {
+            // Only once a category is chosen. The question this answers is "how
+            // much went on coffee", and without a category there is no "on
+            // what" — the figure would just be the month's spending, which the
+            // Summary card already carries and carries better, next to the
+            // income it should be read against.
+            if (categoryId != null && transactions.isNotEmpty()) {
                 // On a card, like the totals on Overview and the plan on Budget.
                 // Loose on the background it read as another filter chip's
                 // caption — the one line on this screen that is an ANSWER

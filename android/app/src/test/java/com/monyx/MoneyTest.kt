@@ -212,6 +212,21 @@ class DatesTest {
         assertEquals("5 stycznia, 07:05", withLocale("pl-PL") { Dates.dayTimeLabel(morning) })
     }
 
+    /**
+     * The changelog's date. A list that reaches back across years cannot use
+     * the ledger's year-less label — "18 września" is a date you cannot place.
+     */
+    @Test
+    fun `a full date carries its year, in the interface language`() {
+        assertEquals("18 września 2026", withLocale("pl-PL") { Dates.fullDayLabel("2026-09-18") })
+        assertEquals("5 January 2025", withLocale("en-GB") { Dates.fullDayLabel("2025-01-05") })
+    }
+
+    @Test
+    fun `the ledger's own label still leaves the year off`() {
+        assertEquals("18 września", withLocale("pl-PL") { Dates.dayLabel("2026-09-18") })
+    }
+
     @Test
     fun `month and day labels follow the interface language`() {
         assertEquals("August 2026", withLocale("en-GB") { Dates.monthLabel("2026-08") })

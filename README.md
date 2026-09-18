@@ -17,7 +17,7 @@
     <td align="center" width="16%"><img src="docs/screenshots/overview.png" alt="The month's income, spending and the difference between them, with account filters and a category breakdown" width="100%"></td>
     <td align="center" width="16%"><img src="docs/screenshots/trends.png" alt="Twelve months of spending as stacked bars by category, the budget as a red line over them, and a switch between a normal month and the selected one" width="100%"></td>
     <td align="center" width="16%"><img src="docs/screenshots/add.png" alt="Adding an expense on the built-in keypad" width="100%"></td>
-    <td align="center" width="16%"><img src="docs/screenshots/history.png" alt="Transaction history with search, category and subcategory filters, and what the filtered rows add up to" width="100%"></td>
+    <td align="center" width="16%"><img src="docs/screenshots/history.png" alt="Transaction history with search, and filters by account, category and subcategory" width="100%"></td>
     <td align="center" width="16%"><img src="docs/screenshots/budget.png" alt="Monthly plan and per-category budgets" width="100%"></td>
     <td align="center" width="16%"><img src="docs/screenshots/settings.png" alt="Accounts and categories in settings" width="100%"></td>
   </tr>
@@ -50,8 +50,8 @@ with the new row on screen.
 - **Add** — a keypad that is also a calculator, a note, any date including the
   future, and *Make it repeat* to turn the row being typed into a repeating rule.
 - **History** — the month, searchable, filtered by account, category and then
-  subcategory, with the filtered rows totalled above them so "how much went on
-  coffee" is a figure rather than an addition. Pulled down to sync. Today and
+  subcategory; pick a category and the rows are totalled above them, so "how much
+  went on coffee" is a figure rather than an addition. Pulled down to sync. Today and
   yesterday are labelled as such, and *Planned* shows
   what the repeating rules are about to write.
 - **Budget** — what there is to spend this month, limits on main categories that
