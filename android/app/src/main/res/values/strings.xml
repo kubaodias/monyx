@@ -159,6 +159,7 @@
     <string name="settings_backup_stale">No backup for more than 3 days</string>
     <string name="settings_backup_unknown">No backup information</string>
     <string name="settings_changelog">What\'s new</string>
+    <string name="settings_changelog_failed">Couldn\'t load the release notes</string>
     <string name="settings_changelog_empty">No release notes yet</string>
     <string name="settings_changelog_current">installed</string>
     <string name="settings_app_version">App version</string>

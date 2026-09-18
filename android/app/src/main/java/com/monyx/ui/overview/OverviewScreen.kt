@@ -534,6 +534,12 @@ private fun HistoryFace(
         return
     }
 
+    // Above the chart, in the same place it sits on the pie face. It governs
+    // both the legend below and which question the whole card is answering, so
+    // finding it meant scrolling past a chart to a control that had been on
+    // screen a moment earlier on the other side of the card.
+    AmountToggle(showsMonth = showsMonth, onSelect = onSelectAmountMode)
+    Spacer(modifier = Modifier.height(16.dp))
     CategoryHistoryChart(
         history = history,
         hidden = hidden,
@@ -577,8 +583,6 @@ private fun HistoryFace(
         categories = legendOrder(history.categories, hidden) { amounts[it.id] ?: 0L },
         hidden = hidden,
         amounts = amounts,
-        showsMonth = showsMonth,
-        onSelectAmount = onSelectAmountMode,
         onToggle = onToggle,
         onToggleAll = onToggleAll,
         onOpen = onCategoryClick,

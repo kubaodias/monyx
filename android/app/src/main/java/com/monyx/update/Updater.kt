@@ -20,6 +20,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.io.File
 
 sealed interface UpdateState {
@@ -94,15 +95,18 @@ class Updater(private val app: Application, private val session: Session) {
      * Runs even in a debug build, unlike [check]: reading what shipped is not
      * the same as being offered an APK this build could never install.
      *
-     * Returns empty rather than throwing. A changelog is something you open out
-     * of curiosity, and a dialog that crashes the screen behind it is a worse
-     * answer than one that says there is nothing to show.
+     * On IO, and that is not a detail: [Api] is blocking OkHttp, and the caller
+     * is a button in a composable whose scope is the main dispatcher. Without
+     * this the call threw NetworkOnMainThreadException on every tap, runCatching
+     * swallowed it, and the dialog opened empty — the failure looked exactly
+     * like a server with nothing to say.
+     *
+     * Null when the fetch failed, empty when the server genuinely has no
+     * releases. Collapsing the two is what made the bug above invisible.
      */
-    suspend fun releaseNotes(): List<ReleaseNote> {
-        val token = session.token() ?: return emptyList()
-        return runCatching { Api.latestRelease(token, 0).update?.notes }
-            .getOrNull()
-            .orEmpty()
+    suspend fun releaseNotes(): List<ReleaseNote>? = withContext(Dispatchers.IO) {
+        val token = session.token() ?: return@withContext null
+        runCatching { Api.latestRelease(token, 0).update?.notes.orEmpty() }.getOrNull()
     }
 
     private fun check(quiet: Boolean) {

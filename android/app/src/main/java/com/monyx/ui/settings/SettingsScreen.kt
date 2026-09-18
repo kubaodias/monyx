@@ -52,6 +52,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Language
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -588,14 +589,24 @@ private fun LanguageRow(label: String, selected: Boolean, onSelect: () -> Unit) 
  * about how to show them, and the server should not be making it.
  */
 @Composable
-private fun ChangelogDialog(releases: List<ReleaseNote>, onDismiss: () -> Unit) {
+private fun ChangelogDialog(
+    releases: List<ReleaseNote>,
+    failed: Boolean,
+    onDismiss: () -> Unit,
+) {
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.settings_changelog)) },
         text = {
             if (releases.isEmpty()) {
                 Text(
-                    stringResource(R.string.settings_changelog_empty),
+                    stringResource(
+                        if (failed) {
+                            R.string.settings_changelog_failed
+                        } else {
+                            R.string.settings_changelog_empty
+                        },
+                    ),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -650,13 +661,21 @@ private fun BuildIdentitySection() {
     val updater = app.updater
     val state by updater.state.collectAsStateWithLifecycle()
 
+    // Open-with-content, open-with-failure, or closed. Three states because a
+    // fetch that fell over and a server with nothing to say are different
+    // things to be told.
     var changelog by remember { mutableStateOf<List<ReleaseNote>?>(null) }
+    var changelogFailed by remember { mutableStateOf(false) }
     var loadingChangelog by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     val changelogLabel = stringResource(R.string.settings_changelog)
 
-    if (changelog != null) {
-        ChangelogDialog(releases = changelog.orEmpty(), onDismiss = { changelog = null })
+    if (changelog != null || changelogFailed) {
+        ChangelogDialog(
+            releases = changelog.orEmpty(),
+            failed = changelogFailed,
+            onDismiss = { changelog = null; changelogFailed = false },
+        )
     }
 
     SectionCard(title = stringResource(R.string.settings_app_version)) {
@@ -674,7 +693,9 @@ private fun BuildIdentitySection() {
                 onClick = {
                     loadingChangelog = true
                     scope.launch {
-                        changelog = updater.releaseNotes()
+                        val notes = updater.releaseNotes()
+                        changelog = notes
+                        changelogFailed = notes == null
                         loadingChangelog = false
                     }
                 },
@@ -683,14 +704,14 @@ private fun BuildIdentitySection() {
                 if (loadingChangelog) {
                     CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
                 } else {
-                    Text(
-                        "📜",
-                        // An emoji is a glyph, so it follows fontSize, and at
-                        // bodyMedium it sat lost in the middle of a 48dp target.
-                        style = MaterialTheme.typography.titleMedium,
-                        modifier = Modifier.semantics {
-                            contentDescription = changelogLabel
-                        },
+                    // An icon rather than an emoji: emoji are drawn by whatever
+                    // font the phone happens to ship, so a scroll is a different
+                    // picture on every device and matches nothing else here.
+                    Icon(
+                        imageVector = Icons.Filled.Info,
+                        contentDescription = changelogLabel,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(20.dp),
                     )
                 }
             }
