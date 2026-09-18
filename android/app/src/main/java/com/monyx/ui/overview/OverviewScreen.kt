@@ -466,11 +466,6 @@ private fun BreakdownCard(
                     onSelectAmountMode = onSelectAmountMode,
                 )
             } else {
-                // The same two questions the chart behind this card answers, so
-                // "is this a lot?" can be asked of a normal month without
-                // turning the card over and reading a different control.
-                AmountToggle(showsMonth = showsMonth, onSelect = onSelectAmountMode)
-                Spacer(modifier = Modifier.height(16.dp))
                 val slices = if (!showsMonth) {
                     // Averages come from the twelve-month window, which is the
                     // only place they exist — the pie's own query knows one
@@ -494,6 +489,10 @@ private fun BreakdownCard(
                     }
                 }
                 PieChart(slices = slices, onSliceClick = onCategoryClick)
+                // Under the chart, matching the other face: the picture first,
+                // then what it is a picture of.
+                Spacer(modifier = Modifier.height(16.dp))
+                AmountToggle(showsMonth = showsMonth, onSelect = onSelectAmountMode)
             }
         }
     }
@@ -534,12 +533,6 @@ private fun HistoryFace(
         return
     }
 
-    // Above the chart, in the same place it sits on the pie face. It governs
-    // both the legend below and which question the whole card is answering, so
-    // finding it meant scrolling past a chart to a control that had been on
-    // screen a moment earlier on the other side of the card.
-    AmountToggle(showsMonth = showsMonth, onSelect = onSelectAmountMode)
-    Spacer(modifier = Modifier.height(16.dp))
     CategoryHistoryChart(
         history = history,
         hidden = hidden,
@@ -574,7 +567,13 @@ private fun HistoryFace(
             )
         }
     }
-    Spacer(modifier = Modifier.height(20.dp))
+    // Under the chart AND under the budget key: everything above it is the
+    // picture, everything below it is the list of numbers, and the switch is
+    // what those numbers are. Putting it on top made it look like a title for
+    // the chart, which it never governed.
+    Spacer(modifier = Modifier.height(16.dp))
+    AmountToggle(showsMonth = showsMonth, onSelect = onSelectAmountMode)
+    Spacer(modifier = Modifier.height(12.dp))
     val mode = if (showsMonth) LegendAmount.SelectedMonth else LegendAmount.Average
     val amounts = remember(history, mode) { legendAmounts(history, mode) }
     CategoryHistoryLegend(

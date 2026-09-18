@@ -284,6 +284,34 @@ fun CategoryHistoryLegend(
     modifier: Modifier = Modifier,
 ) {
     Column(modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        // Directly under the switch and above the rows, so the two controls
+        // that govern this list sit together instead of one topping the list
+        // and the other tailing it.
+        //
+        // One control rather than two, because the two are never both useful:
+        // with a full chart the only move is to clear it, and with anything
+        // hidden the move anyone reaches for is to get it all back.
+        Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Spacer(modifier = Modifier.weight(1f))
+            Text(
+                text = stringResource(
+                    // Asked of the rows on screen, not of the stored set, which
+                    // outlives them and can name categories this window has
+                    // never heard of.
+                    if (categories.none { it.id in hidden }) {
+                        R.string.overview_history_hide_all
+                    } else {
+                        R.string.overview_history_show_all
+                    },
+                ),
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier
+                    .clip(MaterialTheme.shapes.small)
+                    .clickable(onClick = onToggleAll)
+                    .padding(horizontal = 6.dp, vertical = 2.dp),
+            )
+        }
         categories.forEach { category ->
             val isHidden = category.id in hidden
             Row(
@@ -348,42 +376,6 @@ fun CategoryHistoryLegend(
                 }
             }
         }
-        Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Spacer(modifier = Modifier.weight(1f))
-            // Both choices on screen, the live one filled in.
-            //
-            // This was one label with a swap arrow after it: the heading named
-            // the figure currently in the column and the arrow implied it could
-            // be something else. It read as a caption with decoration — nothing
-            // said what the other state would be, or that the words themselves
-            // were the button. Two segments say the whole thing at once: there
-            // are exactly these two answers, and this is the one you are
-            // looking at.
-            // Under the rows, not over them. It acts on the list, and a
-            // control that acts on a list belongs at the end of it — above,
-            // it read as a heading for the thing it actually operates on.
-            // One control rather than two, because the two are never both
-            // useful: with a full chart the only move is to clear it, and with
-            // anything hidden the move anyone reaches for is to get it all back.
-            Text(
-                text = stringResource(
-                    // Asked of the rows on screen, not of the stored set, which
-                    // outlives them and can name categories this window has
-                    // never heard of.
-                    if (categories.none { it.id in hidden }) {
-                        R.string.overview_history_hide_all
-                    } else {
-                        R.string.overview_history_show_all
-                    },
-                ),
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier
-                    .clip(MaterialTheme.shapes.small)
-                    .clickable(onClick = onToggleAll)
-                    .padding(horizontal = 6.dp, vertical = 2.dp),
-            )
-        }
     }
 }
 
@@ -410,16 +402,19 @@ internal fun AmountToggle(showsMonth: Boolean, onSelect: (LegendAmount) -> Unit)
             .border(1.dp, MaterialTheme.colorScheme.outlineVariant, CircleShape)
             .padding(2.dp),
     ) {
-        AmountSegment(
-            text = stringResource(R.string.overview_history_average),
-            selected = !showsMonth,
-            onClick = { onSelect(LegendAmount.Average) },
-            modifier = Modifier.weight(1f),
-        )
+        // This month on the left, because it is what the card opens on and what
+        // the month switcher above the screen is pointing at; the average is
+        // the alternative you go looking for.
         AmountSegment(
             text = stringResource(R.string.overview_history_this_month),
             selected = showsMonth,
             onClick = { onSelect(LegendAmount.SelectedMonth) },
+            modifier = Modifier.weight(1f),
+        )
+        AmountSegment(
+            text = stringResource(R.string.overview_history_average),
+            selected = !showsMonth,
+            onClick = { onSelect(LegendAmount.Average) },
             modifier = Modifier.weight(1f),
         )
     }
