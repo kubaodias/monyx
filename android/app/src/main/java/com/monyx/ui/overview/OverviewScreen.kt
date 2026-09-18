@@ -88,19 +88,23 @@ fun OverviewScreen(
     val history by viewModel.history.collectAsStateWithLifecycle()
     val hidden by viewModel.hidden.collectAsStateWithLifecycle()
     val budgetHidden by viewModel.budgetHidden.collectAsStateWithLifecycle()
-    val legendShowsMonth by viewModel.legendShowsMonth.collectAsStateWithLifecycle()
+    val showsMonth by viewModel.showsMonth.collectAsStateWithLifecycle()
 
-    LazyColumn(
-        modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(horizontal = 20.dp, vertical = 20.dp),
-        verticalArrangement = Arrangement.spacedBy(20.dp),
-    ) {
-        item {
-            MonthSwitcher(
-                period = state.period,
-                onSelect = viewModel::setPeriod,
-            )
-        }
+    Column(modifier = Modifier.fillMaxSize()) {
+        // Pinned, like the identical control on Transactions. It names the month
+        // every figure below it belongs to, and once the balance card had
+        // scrolled past there was nothing left on screen saying which month was
+        // being read — on a screen whose whole content changes with it.
+        MonthSwitcher(
+            period = state.period,
+            onSelect = viewModel::setPeriod,
+            modifier = Modifier.padding(horizontal = 20.dp, vertical = 20.dp),
+        )
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = 20.dp),
+            verticalArrangement = Arrangement.spacedBy(20.dp),
+        ) {
         if (state.accounts.size > 1) {
             item {
                 AccountFilter(
@@ -137,9 +141,10 @@ fun OverviewScreen(
                 // Tapping a bar moves the whole screen to that month, which is
                 // the same thing the switcher at the top does.
                 onSelectMonth = viewModel::setPeriod,
-                legendShowsMonth = legendShowsMonth,
-                onToggleLegendAmount = viewModel::toggleLegendAmount,
+                showsMonth = showsMonth,
+                onSelectAmountMode = viewModel::setAmountMode,
             )
+        }
         }
     }
 }
@@ -402,8 +407,8 @@ private fun BreakdownCard(
     onToggleAllHidden: () -> Unit,
     onCategoryClick: (String) -> Unit,
     onSelectMonth: (String) -> Unit,
-    legendShowsMonth: Boolean,
-    onToggleLegendAmount: () -> Unit,
+    showsMonth: Boolean,
+    onSelectAmountMode: (LegendAmount) -> Unit,
 ) {
     var showHistory by rememberSaveable { mutableStateOf(false) }
     // Turning a card over is somewhere you went, so Back is the way out of it.
@@ -457,17 +462,36 @@ private fun BreakdownCard(
                     onToggleAll = onToggleAllHidden,
                     onCategoryClick = onCategoryClick,
                     onSelectMonth = onSelectMonth,
-                    legendShowsMonth = legendShowsMonth,
-                    onToggleLegendAmount = onToggleLegendAmount,
+                    showsMonth = showsMonth,
+                    onSelectAmountMode = onSelectAmountMode,
                 )
             } else {
-                val slices = breakdown.map { spend ->
-                    PieSlice(
-                        id = spend.categoryId,
-                        label = spend.name,
-                        amountMinor = spend.spentMinor,
-                        color = Palette.colorFor(spend.color, spend.categoryId),
-                    )
+                // The same two questions the chart behind this card answers, so
+                // "is this a lot?" can be asked of a normal month without
+                // turning the card over and reading a different control.
+                AmountToggle(showsMonth = showsMonth, onSelect = onSelectAmountMode)
+                Spacer(modifier = Modifier.height(16.dp))
+                val slices = if (!showsMonth) {
+                    // Averages come from the twelve-month window, which is the
+                    // only place they exist — the pie's own query knows one
+                    // month and nothing else.
+                    history.categories.map { category ->
+                        PieSlice(
+                            id = category.id,
+                            label = category.name,
+                            amountMinor = category.averageMinor,
+                            color = Palette.colorFor(category.color, category.id),
+                        )
+                    }
+                } else {
+                    breakdown.map { spend ->
+                        PieSlice(
+                            id = spend.categoryId,
+                            label = spend.name,
+                            amountMinor = spend.spentMinor,
+                            color = Palette.colorFor(spend.color, spend.categoryId),
+                        )
+                    }
                 }
                 PieChart(slices = slices, onSliceClick = onCategoryClick)
             }
@@ -493,8 +517,8 @@ private fun HistoryFace(
     onToggleAll: () -> Unit,
     onCategoryClick: (String) -> Unit,
     onSelectMonth: (String) -> Unit,
-    legendShowsMonth: Boolean,
-    onToggleLegendAmount: () -> Unit,
+    showsMonth: Boolean,
+    onSelectAmountMode: (LegendAmount) -> Unit,
 ) {
     if (history.isEmpty) {
         Box(
@@ -545,7 +569,7 @@ private fun HistoryFace(
         }
     }
     Spacer(modifier = Modifier.height(20.dp))
-    val mode = if (legendShowsMonth) LegendAmount.SelectedMonth else LegendAmount.Average
+    val mode = if (showsMonth) LegendAmount.SelectedMonth else LegendAmount.Average
     val amounts = remember(history, mode) { legendAmounts(history, mode) }
     CategoryHistoryLegend(
         // Ranked by the figure on show, so switching the column re-sorts the
@@ -553,12 +577,8 @@ private fun HistoryFace(
         categories = legendOrder(history.categories, hidden) { amounts[it.id] ?: 0L },
         hidden = hidden,
         amounts = amounts,
-        heading = if (legendShowsMonth) {
-            Dates.monthLabel(history.selectedPeriod)
-        } else {
-            stringResource(R.string.overview_history_average)
-        },
-        onToggleAmount = onToggleLegendAmount,
+        showsMonth = showsMonth,
+        onSelectAmount = onSelectAmountMode,
         onToggle = onToggle,
         onToggleAll = onToggleAll,
         onOpen = onCategoryClick,

@@ -19,6 +19,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Check
@@ -29,6 +30,8 @@ import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material3.AssistChip
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -267,36 +270,47 @@ fun TransactionsScreen(
             // much went on coffee", and until now the only way to answer it was
             // to add the day headers up by hand.
             if (transactions.isNotEmpty()) {
-                Row(
+                // On a card, like the totals on Overview and the plan on Budget.
+                // Loose on the background it read as another filter chip's
+                // caption — the one line on this screen that is an ANSWER
+                // rather than a control, and nothing said so.
+                Card(
+                    shape = RoundedCornerShape(20.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surface,
+                    ),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 16.dp)
                         .padding(bottom = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Text(
-                        text = pluralStringResource(
-                            R.plurals.transactions_count,
-                            totals.count,
-                            totals.count,
-                        ),
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.weight(1f),
-                    )
-                    // Income only when there is some. On a category filter there
-                    // never is, and a permanent "+0,00" beside the figure people
-                    // came for is noise on the one line that has to be read.
-                    if (totals.incomeMinor > 0) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
                         Text(
-                            text = "+${Money.format(totals.incomeMinor)}",
+                            text = pluralStringResource(
+                                R.plurals.transactions_count,
+                                totals.count,
+                                totals.count,
+                            ),
                             style = MaterialTheme.typography.labelMedium,
-                            fontWeight = FontWeight.SemiBold,
-                            color = MaterialTheme.colorScheme.primary,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.weight(1f),
                         )
-                        Spacer(Modifier.width(10.dp))
-                    }
-                    if (totals.expenseMinor > 0 || totals.incomeMinor == 0L) {
+                        // One number: what the rows on screen cost.
+                        //
+                        // Income used to sit beside it whenever the list held
+                        // any, which on an unfiltered month meant a salary
+                        // printed next to the spending — two figures that do not
+                        // add up to anything, on a line whose whole job is to be
+                        // read in one glance. The month's income is on the
+                        // Summary card, where it has something to be subtracted
+                        // from. Here the question is only ever "how much went
+                        // out".
                         Text(
                             text = Money.formatWithCurrency(totals.expenseMinor),
                             style = MaterialTheme.typography.titleSmall,

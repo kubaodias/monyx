@@ -53,7 +53,7 @@
     <string name="overview_breakdown_history">Wydatki przez 12 miesięcy</string>
     <string name="overview_show_history">Pokaż ostatnie 12 miesięcy</string>
     <string name="overview_show_breakdown">Wróć do tego miesiąca</string>
-    <string name="overview_history_switch_amount">Pokaż miesiąc zamiast średniej</string>
+    <string name="overview_history_this_month">Wydatki w tym miesiącu</string>
     <string name="overview_history_average">Średnio na miesiąc</string>
     <string name="overview_history_hide_all">Ukryj wszystkie</string>
     <string name="overview_history_show_all">Pokaż wszystkie</string>

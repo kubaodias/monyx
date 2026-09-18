@@ -2,6 +2,7 @@ package com.monyx.ui.overview
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
@@ -41,6 +42,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.rememberTextMeasurer
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -276,41 +278,27 @@ fun CategoryHistoryLegend(
     hidden: Set<String>,
     /** What to print per category — see [legendAmounts]. */
     amounts: Map<String, Long>,
-    /** What that column is: the window's average, or one month's spending. */
-    heading: String,
-    onToggleAmount: () -> Unit,
+    /** Which of the two the column currently holds. */
+    showsMonth: Boolean,
+    onSelectAmount: (LegendAmount) -> Unit,
     onToggle: (String) -> Unit,
     onToggleAll: () -> Unit,
     onOpen: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        AmountToggle(showsMonth = showsMonth, onSelect = onSelectAmount)
         Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            // The heading is the switch. It already had to say which figure the
-            // column holds, and a label that names the current state is the
-            // smallest honest place to put the choice — a separate button would
-            // have needed its own words for the same fact.
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier
-                    .weight(1f)
-                    .clip(MaterialTheme.shapes.small)
-                    .clickable(onClick = onToggleAmount)
-                    .padding(horizontal = 4.dp, vertical = 2.dp),
-            ) {
-                Text(
-                    text = heading,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Spacer(modifier = Modifier.width(4.dp))
-                Icon(
-                    imageVector = Icons.Filled.SwapHoriz,
-                    contentDescription = stringResource(R.string.overview_history_switch_amount),
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(14.dp),
-                )
-            }
+            Spacer(modifier = Modifier.weight(1f))
+            // Both choices on screen, the live one filled in.
+            //
+            // This was one label with a swap arrow after it: the heading named
+            // the figure currently in the column and the arrow implied it could
+            // be something else. It read as a caption with decoration — nothing
+            // said what the other state would be, or that the words themselves
+            // were the button. Two segments say the whole thing at once: there
+            // are exactly these two answers, and this is the one you are
+            // looking at.
             // One control rather than two, because the two are never both
             // useful: with a full chart the only move is to clear it, and with
             // anything hidden the move anyone reaches for is to get it all back.
@@ -398,6 +386,80 @@ fun CategoryHistoryLegend(
             }
         }
     }
+}
+
+/**
+ * The average/this-month switch, shared by both faces of the breakdown card.
+ *
+ * Its own full-width row, and the two halves say what they MEAN rather than
+ * naming the month. It was briefly "Średnio na miesiąc" beside "Maj 2026",
+ * which left the reader to work out that a month name in that position stood
+ * for that month's spending — the one thing the column is, and the one thing
+ * the label did not say.
+ *
+ * Both faces use it and each remembers its own answer, because their sensible
+ * defaults differ: a pie under a month switcher is about that month, and a
+ * twelve-month chart is about a normal one.
+ */
+@Composable
+internal fun AmountToggle(showsMonth: Boolean, onSelect: (LegendAmount) -> Unit) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(CircleShape)
+            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, CircleShape)
+            .padding(2.dp),
+    ) {
+        AmountSegment(
+            text = stringResource(R.string.overview_history_average),
+            selected = !showsMonth,
+            onClick = { onSelect(LegendAmount.Average) },
+            modifier = Modifier.weight(1f),
+        )
+        AmountSegment(
+            text = stringResource(R.string.overview_history_this_month),
+            selected = showsMonth,
+            onClick = { onSelect(LegendAmount.SelectedMonth) },
+            modifier = Modifier.weight(1f),
+        )
+    }
+}
+
+/**
+ * One half of the average/month switch.
+ *
+ * The unselected half is a live target, not a label: tapping either side is
+ * how the switch is worked, and only one of them ever does anything. Kept
+ * legible rather than dimmed to 38% — it is the thing you are being asked to
+ * choose, and a choice you cannot read is not being offered.
+ */
+@Composable
+private fun AmountSegment(
+    text: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.labelSmall,
+        textAlign = TextAlign.Center,
+        fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+        maxLines = 1,
+        color = if (selected) {
+            MaterialTheme.colorScheme.onPrimaryContainer
+        } else {
+            MaterialTheme.colorScheme.onSurfaceVariant
+        },
+        modifier = modifier
+            .clip(CircleShape)
+            .background(
+                if (selected) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
+            )
+            .clickable(onClick = onClick)
+            .padding(horizontal = 8.dp, vertical = 5.dp),
+    )
 }
 
 /**
