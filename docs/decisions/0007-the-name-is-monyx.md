@@ -80,8 +80,9 @@ an oversight to tidy up later: every phone still has the old app installed and
 still points at the old host, and will until someone reinstalls. Deleting them
 is what breaks those phones, not keeping them.
 
-`Api.BASE_URL` is a new host rather than a renamed one, for the same reason —
-`monyx-api-31cdf6d8-0` shares no identity with `monio-api-db2fb8bb-e`.
+`Api.BASE_URL` points at a new host rather than a renamed one, for the same
+reason: the two deployments have different identities. The address is supplied
+through local build configuration.
 
 This is the third naming decision in three days, and the last one that is cheap.
 Doing it again after anything reaches Google Play costs an installed base rather
