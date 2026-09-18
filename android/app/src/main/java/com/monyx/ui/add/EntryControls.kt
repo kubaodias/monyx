@@ -15,9 +15,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -30,14 +31,17 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -183,7 +187,7 @@ internal fun ContextChip(
 }
 
 /**
- * The categories, and — once one is chosen — its subcategories below them.
+ * The families, and a picker for what is inside the one you tap.
  *
  * It was one flat grid: every root followed by its children, so a household
  * with eleven families put fifty circles on screen and "Paliwo" sat beside "Dom
@@ -194,17 +198,22 @@ internal fun ContextChip(
  * header, and the grid you were aiming at moved under your thumb between the
  * first tap and the second.
  *
- * So both, stacked. The roots never move. Choosing one opens a second block
- * under a rule, and the two blocks are visibly different things rather than one
- * long list. The subcategory step is optional in the honest sense — filing on
- * "Dom i ogród" and stopping there is a complete answer, and tapping the lit
- * child again puts it back on the parent.
+ * Then both were stacked — roots fixed, children revealed underneath a rule.
+ * That read well on paper and failed on a phone: eleven families fill the grid
+ * to the fold, so the block opened where nobody could see it and the tap looked
+ * like it had done nothing.
  *
- * Which family is open is not state. It is read off the selection: the chosen
- * category, or its parent if the chosen one is a child. Two pieces of state for
- * one choice is how a picker ends up showing a parent from one family and a
- * child from another — and it is why this used to stay three taps deep in
- * whatever the last saved transaction was filed under.
+ * So the second step is now its own picker, over the grid rather than under it.
+ * A family with children opens it; a family without one is simply chosen. The
+ * grid itself never reflows, which is what makes the first tap safe to aim at.
+ *
+ * The step stays optional in the honest sense: the family's own row is the
+ * first thing in the picker, so "Dom i ogród" and nothing finer is one tap and
+ * is a complete answer.
+ *
+ * Which family is open IS state here, unlike the selection-derived version this
+ * replaces — a dialog has to stay open while you read it, including when what
+ * you read makes you pick the parent you already had.
  */
 @Composable
 internal fun CategoryGrid(
@@ -224,8 +233,8 @@ internal fun CategoryGrid(
     }
 
     val selected = categories.firstOrNull { it.id == selectedId }
-    val openRootId = selected?.let { it.parentId ?: it.id }
-    val children = openRootId?.let { childrenOf[it] }.orEmpty()
+    val selectedRootId = selected?.let { it.parentId ?: it.id }
+    var picking by rememberSaveable { mutableStateOf<String?>(null) }
 
     LazyVerticalGrid(
         columns = GridCells.Fixed(4),
@@ -238,33 +247,125 @@ internal fun CategoryGrid(
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         items(roots, key = { it.id }) { category ->
+            val children = childrenOf[category.id].orEmpty()
             CategoryCell(
                 category = category,
                 color = colorOf(category),
-                selected = category.id == selectedId,
-                // The family whose children are showing below, when the choice
-                // itself is one of those children. A ring rather than a fill:
-                // it is not the answer, it is where the answer came from.
-                open = category.id == openRootId && category.id != selectedId,
-                onClick = { onSelect(category.id) },
+                selected = category.id == selectedRootId,
+                // The chosen child's name, on its family's circle. Without it
+                // the grid says "Dzieci" while the transaction saves as
+                // "Dzieci > Zabawki", and the finer answer is invisible at
+                // exactly the moment it wants checking.
+                label = selected?.takeIf { it.parentId == category.id }?.name,
+                onClick = {
+                    if (children.isEmpty()) onSelect(category.id) else picking = category.id
+                },
             )
         }
-        if (openRootId != null && children.isNotEmpty()) {
-            item(key = "split", span = { GridItemSpan(maxLineSpan) }) {
-                SubcategorySplit()
+    }
+
+    val family = picking?.let { id -> roots.firstOrNull { it.id == id } }
+    if (family != null) {
+        SubcategoryPicker(
+            family = family,
+            children = childrenOf[family.id].orEmpty(),
+            selectedId = selectedId,
+            colorOf = colorOf,
+            onPick = {
+                onSelect(it)
+                picking = null
+            },
+            onDismiss = { picking = null },
+        )
+    }
+}
+
+/**
+ * The second step: this family, then everything inside it.
+ *
+ * The family's own row comes first and is not a heading — it is the answer for
+ * anyone who does not split that family up, and burying it under its children
+ * would turn an optional step into a required one. It reads as "Dzieci" alone
+ * rather than repeating the word twice, because the dialog's title has already
+ * said which family this is.
+ */
+@Composable
+private fun SubcategoryPicker(
+    family: CategoryEntity,
+    children: List<CategoryEntity>,
+    selectedId: String?,
+    colorOf: (CategoryEntity) -> Color,
+    onPick: (String) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(family.name) },
+        text = {
+            // Scrollable: a family with a dozen children would otherwise push
+            // its own last rows past the bottom of the dialog with no way down.
+            Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                (listOf(family) + children).forEach { category ->
+                    SubcategoryRow(
+                        category = category,
+                        color = colorOf(category),
+                        selected = category.id == selectedId,
+                        onClick = { onPick(category.id) },
+                    )
+                }
             }
-            items(children, key = { it.id }) { category ->
-                CategoryCell(
-                    category = category,
-                    color = colorOf(category),
-                    selected = category.id == selectedId,
-                    open = false,
-                    // Tapping the lit one goes back to the parent. Optional has
-                    // to be undoable or it is a second required step with a
-                    // softer label.
-                    onClick = { onSelect(if (category.id == selectedId) openRootId else category.id) },
-                )
-            }
+        },
+        confirmButton = {},
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.budget_cancel)) }
+        },
+    )
+}
+
+/** One line of the picker: the category's own circle, its name, and a tick. */
+@Composable
+private fun SubcategoryRow(
+    category: CategoryEntity,
+    color: Color,
+    selected: Boolean,
+    onClick: () -> Unit,
+) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 8.dp, vertical = 10.dp),
+    ) {
+        Box(
+            modifier = Modifier
+                .size(32.dp)
+                .clip(CircleShape)
+                .background(if (selected) color else color.copy(alpha = 0.16f)),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                imageVector = Palette.icon(category.icon),
+                contentDescription = null,
+                tint = if (selected) Color.White else color,
+                modifier = Modifier.size(18.dp),
+            )
+        }
+        Spacer(Modifier.width(12.dp))
+        Text(
+            text = category.name,
+            style = MaterialTheme.typography.bodyLarge,
+            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+            modifier = Modifier.weight(1f),
+        )
+        if (selected) {
+            Icon(
+                imageVector = Icons.Filled.Check,
+                contentDescription = null,
+                tint = color,
+                modifier = Modifier.size(20.dp),
+            )
         }
     }
 }
@@ -275,7 +376,8 @@ private fun CategoryCell(
     category: CategoryEntity,
     color: Color,
     selected: Boolean,
-    open: Boolean,
+    /** The chosen subcategory's name, when one inside this family is chosen. */
+    label: String? = null,
     onClick: () -> Unit,
 ) {
     // fillMaxWidth, or the cell is only as wide as its widest child and sits at
@@ -292,11 +394,7 @@ private fun CategoryCell(
                 .clip(CircleShape)
                 .background(if (selected) color else color.copy(alpha = 0.16f))
                 .then(
-                    if (selected || open) {
-                        Modifier.border(2.dp, color, CircleShape)
-                    } else {
-                        Modifier
-                    },
+                    if (selected) Modifier.border(2.dp, color, CircleShape) else Modifier,
                 ),
             contentAlignment = Alignment.Center,
         ) {
@@ -309,7 +407,10 @@ private fun CategoryCell(
         }
         Spacer(Modifier.height(4.dp))
         Text(
-            text = category.name,
+            // The subcategory's name replaces the family's rather than joining
+            // it: "Dzieci > Zabawki" does not fit under a 48dp circle at 11sp,
+            // and the family is already legible from the colour and position.
+            text = label ?: category.name,
             fontSize = 11.sp,
             // 11sp default leading is ~15sp, which makes a wrapped name look
             // like two separate labels rather than one over two lines. Two
@@ -327,33 +428,6 @@ private fun CategoryCell(
             color = MaterialTheme.colorScheme.onBackground,
             fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
         )
-    }
-}
-
-/**
- * The rule between the families and the family that is open.
- *
- * Without it the children read as a fifth row of roots — same circles, same
- * size, no boundary — and the grid grows a row every time somebody adds a
- * subcategory anywhere. A line and a word are enough to say these are the
- * inside of the one above.
- */
-@Composable
-private fun SubcategorySplit() {
-    Row(
-        modifier = Modifier.fillMaxWidth().padding(top = 4.dp, bottom = 2.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        Text(
-            text = stringResource(R.string.add_pick_subcategory),
-            fontSize = 11.sp,
-            fontWeight = FontWeight.Medium,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        HorizontalDivider(modifier = Modifier.weight(1f))
     }
 }
 

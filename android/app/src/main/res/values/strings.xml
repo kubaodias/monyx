@@ -46,6 +46,7 @@
     <!-- Overview -->
     <string name="overview_income">Income</string>
     <string name="overview_expenses">Expenses</string>
+    <string name="overview_account_total">In the accounts</string>
     <string name="overview_balance">Balance</string>
     <string name="overview_breakdown">Where the money goes</string>
     <string name="overview_breakdown_history">Spending over 12 months</string>

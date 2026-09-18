@@ -38,13 +38,25 @@ data class OverviewUiState(
     val incomeMinor: Long = 0,
     val expenseMinor: Long = 0,
     /**
-     * What is actually in the accounts, not what moved through them.
+     * Earned minus spent, for the selected month — whether the month came out
+     * ahead or behind.
      *
-     * This used to be income minus expenses for the month, which is a rate
-     * rather than a position: it said "we are 900 zł up in September" on a card
-     * headed Bilans, next to a strip of account buttons whose balances added up
-     * to something else entirely. The two numbers were both right and only one
-     * of them was the one being asked for.
+     * This is the front of the card, and it is deliberately a rate rather than
+     * a position. The card used to headline the account balance instead, on the
+     * grounds that "we are 900 zł up in September" is not what "Bilans" means
+     * next to a strip of account buttons. True — but it made the month switcher
+     * above it pointless: September and March printed the same number, because
+     * what is in the account today has nothing to do with the month being
+     * looked at. Position has not been lost; it is on the account chips, and on
+     * the back of this card.
+     */
+    val netMinor: Long = 0,
+    /** The thirty-day window, for the trend face only. See [balanceMinor]. */
+    val windowIncomeMinor: Long = 0,
+    val windowExpenseMinor: Long = 0,
+    /**
+     * What is actually in the accounts, not what moved through them — the
+     * number the running line on the back of the card arrives at.
      *
      * Follows the account filter, so with everything selected — the default —
      * it is the household's total, and selecting one account narrows it to that
@@ -173,15 +185,24 @@ class OverviewViewModel(
                     Dates.iso(window.endInclusive),
                     accountIds,
                 ),
-            ) { breakdown, accounts, daily ->
+                repository.monthTotals(selectedPeriod, accountIds),
+            ) { breakdown, accounts, daily, month ->
                 OverviewUiState(
                     period = selectedPeriod,
-                    // Summed from the same rows the chart is drawn from rather
-                    // than fetched again for the month. monthTotals is no longer
-                    // asked for at all here: two queries answering one question
-                    // is how the front and the back of a card start disagreeing.
-                    incomeMinor = daily.sumOf { it.incomeMinor },
-                    expenseMinor = daily.sumOf { it.expenseMinor },
+                    // The MONTH, because that is the question the card is under:
+                    // a month switcher sits directly above it, and a figure that
+                    // ignores which month is chosen makes that control a lie for
+                    // every month but this one. Judging a finished month against
+                    // its budget is the whole reason to look back at one.
+                    incomeMinor = month.incomeMinor,
+                    expenseMinor = month.expenseMinor,
+                    netMinor = month.incomeMinor - month.expenseMinor,
+                    // The thirty days the chart on the back actually draws. Kept
+                    // apart from the month rather than reconciled with it: the
+                    // two faces answer different questions now, and each says
+                    // which one it is answering.
+                    windowIncomeMinor = daily.sumOf { it.incomeMinor },
+                    windowExpenseMinor = daily.sumOf { it.expenseMinor },
                     balanceMinor = accounts
                         .filter { accountIds.isEmpty() || it.id in accountIds }
                         .sumOf { it.balanceMinor },

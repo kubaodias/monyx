@@ -85,13 +85,26 @@ class BudgetViewModel(
             PlanState(period = _period.value),
         )
 
-    /** Expense categories that do not yet have a limit for the current period. */
+    /**
+     * Main categories that do not yet have a limit for the current period.
+     *
+     * Subcategories are deliberately not offered. A limit on a parent already
+     * covers everything under it — budgetUsage sums the children into it — so a
+     * second limit on one child is a budget inside a budget, and the two answer
+     * the same question differently. Offering both is how a household ends up
+     * with Dom i ogród capped at 1000 and Ogród capped at 400 underneath it,
+     * with nothing on screen to say which one is being enforced.
+     *
+     * A limit already set on a subcategory is left alone rather than hidden:
+     * budgetUsage still returns it and the list still shows it, so it can be
+     * seen and removed. This narrows what can be CREATED, not what exists.
+     */
     val availableToAdd: StateFlow<List<CategoryEntity>> = combine(
         repository.expenseCategories(),
         budgetUsage,
     ) { categories, usage ->
         val budgeted = usage.map { it.categoryId }.toSet()
-        categories.filter { it.id !in budgeted }
+        categories.filter { it.parentId == null && it.id !in budgeted }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     fun setPeriod(period: String) {

@@ -113,6 +113,9 @@ fun OverviewScreen(
             SummaryCard(
                 income = state.incomeMinor,
                 expense = state.expenseMinor,
+                net = state.netMinor,
+                windowIncome = state.windowIncomeMinor,
+                windowExpense = state.windowExpenseMinor,
                 balance = state.balanceMinor,
                 trend = state.trend,
             )
@@ -139,19 +142,30 @@ fun OverviewScreen(
 }
 
 /**
- * The month's balance on the front, how it got there on the back.
+ * How the chosen month went on the front, where the money stands on the back.
  *
- * A flip rather than a second card or a screen of its own, because it is one
- * fact seen two ways: the running total on the back is the number on the front,
- * arriving. Two cards side by side would have claimed two separate facts.
+ * The two faces now answer two questions, and each names its own. The front is
+ * the MONTH: earned, spent, and the difference, so moving the switcher above it
+ * to March answers "did March come out ahead?". The back is the last thirty
+ * days and the balance they arrive at, which is a position and does not belong
+ * to any one month.
  *
- * Which is why the same three figures are printed on both faces. The back used
- * to headline the thirty-day net instead, so a September that had not started
- * yet read 0,00 on the front and 4 447,00 on the back — one card, two answers,
- * and no way to tell from either which question it had answered.
+ * Both faces used to print the same three figures, on the principle that one
+ * card must not give two answers. The principle stands; what changed is that
+ * the front's question was the wrong one — it printed the same balance whatever
+ * month was chosen. The rule is now that each face LABELS its answer, which the
+ * back already did whenever a day was focused.
  */
 @Composable
-private fun SummaryCard(income: Long, expense: Long, balance: Long, trend: TrendSeries) {
+private fun SummaryCard(
+    income: Long,
+    expense: Long,
+    net: Long,
+    windowIncome: Long,
+    windowExpense: Long,
+    balance: Long,
+    trend: TrendSeries,
+) {
     var showTrend by rememberSaveable { mutableStateOf(false) }
     // Dropped whenever the window itself changes — a day index means nothing
     // once the month switcher has moved the thirty days underneath it.
@@ -187,8 +201,8 @@ private fun SummaryCard(income: Long, expense: Long, balance: Long, trend: Trend
             if (showingBack) {
                 TrendFace(
                     trend = trend,
-                    income = income,
-                    expense = expense,
+                    income = windowIncome,
+                    expense = windowExpense,
                     balance = balance,
                     focused = focused,
                     onFocus = { focused = it },
@@ -201,7 +215,7 @@ private fun SummaryCard(income: Long, expense: Long, balance: Long, trend: Trend
                 TotalsFace(
                     income = income,
                     expense = expense,
-                    balance = balance,
+                    net = net,
                     onOpenTrend = { showTrend = true },
                 )
             }
@@ -210,7 +224,7 @@ private fun SummaryCard(income: Long, expense: Long, balance: Long, trend: Trend
 }
 
 @Composable
-private fun TotalsFace(income: Long, expense: Long, balance: Long, onOpenTrend: () -> Unit) {
+private fun TotalsFace(income: Long, expense: Long, net: Long, onOpenTrend: () -> Unit) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -235,10 +249,10 @@ private fun TotalsFace(income: Long, expense: Long, balance: Long, onOpenTrend: 
             )
         }
         Text(
-            text = Money.formatWithCurrency(balance),
+            text = Money.formatWithCurrency(net),
             style = MaterialTheme.typography.displaySmall,
             fontWeight = FontWeight.Bold,
-            color = amountColor(balance),
+            color = amountColor(net),
         )
         Spacer(modifier = Modifier.height(24.dp))
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
@@ -282,9 +296,13 @@ private fun TrendFace(
     // "Through 25 August", not "25 August". The number under it is the balance
     // as it stood at the END of that day, while the two figures below are what
     // moved on the day itself — a bare date would have read as both.
+    // Not "Bilans": the front of the card owns that word now, for the month's
+    // net. This face headlines what is actually in the accounts, and a card
+    // whose two sides print different numbers under one label is the confusion
+    // the flip was built to avoid.
     val label = point
         ?.let { stringResource(R.string.overview_trend_through, Dates.dayLabel(it.date.toString())) }
-        ?: stringResource(R.string.overview_balance)
+        ?: stringResource(R.string.overview_account_total)
     val headline = if (point == null) balance else trend.runningAt(focused)
     val shownIncome = point?.incomeMinor ?: income
     val shownExpense = point?.expenseMinor ?: expense

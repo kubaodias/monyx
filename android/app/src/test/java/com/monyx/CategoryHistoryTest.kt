@@ -486,4 +486,59 @@ class CategoryHistoryTest {
     fun `a tap past the last column stays on the last month`() {
         assertEquals(11, monthIndexAt(1000f, 40f, 400f, 12))
     }
+
+    // ------------------------------------------- a limit of nothing is a limit
+
+    @Test
+    fun `a limit of zero draws a line on the floor, not no line`() {
+        val months = historyWith(listOf(limit("2026-07", "food", 0))).months
+        assertNull(months.first { it.period == "2026-06" }.budgetMinor(emptySet()))
+        assertEquals(0L, months.first { it.period == "2026-07" }.budgetMinor(emptySet()))
+    }
+
+    @Test
+    fun `zero carries forward like any other limit`() {
+        val months = historyWith(listOf(limit("2026-07", "food", 0))).months
+        assertEquals(0L, months.last().budgetMinor(emptySet()))
+    }
+
+    @Test
+    fun `zero is superseded, and supersedes`() {
+        val months = historyWith(
+            listOf(
+                limit("2026-07", "food", 90000),
+                limit("2026-08", "food", 0, seq = 2),
+                limit("2026-09", "food", 50000, seq = 3),
+            ),
+        ).months
+        assertEquals(90000L, months.first { it.period == "2026-07" }.budgetMinor(emptySet()))
+        assertEquals(0L, months.first { it.period == "2026-08" }.budgetMinor(emptySet()))
+        assertEquals(50000L, months.first { it.period == "2026-09" }.budgetMinor(emptySet()))
+    }
+
+    /**
+     * The distinction the `>= 0` test exists to keep: zero is a budget, a
+     * tombstone is the absence of one, and they must not collapse into each
+     * other just because both carry no money.
+     */
+    @Test
+    fun `a cleared limit is still nothing at all, unlike a zero one`() {
+        val zero = historyWith(listOf(limit("2026-07", "food", 0))).months
+        val cleared = historyWith(
+            listOf(limit("2026-07", "food", 90000), limit("2026-08", "food", 0, deleted = 1, seq = 2)),
+        ).months
+        assertEquals(0L, zero.last().budgetMinor(emptySet()))
+        assertNull(cleared.last().budgetMinor(emptySet()))
+    }
+
+    @Test
+    fun `a zero limit on one category still sums with a real one on another`() {
+        val months = historyWith(
+            listOf(limit("2026-07", "food", 0), limit("2026-07", "fun", 30000)),
+        ).months
+        assertEquals(30000L, months.last().budgetMinor(emptySet()))
+        // Hiding the funded one leaves the zero behind, which is a line at the
+        // floor rather than no line: the household still budgeted for food.
+        assertEquals(0L, months.last().budgetMinor(setOf("fun")))
+    }
 }

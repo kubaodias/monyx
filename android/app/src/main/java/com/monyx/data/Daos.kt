@@ -494,10 +494,16 @@ interface MonyxDao {
              -- limits to answer "how much is left to assign" makes it wrong, so
              -- it is resolved here: newest seq wins, which is the server's copy,
              -- because that is the one every other phone is looking at.
+             -- pending first, and that ordering is not a detail. A row this
+             -- phone has just written carries seq 0 until the server stamps
+             -- it, so on seq alone the newest edit there is loses to every
+             -- synced row — and where a duplicate exists, changing the limit
+             -- did nothing visible at all: the dialog closed, the row kept its
+             -- old number, and the only way to see the edit was to sync.
              AND b.id = (SELECT b3.id FROM budgets b3
                          WHERE b3.categoryId = b.categoryId AND b3.period = b.period
                            AND b3.deleted = 0
-                         ORDER BY b3.seq DESC, b3.id DESC LIMIT 1)
+                         ORDER BY b3.pending DESC, b3.seq DESC, b3.id DESC LIMIT 1)
            ORDER BY c.sortOrder, c.name"""
     )
     fun budgetUsage(period: String): Flow<List<BudgetUsage>>

@@ -62,6 +62,34 @@ object Money {
         return fresh
     }
 
+    /**
+     * "4000", or "4000,5" — what a text field should be seeded with.
+     *
+     * [format] is for reading and this is for editing, and the two want
+     * opposite things. Grouping is the problem: a field is re-parsed on every
+     * keystroke, and the space in "4 000,00" is a character somebody has to
+     * work around to turn four thousand into five. The trailing ",00" is the
+     * same nuisance from the other end — nobody typing a budget wants to clear
+     * two zeros first.
+     *
+     * The decimal separator stays the locale's, because that is the key the
+     * keyboard offers. [parseToMinor] takes either one back, so a comma typed
+     * into an English build still reads as a decimal point.
+     */
+    fun formatForEditing(minor: Long): String {
+        val separator = DecimalFormatSymbols.getInstance(Locale.getDefault()).decimalSeparator
+        val sign = if (minor < 0) "-" else ""
+        val absolute = if (minor < 0) -minor else minor
+        val grosze = (absolute % 100).toInt()
+        val fraction = when {
+            grosze == 0 -> ""
+            // 4000,50 is "4000,5": the second zero says nothing a person needs.
+            grosze % 10 == 0 -> "$separator${grosze / 10}"
+            else -> separator + grosze.toString().padStart(2, '0')
+        }
+        return "$sign${absolute / 100}$fraction"
+    }
+
     /** "1 324,00 zł" — the full form. */
     fun formatWithCurrency(minor: Long): String = "${format(minor)} $CURRENCY"
 
