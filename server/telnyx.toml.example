@@ -1,16 +1,26 @@
-name = "monyx-api"
+# Template. Copy to telnyx.toml and fill in the identifiers.
+#
+#     cp server/telnyx.toml.example server/telnyx.toml
+#
+# telnyx.toml itself is gitignored: a function's id is also its hostname
+# (<name>-<first 8 of func_id>-<n>.telnyxcompute.com), so committing it publishes
+# the address of the deployment. Keeping it out of Git does not make the address
+# a secret on an installed phone — it only stops it being handed to a reader of
+# the repository.
+
+name = "<your function name>"
 main = "src/index.ts"
 compatibility_date = "2026-05-01"
 
 # The shared source of truth. Bound as env.DB: bindings come from
 # `import { env } from "@telnyx/edge-runtime"`, never from the fetch argument.
 [storage.sqldb.DB]
-id = "0f99e845-cb59-413c-b6a3-0ffe9ac22160"
+id = "<your sqldb id>"
 
 # Caches the FCM OAuth access token (key "fcm/token" — KV keys may not
 # contain a colon). The cached value carries its own expires_at.
 [storage.kv.KV]
-id = "85862881-aa7f-48b5-953b-8cb022946950"
+id = "<your kv id>"
 
 # Whole service-account JSON, parsed in code: a bare PEM in an env var loses
 # its newlines.
@@ -70,6 +80,8 @@ limit = 10
 period = 60
 
 
-[edge_compute]
-func_id = "31cdf6d8-0997-4ea7-b205-72d4818ff2af"
-func_name = "monyx-api"
+# Written back by `telnyx-edge ship` the first time it deploys. Leave this block
+# out entirely to have a NEW function created; keep it to update that one.
+# [edge_compute]
+# func_id = "<written by ship>"
+# func_name = "<written by ship>"

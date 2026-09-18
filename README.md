@@ -146,6 +146,17 @@ further invites from Settings.
 
 ## Android
 
+The server's own config is ignored too, for the same reason: a function's id is
+also its hostname, so committing `server/telnyx.toml` publishes the address of
+the deployment. Copy the template and fill in your identifiers:
+
+```sh
+cp server/telnyx.toml.example server/telnyx.toml
+```
+
+Leave the `[edge_compute]` block out to have `telnyx-edge ship` create a new
+function and write the block back; keep it to redeploy that same function.
+
 Set the backend address in an ignored `android/backend.properties` file:
 
 ```properties
