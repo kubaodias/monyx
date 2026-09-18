@@ -80,9 +80,12 @@ fun OverviewScreen(
     onOpenTransactions: (categoryId: String?, period: String?) -> Unit,
 ) {
     val app = LocalContext.current.applicationContext as MonyxApp
-    val viewModel: OverviewViewModel = viewModel(factory = OverviewViewModel.factory(app.repository, app.selectedMonth))
+    val viewModel: OverviewViewModel = viewModel(
+        factory = OverviewViewModel.factory(app.repository, app.selectedMonth, app.hiddenCategories),
+    )
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val history by viewModel.history.collectAsStateWithLifecycle()
+    val hidden by viewModel.hidden.collectAsStateWithLifecycle()
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -116,6 +119,9 @@ fun OverviewScreen(
             BreakdownCard(
                 breakdown = state.breakdown,
                 history = history,
+                hidden = hidden,
+                onToggleHidden = viewModel::toggleHidden,
+                onToggleAllHidden = { viewModel.toggleAllHidden(history.categories.map { it.id }) },
                 // A slice is a question — "what made up that 340 zł?" — so it
                 // opens that category's transactions for the month on screen,
                 // not for today.
@@ -364,6 +370,9 @@ private fun SummaryStat(label: String, amountMinor: Long, tint: Color) {
 private fun BreakdownCard(
     breakdown: List<CategorySpend>,
     history: CategoryHistory,
+    hidden: Set<String>,
+    onToggleHidden: (String) -> Unit,
+    onToggleAllHidden: () -> Unit,
     onCategoryClick: (String) -> Unit,
     onSelectMonth: (String) -> Unit,
 ) {
@@ -372,10 +381,6 @@ private fun BreakdownCard(
     // Without this the gesture leaves the Overview entirely and the card is
     // still showing its back when you come back to the tab.
     BackHandler(enabled = showHistory) { showHistory = false }
-    // Ids, so a category hidden in one month's data stays hidden when the
-    // window moves under it. Saveable as a list because a Set is not.
-    var hiddenIds by rememberSaveable { mutableStateOf(listOf<String>()) }
-    val hidden = hiddenIds.toSet()
     Card(
         shape = RoundedCornerShape(24.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
@@ -417,15 +422,8 @@ private fun BreakdownCard(
                 HistoryFace(
                     history = history,
                     hidden = hidden,
-                    onToggle = { id ->
-                        hiddenIds = if (id in hidden) hiddenIds - id else hiddenIds + id
-                    },
-                    // All or nothing, from whichever state the legend is in:
-                    // with anything hidden it puts everything back, and only
-                    // from a full chart does it clear it.
-                    onToggleAll = {
-                        hiddenIds = if (hidden.isEmpty()) history.categories.map { it.id } else emptyList()
-                    },
+                    onToggle = onToggleHidden,
+                    onToggleAll = onToggleAllHidden,
                     onCategoryClick = onCategoryClick,
                     onSelectMonth = onSelectMonth,
                 )
@@ -502,7 +500,7 @@ private fun HistoryFace(
     }
     Spacer(modifier = Modifier.height(20.dp))
     CategoryHistoryLegend(
-        categories = history.categories,
+        categories = legendOrder(history.categories, hidden),
         hidden = hidden,
         onToggle = onToggle,
         onToggleAll = onToggleAll,
