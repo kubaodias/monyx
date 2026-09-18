@@ -203,6 +203,12 @@ fun legendOrder(categories: List<HistoryCategory>, hidden: Set<String>): List<Hi
  * Three things this has to get right, all of which look identical on a chart
  * once they are wrong:
  *
+ * A limit of zero is a limit, not a missing one: "spend nothing on this" is a
+ * budget somebody set on purpose, and the only way to say "no limit here" is a
+ * tombstone. Which is why the test below is `>= 0` and the deleted flag does
+ * the other job — reading zero as absent would quietly drop the strictest
+ * budget a household can set.
+ *
  * A limit holds from its month **onward** until another row supersedes it, so
  * most months on the chart have no row of their own and inherit one. Clearing a
  * limit writes a tombstone, and inheritance stops there rather than skipping
@@ -230,7 +236,7 @@ internal fun limitsPerMonth(
     return periods.associateWith { period ->
         val inEffect = byCategory.values.mapNotNull { history ->
             history.lastOrNull { it.period <= period }
-                ?.takeIf { it.deleted == 0 && it.limitMinor > 0L }
+                ?.takeIf { it.deleted == 0 && it.limitMinor >= 0L }
         }
         val rolledUpAtParent = inEffect.filter { it.categoryId == it.rollupId }.map { it.rollupId }.toSet()
         inEffect

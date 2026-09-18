@@ -396,7 +396,9 @@ private fun EditPlanDialog(
     onDismiss: () -> Unit,
     onSave: (Long) -> Unit,
 ) {
-    var text by remember { mutableStateOf(if (initialMinor == 0L) "" else Money.format(initialMinor)) }
+    var text by remember {
+        mutableStateOf(if (initialMinor == 0L) "" else Money.formatForEditing(initialMinor))
+    }
     val minor = Money.parseToMinor(text)
 
     AlertDialog(
@@ -443,7 +445,15 @@ private fun BudgetRow(
     onEdit: () -> Unit,
     onOpenTransactions: () -> Unit,
 ) {
-    val pct = if (usage.limitMinor > 0) usage.spentMinor.toFloat() / usage.limitMinor.toFloat() else 0f
+    // A limit of nothing is a real limit — "do not spend here" — so any spending
+    // against it fills the bar rather than leaving it empty. Dividing by the
+    // limit cannot answer that, and an empty bar beside the words "over by 40 zl"
+    // reads as a bug.
+    val pct = when {
+        usage.limitMinor > 0 -> usage.spentMinor.toFloat() / usage.limitMinor.toFloat()
+        usage.spentMinor > 0 -> 1f
+        else -> 0f
+    }
     val barColor = when {
         pct >= 1f -> MaterialTheme.colorScheme.error
         pct >= 0.8f -> MaterialTheme.colorScheme.tertiary
@@ -526,11 +536,17 @@ private fun EditBudgetLimitDialog(
     onClear: () -> Unit,
 ) {
     var text by remember(target.categoryId) {
-        mutableStateOf(
-            if (target.limitMinor != null && target.limitMinor > 0) Money.format(target.limitMinor) else "",
-        )
+        mutableStateOf(target.limitMinor?.let { Money.formatForEditing(it) } ?: "")
     }
     val hasExisting = target.limitMinor != null
+
+    // Zero is a limit like any other, so the field cannot use "parses to 0" as
+    // its shorthand for "nothing typed" any more: an empty box and a typed 0 are
+    // different answers. A digit somewhere in the text is what separates them.
+    // Negative is still refused — there is no such thing as owing yourself a
+    // budget, and clearing a limit is the Remove button, not a minus sign.
+    val parsed = if (text.any { it.isDigit() }) Money.parseToMinor(text) else null
+    val canSave = parsed != null && parsed >= 0
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -556,10 +572,10 @@ private fun EditBudgetLimitDialog(
             }
         },
         confirmButton = {
-            TextButton(onClick = {
-                val minor = Money.parseToMinor(text)
-                if (minor > 0) onSave(minor)
-            }) {
+            TextButton(
+                onClick = { parsed?.let(onSave) },
+                enabled = canSave,
+            ) {
                 Text(stringResource(R.string.budget_save))
             }
         },

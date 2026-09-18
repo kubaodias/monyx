@@ -143,6 +143,54 @@ class DatesTest {
         assertEquals("2026-09-01", withLocale("pl-PL") { Dates.localDate(instantMs) })
     }
 
+    // ------------------------------------------------- seeding an input field
+
+    @Test
+    fun `an editable amount carries no grouping and no empty grosze`() =
+        withLocale("pl-PL") {
+            assertEquals("4000", Money.formatForEditing(400000))
+            assertEquals("1324", Money.formatForEditing(132400))
+            assertEquals("0", Money.formatForEditing(0))
+        }
+
+    @Test
+    fun `grosze survive, and a single trailing zero does not`() = withLocale("pl-PL") {
+        assertEquals("45,99", Money.formatForEditing(4599))
+        assertEquals("4000,5", Money.formatForEditing(400050))
+        assertEquals("0,05", Money.formatForEditing(5))
+    }
+
+    @Test
+    fun `the decimal separator is the locale's, the grouping is nobody's`() {
+        assertEquals("1234,56", withLocale("pl-PL") { Money.formatForEditing(123456) })
+        assertEquals("1234.56", withLocale("en-GB") { Money.formatForEditing(123456) })
+    }
+
+    /**
+     * The round trip is the point: whatever is seeded into the field has to
+     * come back as the same amount when the field is read again untouched.
+     */
+    @Test
+    fun `what is seeded parses back to what it was`() {
+        for (tag in listOf("pl-PL", "en-GB")) {
+            withLocale(tag) {
+                for (minor in listOf(0L, 5L, 4599L, 100000L, 400050L, 123456L, 999999999L)) {
+                    assertEquals(
+                        "$tag lost $minor",
+                        minor,
+                        Money.parseToMinor(Money.formatForEditing(minor)),
+                    )
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `a negative keeps its sign`() = withLocale("pl-PL") {
+        assertEquals("-45,99", Money.formatForEditing(-4599))
+        assertEquals(-4599L, Money.parseToMinor(Money.formatForEditing(-4599)))
+    }
+
     @Test
     fun `month and day labels follow the interface language`() {
         assertEquals("August 2026", withLocale("en-GB") { Dates.monthLabel("2026-08") })
