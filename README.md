@@ -150,30 +150,41 @@ coexist on one phone. Without it the eventual release install fails with
 `INSTALL_FAILED_UPDATE_INCOMPATIBLE`, and the only way through is an uninstall
 that destroys local data.
 
-`versionCode` is derived from `git rev-list --count HEAD`. **Android refuses any
-APK whose versionCode is lower than the installed one**, so a bad release cannot
-be rolled back without an uninstall. Settings shows `versionName (versionCode)`
-so "which build do you have?" is answerable over the phone.
+The version is semver. `versionName` is `-PmonyxVersion`, which the release
+script passes, or else the newest `v*` tag, or else `0.0.0`. `versionCode` is
+derived from it as `major * 1_000_000 + minor * 1_000 + patch`. **Android refuses
+any APK whose versionCode is lower than the installed one**, so a bad release
+cannot be rolled back without an uninstall. Settings shows the version, so
+"which build do you have?" is answerable over the phone.
 
 ### Publishing an update
 
 ```sh
-node scripts/release.mjs --notes "Po zapisaniu otwiera się lista transakcji."
-node scripts/release.mjs --notes-file notes.txt --dry-run   # every check, no upload
-node scripts/release.mjs --notes-file notes.txt --skip-build  # reuse the built APK
+node scripts/release.mjs --bump patch --note "Po zapisaniu otwiera się lista transakcji."
+node scripts/release.mjs --bump minor --notes-file notes.txt --dry-run   # every check, no upload
+node scripts/release.mjs --version 2.0.0 --notes-file notes.txt --skip-build  # reuse the built APK
+node --test scripts/*.test.mjs   # the version, notes and pruning rules
 ```
 
 Needs `TELNYX_API_KEY`, or a `~/.telnyx-edge/config.toml` from `telnyx-edge
 login`; `--db` names a database other than `monyx`.
 
+`--bump major|minor|patch` counts from the newest published release; `--version`
+names the version outright. Each `--note`, or each line of `--notes-file`, is one
+bullet in the update dialog.
+
 Builds the release, checks it is signed with the release certificate, uploads it
 to the private `monyx-releases` bucket, reads it back and compares sha256, and
-only then writes the `app_releases` row. Installed release builds offer it on
-their next launch; Settings › Advanced can check on demand. **The tree must be
-committed first** — versionCode is the commit count — and a versionCode at or
-below the published latest is refused, because no phone could install it.
-Withdraw a release by deleting its row. See
-[ADR 0020](docs/decisions/0020-the-app-updates-itself-and-asks-first.md).
+only then writes the `app_releases` row. Then it tags the commit `v<version>`
+(push the tag yourself) and deletes every APK from the bucket except this release
+and the one before it. Installed release builds offer it on their next launch;
+Settings › Advanced can check on demand. **The tree must be committed first**,
+because the tag has to describe what shipped. A version at or below the latest
+published one is refused, because no phone could install it. Withdraw a release
+by deleting its row. Phones not yet updated are then offered the previous
+release, whose APK is still in the bucket. See ADRs
+[0020](docs/decisions/0020-the-app-updates-itself-and-asks-first.md) and
+[0021](docs/decisions/0021-releases-are-semver-and-the-bucket-keeps-two.md).
 
 ### The release keystore
 
