@@ -3,10 +3,12 @@ package com.monyx
 import com.monyx.data.BudgetLimit
 import com.monyx.data.MonthlyCategorySpend
 import com.monyx.ui.overview.HISTORY_MONTHS
+import com.monyx.ui.overview.LegendAmount
 import com.monyx.ui.overview.HistoryCategory
 import com.monyx.ui.overview.axisTicks
 import com.monyx.ui.overview.categoryHistory
 import com.monyx.ui.overview.historyWindow
+import com.monyx.ui.overview.legendAmounts
 import com.monyx.ui.overview.legendOrder
 import com.monyx.ui.overview.monthIndexAt
 import org.junit.Assert.assertEquals
@@ -485,6 +487,78 @@ class CategoryHistoryTest {
     @Test
     fun `a tap past the last column stays on the last month`() {
         assertEquals(11, monthIndexAt(1000f, 40f, 400f, 12))
+    }
+
+    // --------------------------------------- what the legend prints per row
+
+    private fun twoMonths() = categoryHistory(
+        rows = listOf(
+            spend("2026-08", "food", 90000),
+            spend("2026-08", "fun", 10000),
+            spend("2026-09", "food", 20000),
+            spend("2026-09", "fun", 50000),
+        ),
+        periods = historyWindow("2026-09", today),
+        selectedPeriod = "2026-09",
+        today = today,
+    )
+
+    @Test
+    fun `the average is what it always was`() {
+        val amounts = legendAmounts(twoMonths(), LegendAmount.Average)
+        val categories = twoMonths().categories.associateBy { it.id }
+        assertEquals(categories["food"]!!.averageMinor, amounts["food"])
+        assertEquals(categories["fun"]!!.averageMinor, amounts["fun"])
+    }
+
+    @Test
+    fun `the month shows that month, not the window`() {
+        val amounts = legendAmounts(twoMonths(), LegendAmount.SelectedMonth)
+        assertEquals(20000L, amounts["food"])
+        assertEquals(50000L, amounts["fun"])
+    }
+
+    /**
+     * The whole point of the toggle: September's biggest category is not the
+     * window's biggest, and the list has to say so in its order as well as in
+     * its numbers.
+     */
+    @Test
+    fun `switching to the month re-sorts the legend with it`() {
+        val history = twoMonths()
+        val byAverage = legendAmounts(history, LegendAmount.Average)
+        val byMonth = legendAmounts(history, LegendAmount.SelectedMonth)
+        assertEquals(
+            listOf("food", "fun"),
+            legendOrder(history.categories, emptySet()) { byAverage[it.id] ?: 0L }.map { it.id },
+        )
+        assertEquals(
+            listOf("fun", "food"),
+            legendOrder(history.categories, emptySet()) { byMonth[it.id] ?: 0L }.map { it.id },
+        )
+    }
+
+    @Test
+    fun `a category with nothing in the chosen month is a zero, not a gap`() {
+        val history = categoryHistory(
+            rows = listOf(spend("2026-08", "food", 90000), spend("2026-09", "fun", 50000)),
+            periods = historyWindow("2026-09", today),
+            selectedPeriod = "2026-09",
+            today = today,
+        )
+        val amounts = legendAmounts(history, LegendAmount.SelectedMonth)
+        assertEquals(0L, amounts["food"])
+        assertEquals(50000L, amounts["fun"])
+    }
+
+    @Test
+    fun `hidden rows still sink, whichever figure is on show`() {
+        val history = twoMonths()
+        val byMonth = legendAmounts(history, LegendAmount.SelectedMonth)
+        assertEquals(
+            listOf("food", "fun"),
+            legendOrder(history.categories, setOf("fun")) { byMonth[it.id] ?: 0L }.map { it.id },
+        )
     }
 
     // ------------------------------------------- a limit of nothing is a limit

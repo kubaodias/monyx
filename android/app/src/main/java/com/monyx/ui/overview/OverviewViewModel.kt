@@ -142,6 +142,21 @@ class OverviewViewModel(
     }
 
     /**
+     * Whether the legend prints the selected month or the year's average.
+     * Remembered on this phone, like the other two — see [ChartPreferences].
+     */
+    val legendShowsMonth: StateFlow<Boolean> = chartPreferences.legendShowsMonth
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5_000),
+            initialValue = false,
+        )
+
+    fun toggleLegendAmount() {
+        viewModelScope.launch { chartPreferences.toggleLegendAmount() }
+    }
+
+    /**
      * Hide all, or show all — from whatever the categories on screen are doing,
      * never from the stored set.
      *

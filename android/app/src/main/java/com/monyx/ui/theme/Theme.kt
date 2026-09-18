@@ -2,6 +2,7 @@ package com.monyx.ui.theme
 
 import android.app.Activity
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
@@ -9,6 +10,7 @@ import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
@@ -56,6 +58,29 @@ private val DarkColors = darkColorScheme(
     outlineVariant = Color(0xFF3A423E),
     error = Color(0xFFF2B8B5),
 )
+
+// Amber, in two weights, because one amber cannot sit on both backgrounds. The
+// category palette's amber (0xFFEEA23E) is tuned for a filled circle and is far
+// too pale to read as TEXT on white — around 2:1, which is a colour you notice
+// and then cannot make out.
+private val AmberInk = Color(0xFF9A5B00)
+private val AmberGlow = Color(0xFFF0B357)
+
+/**
+ * The third state, between "fine" and "wrong".
+ *
+ * Material gives a scheme an error colour and nothing between it and ordinary
+ * text, so an app with anything to flag either shouts in red or says it in the
+ * same grey as everything else. An update waiting to be installed is neither: it
+ * is not a failure, and red next to "Dostępna jest wersja 0.9.0" reads as
+ * something having gone wrong with it.
+ *
+ * Picked off the surface rather than by asking the system for dark mode, so it
+ * follows whatever scheme is actually in force — including a preview or a test
+ * that hands MonyxTheme a scheme of its own.
+ */
+val ColorScheme.attention: Color
+    get() = if (surface.luminance() > 0.5f) AmberInk else AmberGlow
 
 /** Tabular figures matter on a screen that is mostly numbers. */
 val MonyxTypography = Typography(

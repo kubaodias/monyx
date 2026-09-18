@@ -70,6 +70,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.AnnotatedString
@@ -84,7 +85,9 @@ import com.monyx.R
 import com.monyx.update.UpdateState
 import com.monyx.data.Dates
 import com.monyx.data.MemberEntity
+import com.monyx.sync.ReleaseNote
 import com.monyx.ui.theme.Palette
+import com.monyx.ui.theme.attention
 import kotlinx.coroutines.launch
 
 private const val BACKUP_STALE_MS = 3L * 24 * 60 * 60 * 1000
@@ -572,18 +575,126 @@ private fun LanguageRow(label: String, selected: Boolean, onSelect: () -> Unit) 
     }
 }
 
+/**
+ * What every published release changed, newest first.
+ *
+ * The version this phone is running is marked rather than filtered to the top:
+ * the list is a history, and the interesting question standing in front of it is
+ * usually "how far behind am I?", which needs the newest ones visible above your
+ * own.
+ *
+ * Notes arrive as one string of lines, the way the release script wrote them, so
+ * they are split here rather than stored pre-bulleted — a bullet is a decision
+ * about how to show them, and the server should not be making it.
+ */
+@Composable
+private fun ChangelogDialog(releases: List<ReleaseNote>, onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.settings_changelog)) },
+        text = {
+            if (releases.isEmpty()) {
+                Text(
+                    stringResource(R.string.settings_changelog_empty),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            } else {
+                LazyColumn(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                    items(releases, key = { it.versionCode }) { release ->
+                        Column {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    release.versionName,
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.SemiBold,
+                                )
+                                if (release.versionCode == BuildConfig.VERSION_CODE) {
+                                    Spacer(Modifier.width(6.dp))
+                                    Text(
+                                        stringResource(R.string.settings_changelog_current),
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.primary,
+                                    )
+                                }
+                            }
+                            Text(
+                                Dates.dayLabel(Dates.localDate(release.publishedAt)),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                            Spacer(Modifier.height(4.dp))
+                            release.notes.lines()
+                                .map { it.trim().removePrefix("•").trim() }
+                                .filter { it.isNotEmpty() }
+                                .forEach { line ->
+                                    Text(
+                                        "• $line",
+                                        style = MaterialTheme.typography.bodySmall,
+                                    )
+                                }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.budget_cancel)) }
+        },
+    )
+}
+
 @Composable
 private fun BuildIdentitySection() {
     val app = LocalContext.current.applicationContext as MonyxApp
     val updater = app.updater
     val state by updater.state.collectAsStateWithLifecycle()
 
+    var changelog by remember { mutableStateOf<List<ReleaseNote>?>(null) }
+    var loadingChangelog by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+    val changelogLabel = stringResource(R.string.settings_changelog)
+
+    if (changelog != null) {
+        ChangelogDialog(releases = changelog.orEmpty(), onDismiss = { changelog = null })
+    }
+
     SectionCard(title = stringResource(R.string.settings_app_version)) {
-        Text(
-            stringResource(R.string.settings_build, BuildConfig.VERSION_NAME),
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                stringResource(R.string.settings_build, BuildConfig.VERSION_NAME),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(Modifier.width(4.dp))
+            // A scroll, next to the number it explains. The version alone is a
+            // fact nobody can do anything with; what people actually want from
+            // it is "what changed?", and that answer had nowhere to live.
+            IconButton(
+                onClick = {
+                    loadingChangelog = true
+                    scope.launch {
+                        changelog = updater.releaseNotes()
+                        loadingChangelog = false
+                    }
+                },
+                enabled = !loadingChangelog,
+            ) {
+                if (loadingChangelog) {
+                    CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                } else {
+                    Text(
+                        "📜",
+                        // An emoji is a glyph, so it follows fontSize, and at
+                        // bodyMedium it sat lost in the middle of a 48dp target.
+                        style = MaterialTheme.typography.titleMedium,
+                        modifier = Modifier.semantics {
+                            contentDescription = changelogLabel
+                        },
+                    )
+                }
+            }
+        }
         if (!updater.enabled) {
             Text(
                 stringResource(R.string.settings_update_debug),
@@ -601,9 +712,14 @@ private fun BuildIdentitySection() {
             else -> null
         }
         when {
+            // Amber, not grey and not red: there is something for you to do,
+            // and nothing has gone wrong. In grey it read as one more line of
+            // status on a tab full of them.
             offered != null -> Text(
                 stringResource(R.string.settings_update_available, offered.versionName),
                 style = MaterialTheme.typography.bodySmall,
+                fontWeight = FontWeight.Medium,
+                color = MaterialTheme.colorScheme.attention,
             )
             state is UpdateState.UpToDate -> Text(
                 stringResource(R.string.settings_update_up_to_date),

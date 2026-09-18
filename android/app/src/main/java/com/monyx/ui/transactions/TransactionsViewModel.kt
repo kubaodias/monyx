@@ -144,6 +144,35 @@ class TransactionsViewModel(
         .map { it.plannedIds }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptySet())
 
+    /**
+     * What the rows on screen add up to.
+     *
+     * Summed from the list rather than asked of the database, because the list
+     * is already the answer: every filter has been applied to it, including the
+     * projected rows that exist nowhere to be queried. A second query would have
+     * to re-implement each of those filters and would disagree with the rows
+     * above it the first time one of them drifted.
+     *
+     * Transfers are in neither total. Moving money between two of your own
+     * accounts is not spending it, and a filter that happens to include one
+     * should not make the month look worse.
+     */
+    val filteredTotals: StateFlow<FilteredTotals> = transactions
+        .map { rows ->
+            FilteredTotals(
+                count = rows.size,
+                expenseMinor = rows.filter { it.kind == "expense" }.sumOf { it.amountMinor },
+                incomeMinor = rows.filter { it.kind == "income" }.sumOf { it.amountMinor },
+            )
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), FilteredTotals())
+
+    data class FilteredTotals(
+        val count: Int = 0,
+        val expenseMinor: Long = 0,
+        val incomeMinor: Long = 0,
+    )
+
     private data class Listing(
         val rows: List<TransactionListItem> = emptyList(),
         val plannedIds: Set<String> = emptySet(),

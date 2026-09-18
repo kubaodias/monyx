@@ -52,6 +52,7 @@
     <string name="overview_breakdown_history">Spending over 12 months</string>
     <string name="overview_show_history">Show the last 12 months</string>
     <string name="overview_show_breakdown">Back to this month</string>
+    <string name="overview_history_switch_amount">Show the month instead of the average</string>
     <string name="overview_history_average">Average per month</string>
     <string name="overview_history_hide_all">Hide all</string>
     <string name="overview_history_show_all">Show all</string>
@@ -157,6 +158,9 @@
     <string name="settings_last_backup">Last backup: %1$s</string>
     <string name="settings_backup_stale">No backup for more than 3 days</string>
     <string name="settings_backup_unknown">No backup information</string>
+    <string name="settings_changelog">What\'s new</string>
+    <string name="settings_changelog_empty">No release notes yet</string>
+    <string name="settings_changelog_current">installed</string>
     <string name="settings_app_version">App version</string>
     <string name="settings_build">Version %1$s</string>
     <string name="settings_add_account">Add an account</string>
@@ -301,4 +305,8 @@
     <string name="settings_update_show">Show update</string>
     <string name="settings_update_check_failed">Couldn\'t check for updates</string>
     <string name="settings_update_debug">Debug builds don\'t update themselves</string>
+    <plurals name="transactions_count">
+        <item quantity="one">%1$d transaction</item>
+        <item quantity="other">%1$d transactions</item>
+    </plurals>
 </resources>

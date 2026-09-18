@@ -34,11 +34,24 @@ class ChartPreferences(private val context: Context) {
 
     private val key = stringSetPreferencesKey("history_hidden_categories")
     private val budgetKey = booleanPreferencesKey("history_budget_hidden")
+    private val monthLegendKey = booleanPreferencesKey("history_legend_shows_month")
 
     val hidden: Flow<Set<String>> = context.chartStore.data.map { it[key] ?: emptySet() }
 
     /** The budget line is drawn unless it has been turned off here. */
     val budgetHidden: Flow<Boolean> = context.chartStore.data.map { it[budgetKey] ?: false }
+
+    /**
+     * Whether the legend prints the selected month rather than the year's
+     * average. Remembered for the same reason hiding is: somebody who reads the
+     * chart one way reads it that way every time, and having to say so again on
+     * every launch is the app forgetting something it was told.
+     *
+     * Average is the default — it is what a twelve-month chart is for, and it is
+     * what this list meant before there was a choice.
+     */
+    val legendShowsMonth: Flow<Boolean> =
+        context.chartStore.data.map { it[monthLegendKey] ?: false }
 
     suspend fun toggle(id: String) {
         context.chartStore.edit { prefs ->
@@ -53,5 +66,9 @@ class ChartPreferences(private val context: Context) {
 
     suspend fun toggleBudget() {
         context.chartStore.edit { it[budgetKey] = !(it[budgetKey] ?: false) }
+    }
+
+    suspend fun toggleLegendAmount() {
+        context.chartStore.edit { it[monthLegendKey] = !(it[monthLegendKey] ?: false) }
     }
 }
