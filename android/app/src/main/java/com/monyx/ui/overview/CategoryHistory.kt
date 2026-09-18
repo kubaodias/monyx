@@ -244,21 +244,28 @@ internal fun limitsPerMonth(
  * The y axis: zero and three gridlines up to a round number above the tallest
  * bar.
  *
- * The step is rounded UP to 1, 2, 5 or 10 times a power of ten, so the labels
+ * The step is rounded UP to a round multiple of a power of ten, so the labels
  * are numbers somebody can hold in their head and the tallest bar never touches
  * the ceiling. Divided into three rather than labelled at top and bottom only:
  * the whole question here is whether a month is bigger than its neighbours, and
  * that is read against the lines, not against the numbers.
+ *
+ * The ladder's spacing is the whole trick, and it was wrong. It ran
+ * 1, 1.5, 2, 2.5, 3, 4, 5 and then jumped to 10, so every total from five to ten
+ * times a power of ten produced the SAME axis: with three divisions, a chart
+ * topping out at 15 000 and one topping out at 30 000 both drew a ceiling of
+ * 30 000. Hiding a category halved the bars and moved nothing — the axis looked
+ * frozen, because within that gap it was.
+ *
+ * 6, 7.5 and 8 fill it. They are less round than what surrounds them, which is
+ * the price of an axis that answers when the bars change.
  */
 internal fun axisTicks(maxMinor: Long, divisions: Int = 3): List<Long> {
     if (maxMinor <= 0L) return listOf(0L)
     val raw = maxMinor.toDouble() / divisions
     var magnitude = 1L
     while (magnitude * 10 <= raw) magnitude *= 10
-    // Halves and quarters as well as the round decade: a year topping out at
-    // 4 500 gets 0/1 500/3 000/4 500 rather than an axis to 6 000 with a third
-    // of the chart left empty above the tallest bar.
-    val step = listOf(10, 15, 20, 25, 30, 40, 50, 100)
+    val step = listOf(10, 15, 20, 25, 30, 40, 50, 60, 75, 80, 100)
         .map { it * magnitude / 10 }
         .first { it >= raw }
     return (0..divisions).map { it * step }
