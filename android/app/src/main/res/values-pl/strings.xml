@@ -159,6 +159,7 @@
     <string name="settings_backup_unknown">Brak informacji o kopii zapasowej</string>
     <string name="settings_changelog">Co nowego</string>
     <string name="settings_changelog_failed">Nie udało się pobrać informacji o wydaniach</string>
+    <string name="settings_changelog_close">Zamknij</string>
     <string name="settings_changelog_empty">Brak informacji o wydaniach</string>
     <string name="settings_changelog_current">zainstalowana</string>
     <string name="settings_app_version">Wersja aplikacji</string>
