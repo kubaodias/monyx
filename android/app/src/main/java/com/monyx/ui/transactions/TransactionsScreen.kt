@@ -54,9 +54,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -110,6 +112,7 @@ fun TransactionsScreen(
     val accountId by viewModel.accountId.collectAsStateWithLifecycle()
     val period by viewModel.period.collectAsStateWithLifecycle()
     val categories by viewModel.categories.collectAsStateWithLifecycle()
+    val totals by viewModel.filteredTotals.collectAsStateWithLifecycle()
     val accounts by viewModel.accounts.collectAsStateWithLifecycle()
     val transactions by viewModel.transactions.collectAsStateWithLifecycle()
     val includePlanned by viewModel.includePlanned.collectAsStateWithLifecycle()
@@ -256,6 +259,50 @@ fun TransactionsScreen(
                             Icon(Icons.Filled.Close, contentDescription = null, modifier = Modifier.size(16.dp))
                         },
                     )
+                }
+            }
+
+            // What the rows below add up to. The question people come to this
+            // screen with is almost never "which coffees were they" — it is "how
+            // much went on coffee", and until now the only way to answer it was
+            // to add the day headers up by hand.
+            if (transactions.isNotEmpty()) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp)
+                        .padding(bottom = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        text = pluralStringResource(
+                            R.plurals.transactions_count,
+                            totals.count,
+                            totals.count,
+                        ),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.weight(1f),
+                    )
+                    // Income only when there is some. On a category filter there
+                    // never is, and a permanent "+0,00" beside the figure people
+                    // came for is noise on the one line that has to be read.
+                    if (totals.incomeMinor > 0) {
+                        Text(
+                            text = "+${Money.format(totals.incomeMinor)}",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.primary,
+                        )
+                        Spacer(Modifier.width(10.dp))
+                    }
+                    if (totals.expenseMinor > 0 || totals.incomeMinor == 0L) {
+                        Text(
+                            text = Money.formatWithCurrency(totals.expenseMinor),
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                    }
                 }
             }
 

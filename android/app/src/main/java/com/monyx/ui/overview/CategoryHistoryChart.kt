@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.Icon
@@ -59,9 +60,14 @@ import com.monyx.ui.theme.Palette
  * legend takes its segment out of every bar, which is how the question "what
  * happens to the shape without the holiday?" gets asked.
  *
- * The bars are drawn in the legend's order, which is by average across the
- * window — never by the selected month's own figures. A stack that reordered
- * itself month to month would have no shape to read at all.
+ * The bars are stacked by average across the window — never by the selected
+ * month's own figures. A stack that reordered itself month to month would have
+ * no shape to read at all.
+ *
+ * Which is why this is no longer the legend's order. The legend can be switched
+ * to show one month and re-sorts itself when it is; the stack does not follow,
+ * because the two are answering different questions and only one of them can
+ * afford to move.
  *
  * A tap selects that month, for the whole screen. The chart is then the month
  * switcher as well as the history: the highlight is the month the pie chart
@@ -268,6 +274,11 @@ fun CategoryHistoryChart(
 fun CategoryHistoryLegend(
     categories: List<HistoryCategory>,
     hidden: Set<String>,
+    /** What to print per category — see [legendAmounts]. */
+    amounts: Map<String, Long>,
+    /** What that column is: the window's average, or one month's spending. */
+    heading: String,
+    onToggleAmount: () -> Unit,
     onToggle: (String) -> Unit,
     onToggleAll: () -> Unit,
     onOpen: (String) -> Unit,
@@ -275,12 +286,31 @@ fun CategoryHistoryLegend(
 ) {
     Column(modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                text = stringResource(R.string.overview_history_average),
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.weight(1f),
-            )
+            // The heading is the switch. It already had to say which figure the
+            // column holds, and a label that names the current state is the
+            // smallest honest place to put the choice — a separate button would
+            // have needed its own words for the same fact.
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                    .weight(1f)
+                    .clip(MaterialTheme.shapes.small)
+                    .clickable(onClick = onToggleAmount)
+                    .padding(horizontal = 4.dp, vertical = 2.dp),
+            ) {
+                Text(
+                    text = heading,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(modifier = Modifier.width(4.dp))
+                Icon(
+                    imageVector = Icons.Filled.SwapHoriz,
+                    contentDescription = stringResource(R.string.overview_history_switch_amount),
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(14.dp),
+                )
+            }
             // One control rather than two, because the two are never both
             // useful: with a full chart the only move is to clear it, and with
             // anything hidden the move anyone reaches for is to get it all back.
@@ -339,7 +369,7 @@ fun CategoryHistoryLegend(
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = Money.format(category.averageMinor),
+                        text = Money.format(amounts[category.id] ?: 0L),
                         style = MaterialTheme.typography.bodyMedium,
                     )
                 }

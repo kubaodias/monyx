@@ -190,10 +190,44 @@ fun categoryHistory(
  * Hidden rows are sunk, never dropped. They are the only way back — a category
  * with no row has no eye to turn on again.
  */
-fun legendOrder(categories: List<HistoryCategory>, hidden: Set<String>): List<HistoryCategory> =
+fun legendOrder(
+    categories: List<HistoryCategory>,
+    hidden: Set<String>,
+    /**
+     * What the rows are ranked by — the same figure they print. Ordering by one
+     * number while showing another puts 400 above 900 with nothing on screen to
+     * explain it, which reads as a broken sort rather than a different question.
+     */
+    amountOf: (HistoryCategory) -> Long = { it.averageMinor },
+): List<HistoryCategory> =
     categories.sortedWith(
-        compareBy<HistoryCategory> { it.id in hidden }.thenByDescending { it.averageMinor },
+        compareBy<HistoryCategory> { it.id in hidden }.thenByDescending { amountOf(it) },
     )
+
+/** Which figure the twelve-month legend prints beside each category. */
+enum class LegendAmount { Average, SelectedMonth }
+
+/**
+ * The number each legend row shows, per category.
+ *
+ * Two questions the same list can answer: what a category usually costs, and
+ * what it cost in the month the chart is pointing at. The average is the older
+ * behaviour and stays the default — it is the one that makes sense of a
+ * twelve-month chart at a glance — but once you have tapped a bar to ask about
+ * March, a column of yearly averages is answering something else.
+ *
+ * A category with no spending in the chosen month is a real zero rather than a
+ * missing row: it was on the chart all year and the answer for that month is
+ * "nothing", which is worth seeing.
+ */
+fun legendAmounts(history: CategoryHistory, mode: LegendAmount): Map<String, Long> =
+    when (mode) {
+        LegendAmount.Average -> history.categories.associate { it.id to it.averageMinor }
+        LegendAmount.SelectedMonth -> {
+            val month = history.months.firstOrNull { it.period == history.selectedPeriod }
+            history.categories.associate { it.id to (month?.byCategory?.get(it.id) ?: 0L) }
+        }
+    }
 
 /**
  * The limit in effect in each of [periods], per category, from the raw budget

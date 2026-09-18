@@ -53,6 +53,7 @@
     <string name="overview_breakdown_history">Wydatki przez 12 miesięcy</string>
     <string name="overview_show_history">Pokaż ostatnie 12 miesięcy</string>
     <string name="overview_show_breakdown">Wróć do tego miesiąca</string>
+    <string name="overview_history_switch_amount">Pokaż miesiąc zamiast średniej</string>
     <string name="overview_history_average">Średnio na miesiąc</string>
     <string name="overview_history_hide_all">Ukryj wszystkie</string>
     <string name="overview_history_show_all">Pokaż wszystkie</string>
@@ -156,6 +157,9 @@
     <string name="settings_last_backup">Ostatnia kopia: %1$s</string>
     <string name="settings_backup_stale">Brak kopii zapasowej od ponad 3 dni</string>
     <string name="settings_backup_unknown">Brak informacji o kopii zapasowej</string>
+    <string name="settings_changelog">Co nowego</string>
+    <string name="settings_changelog_empty">Brak informacji o wydaniach</string>
+    <string name="settings_changelog_current">zainstalowana</string>
     <string name="settings_app_version">Wersja aplikacji</string>
     <string name="settings_build">Wersja %1$s</string>
     <string name="settings_add_account">Dodaj konto</string>
@@ -298,4 +302,10 @@
     <string name="settings_update_show">Pokaż aktualizację</string>
     <string name="settings_update_check_failed">Nie udało się sprawdzić aktualizacji</string>
     <string name="settings_update_debug">Wersje debug nie aktualizują się same</string>
+    <plurals name="transactions_count">
+        <item quantity="one">%1$d transakcja</item>
+        <item quantity="few">%1$d transakcje</item>
+        <item quantity="many">%1$d transakcji</item>
+        <item quantity="other">%1$d transakcji</item>
+    </plurals>
 </resources>

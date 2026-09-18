@@ -10,6 +10,7 @@ import android.os.Build
 import com.monyx.BuildConfig
 import com.monyx.sync.Api
 import com.monyx.sync.AvailableUpdate
+import com.monyx.sync.ReleaseNote
 import com.monyx.sync.Session
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -81,6 +82,27 @@ class Updater(private val app: Application, private val session: Session) {
 
     fun checkNow() {
         if (enabled) check(quiet = false)
+    }
+
+    /**
+     * Every release the server still lists, newest first — the changelog.
+     *
+     * Asks for everything newer than version zero, because the endpoint's filter
+     * is `version_code > ?` and nothing is older than nothing. No new route was
+     * needed for this, which is the whole reason it is a query and not a deploy.
+     *
+     * Runs even in a debug build, unlike [check]: reading what shipped is not
+     * the same as being offered an APK this build could never install.
+     *
+     * Returns empty rather than throwing. A changelog is something you open out
+     * of curiosity, and a dialog that crashes the screen behind it is a worse
+     * answer than one that says there is nothing to show.
+     */
+    suspend fun releaseNotes(): List<ReleaseNote> {
+        val token = session.token() ?: return emptyList()
+        return runCatching { Api.latestRelease(token, 0).update?.notes }
+            .getOrNull()
+            .orEmpty()
     }
 
     private fun check(quiet: Boolean) {

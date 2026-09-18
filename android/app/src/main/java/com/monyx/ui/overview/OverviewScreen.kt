@@ -88,6 +88,7 @@ fun OverviewScreen(
     val history by viewModel.history.collectAsStateWithLifecycle()
     val hidden by viewModel.hidden.collectAsStateWithLifecycle()
     val budgetHidden by viewModel.budgetHidden.collectAsStateWithLifecycle()
+    val legendShowsMonth by viewModel.legendShowsMonth.collectAsStateWithLifecycle()
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -136,6 +137,8 @@ fun OverviewScreen(
                 // Tapping a bar moves the whole screen to that month, which is
                 // the same thing the switcher at the top does.
                 onSelectMonth = viewModel::setPeriod,
+                legendShowsMonth = legendShowsMonth,
+                onToggleLegendAmount = viewModel::toggleLegendAmount,
             )
         }
     }
@@ -399,6 +402,8 @@ private fun BreakdownCard(
     onToggleAllHidden: () -> Unit,
     onCategoryClick: (String) -> Unit,
     onSelectMonth: (String) -> Unit,
+    legendShowsMonth: Boolean,
+    onToggleLegendAmount: () -> Unit,
 ) {
     var showHistory by rememberSaveable { mutableStateOf(false) }
     // Turning a card over is somewhere you went, so Back is the way out of it.
@@ -452,6 +457,8 @@ private fun BreakdownCard(
                     onToggleAll = onToggleAllHidden,
                     onCategoryClick = onCategoryClick,
                     onSelectMonth = onSelectMonth,
+                    legendShowsMonth = legendShowsMonth,
+                    onToggleLegendAmount = onToggleLegendAmount,
                 )
             } else {
                 val slices = breakdown.map { spend ->
@@ -486,6 +493,8 @@ private fun HistoryFace(
     onToggleAll: () -> Unit,
     onCategoryClick: (String) -> Unit,
     onSelectMonth: (String) -> Unit,
+    legendShowsMonth: Boolean,
+    onToggleLegendAmount: () -> Unit,
 ) {
     if (history.isEmpty) {
         Box(
@@ -536,9 +545,20 @@ private fun HistoryFace(
         }
     }
     Spacer(modifier = Modifier.height(20.dp))
+    val mode = if (legendShowsMonth) LegendAmount.SelectedMonth else LegendAmount.Average
+    val amounts = remember(history, mode) { legendAmounts(history, mode) }
     CategoryHistoryLegend(
-        categories = legendOrder(history.categories, hidden),
+        // Ranked by the figure on show, so switching the column re-sorts the
+        // list with it — the order is part of the answer, not decoration.
+        categories = legendOrder(history.categories, hidden) { amounts[it.id] ?: 0L },
         hidden = hidden,
+        amounts = amounts,
+        heading = if (legendShowsMonth) {
+            Dates.monthLabel(history.selectedPeriod)
+        } else {
+            stringResource(R.string.overview_history_average)
+        },
+        onToggleAmount = onToggleLegendAmount,
         onToggle = onToggle,
         onToggleAll = onToggleAll,
         onOpen = onCategoryClick,
