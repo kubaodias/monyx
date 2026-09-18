@@ -1,89 +1,38 @@
 # 0007 — The name is Monyx
 
-**Date:** 2026-08-31 · **Status:** accepted · **Supersedes:** 0005
+**Date:** 2026-08-31 · **Status:** accepted
 
 ## Context
 
-0005 settled the naming argument by collapsing 0003's two names into one:
-Monio, identifiers and user-visible copy alike. That held for a day.
+The app, repository and backend need a consistent identity that people can
+recognise in the interface, build configuration and deployment logs.
 
-What it had not done was check whether the name was free. It is not. Monio and
-Monia are both already published on Google Play in the same category, by other
-people. For an app installed by sideloading onto four phones in one family that
-is not a legal problem and is not being treated as one — nobody is competing
-with anybody. It is a problem for a name that has to be said out loud and typed
-into a search box by the people using it.
-
-Monyx also fixes, rather than argues around, the flaw that produced both
-earlier decisions. 0003 split Monio from Monia and 0005 reversed the split, and
-the reason either was ever necessary is that the two names are one unstressed
-vowel apart and nobody can hear the difference. `MO-nyks` cannot be confused
-with anything the project has been called before. The Polish declension problem
-that 0005 sidestepped by removing the name from the greeting does not arise
-either: `Monyx` is an ordinary masculine noun there.
-
-The `-yx` is a nod to Telnyx, which runs the backend. It is a joke, not an
-architectural commitment, and it survives the platform if the platform is ever
-left.
-
-The name is not clear for publication. Monyx Wallet, a payments app owned by
-Nayax, exists on both app stores and holds `monyx.com`. That is worth ten
-minutes of a lawyer's time before anything is ever listed on Play, and worth
-nothing at all while this stays a private build.
+The `-yx` is a nod to Telnyx, which runs the backend. The name does not depend
+on keeping that platform.
 
 ## Decision
 
-**Monyx is the only name**, on both sides of the line 0003 tried to draw:
-`applicationId com.monyx`, the Kotlin package `com.monyx.**`, the Gradle project,
-the Room file `monyx.db`, the Telnyx function `monyx-api`, the SQL database
-`monyx`, the KV namespace `monyx-kv`, the release keystore, the launcher label,
-the notification title and every line of copy.
+**Monyx is the project name.** It identifies the Android application
+`com.monyx`, the Kotlin package `com.monyx.**`, the Gradle project, the Room
+file `monyx.db`, the Telnyx function `monyx-api`, the SQL database `monyx`,
+the KV namespace `monyx-kv`, and the release keystore.
 
-0003 and 0005 keep the old names in their own text. They are the record of
-decisions that were actually taken, and rewriting them to say Monyx would make
-0003's title describe a split that never happened under that name. A superseded
-ADR is history, not documentation.
+The interface uses Monyx in English and Portfel in Polish. The onboarding
+heading is `Let's get started` / `Zaczynajmy`, so the greeting does not need
+to repeat the launcher label.
+
+The backend address comes from local build configuration. Deployment addresses
+are not part of the project identity and are not hardcoded in the client.
 
 ## Consequences
 
-`applicationId` is the expensive half, exactly as 0003 warned it would be once
-an APK had landed on a family phone. `com.monio` and `com.monyx` are two
-different apps as far as Android is concerned: there is no update path. Every
-phone uninstalls, reinstalls and enrols again, and enrolment consumes an invite,
-so a fresh code has to be minted for each person first. The local Room database
-goes with the uninstall and is re-pulled from the server, so nothing is lost
-that had already synced — and the reason to check that everything *has* synced,
-before anyone uninstalls, is that the pending queue is the one thing that
-cannot be recovered.
+Keep `applicationId` and the release signing key stable: Android updates rely
+on both. Debug builds use `com.monyx.debug` so they can coexist with release
+builds without replacing their local data.
 
-The cloud resources still cannot be renamed. The CLI has no rename for
-functions, SQL databases or KV namespaces on v0.5.1, which is the same wall
-0003 hit and worked around by recreating the resources while they were empty.
-They are not empty now, so `monyx`, `monyx-kv` and `monyx-api` were created
-alongside the old three and the data copied across — 97 rows over 11 tables,
-verified row by row and object by object rather than trusted. Secrets are
-organisation-scoped and bound by name with nothing re-entered.
-
-That verification is why this worked. The first `monyx` database was faulty
-from creation: every write returned `ShipError: write committed but snapshot
-ship failed`, meaning it committed in memory, read back correctly, and never
-persisted. `GET /health` was 200 throughout. What exposed it was the end-to-end
-smoke test — enrolment returned `internal_error` while still writing the member,
-the device and burning the invite, which on a phone reads as "try again" with
-the code already spent. The database was deleted and rebuilt, and the rule
-learned is that a new database gets a write probe BEFORE it is trusted with a
-copy, because on this platform a failed write and a successful one can look the
-same from either side.
-
-`monio-api`, `monio` and `monio-kv` are left running and untouched. That is not
-an oversight to tidy up later: every phone still has the old app installed and
-still points at the old host, and will until someone reinstalls. Deleting them
-is what breaks those phones, not keeping them.
-
-`Api.BASE_URL` points at a new host rather than a renamed one, for the same
-reason: the two deployments have different identities. The address is supplied
-through local build configuration.
-
-This is the third naming decision in three days, and the last one that is cheap.
-Doing it again after anything reaches Google Play costs an installed base rather
-than an afternoon.
+Verify a new database with a write probe before trusting it with data. The first
+Monyx database returned `ShipError: write committed but snapshot ship failed`:
+writes could be read back from memory without ever persisting, while
+`GET /health` continued returning 200. The end-to-end smoke test exposed the
+failure, and the database had to be rebuilt. A successful health check alone
+does not establish durable storage.
