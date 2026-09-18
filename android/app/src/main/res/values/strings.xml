@@ -76,6 +76,7 @@
     <string name="transactions_search">Search</string>
     <string name="transactions_empty">No transactions</string>
     <string name="transactions_filter_all">All</string>
+    <string name="transactions_filter_subcategory">Subcategory</string>
     <string name="transactions_filter_category">Category</string>
     <string name="transactions_filter_planned">Planned</string>
     <!-- Shown on the projected rows themselves, and read out by TalkBack in

@@ -77,6 +77,7 @@
     <string name="transactions_search">Szukaj</string>
     <string name="transactions_empty">Brak transakcji</string>
     <string name="transactions_filter_all">Wszystkie</string>
+    <string name="transactions_filter_subcategory">Podkategoria</string>
     <string name="transactions_filter_category">Kategoria</string>
     <string name="transactions_filter_planned">Planowane</string>
     <string name="transactions_planned">Planowane, jeszcze nie zapisane</string>

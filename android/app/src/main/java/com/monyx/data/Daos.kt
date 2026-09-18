@@ -322,7 +322,17 @@ interface MonyxDao {
     @Query("SELECT * FROM accounts WHERE deleted = 0 AND archived = 0 ORDER BY sortOrder, name")
     fun activeAccounts(): Flow<List<AccountEntity>>
 
-    @Query("SELECT * FROM members WHERE deleted = 0 ORDER BY name")
+    /**
+     * Oldest first. Who joined the household when is a fact about the household;
+     * alphabetical order was a fact about nothing, and it reshuffled the list
+     * every time somebody was renamed.
+     *
+     * The phone's own member is lifted to the top on the way to the screen, not
+     * here — the DAO does not know whose phone this is, and a query that took a
+     * member id would make "the list of members" depend on the device reading
+     * it. See MembersSection.
+     */
+    @Query("SELECT * FROM members WHERE deleted = 0 ORDER BY createdAt, id")
     fun members(): Flow<List<MemberEntity>>
 
     @Query("SELECT * FROM categories WHERE id = :id")

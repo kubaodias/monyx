@@ -184,11 +184,39 @@ fun TransactionsScreen(
                     selectedId = accountId,
                     onSelect = viewModel::setAccountFilter,
                 )
+                // The chosen category may be a child, in which case this chip
+                // still shows its family: the two chips are one narrowing, and
+                // a family chip that went blank the moment you picked something
+                // inside it would read as having lost the filter.
+                val chosen = remember(categories, categoryId) {
+                    categories.firstOrNull { it.id == categoryId }
+                }
+                val rootId = chosen?.parentId ?: chosen?.id
                 CategoryFilterChip(
                     categories = remember(categories) { categories.filter { it.parentId == null } },
-                    selectedId = categoryId,
+                    selectedId = rootId,
+                    // Picking a family drops any subcategory that was set: the
+                    // old child belongs to a family you have just left.
                     onSelect = viewModel::setCategoryFilter,
                 )
+                // Only once a family is chosen, and only if it has anything
+                // inside it. A second chip offering nothing is a dead control,
+                // and on a row that already scrolls sideways it costs the width
+                // of the one thing people came here to press.
+                val children = remember(categories, rootId) {
+                    categories.filter { it.parentId != null && it.parentId == rootId }
+                        .sortedBy { it.sortOrder }
+                }
+                if (rootId != null && children.isNotEmpty()) {
+                    SubcategoryFilterChip(
+                        children = children,
+                        selectedId = chosen?.takeIf { it.parentId != null }?.id,
+                        // Clearing narrows back to the whole family rather than
+                        // to everything — the family chip beside it is still set,
+                        // and the two must not contradict each other.
+                        onSelect = { viewModel.setCategoryFilter(it ?: rootId) },
+                    )
+                }
                 // Third, after the two that narrow, because this one is the odd
                 // one out: it ADDS rows rather than removing them. A FilterChip
                 // with a tick rather than a bare Checkbox — it is a checkbox in
@@ -336,6 +364,49 @@ private fun CategoryFilterChip(
                 onClick = { onSelect(null); expanded = false },
             )
             categories.forEach { category ->
+                DropdownMenuItem(
+                    text = { Text(category.name) },
+                    onClick = { onSelect(category.id); expanded = false },
+                )
+            }
+        }
+    }
+}
+
+/**
+ * The second step of the category filter: what inside the chosen family.
+ *
+ * Deliberately a chip of its own rather than more rows on the family menu. A
+ * flat list of every category and subcategory put "Paliwo" beside "Dom i ogród"
+ * as an equal, and on a household with fifty of them the menu became the thing
+ * you had to read rather than the thing you filtered with. Two chips say the
+ * shape out loud: which family, then which part of it.
+ *
+ * Its first entry returns to the whole family, so the narrowing is undoable
+ * without clearing the family chip and starting again.
+ */
+@Composable
+private fun SubcategoryFilterChip(
+    children: List<CategoryEntity>,
+    selectedId: String?,
+    onSelect: (String?) -> Unit,
+) {
+    var expanded by remember { mutableStateOf(false) }
+    val label = children.firstOrNull { it.id == selectedId }?.name
+        ?: stringResource(R.string.transactions_filter_subcategory)
+    Box {
+        FilterChip(
+            selected = selectedId != null,
+            onClick = { expanded = true },
+            label = { Text(label) },
+            trailingIcon = { Icon(Icons.Filled.ArrowDropDown, contentDescription = null) },
+        )
+        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.transactions_filter_all)) },
+                onClick = { onSelect(null); expanded = false },
+            )
+            children.forEach { category ->
                 DropdownMenuItem(
                     text = { Text(category.name) },
                     onClick = { onSelect(category.id); expanded = false },
