@@ -8,16 +8,23 @@
 //
 // Usage: node scripts/smoke-test.mjs <invite_code> [--url https://…]
 import { randomUUID } from "node:crypto";
+import { parseArgs } from "node:util";
 
-const args = process.argv.slice(2);
-const invite = args.find((a) => !a.startsWith("--"));
-const urlIndex = args.indexOf("--url");
-const BASE = urlIndex >= 0
-  ? args[urlIndex + 1]
-  : "https://monyx-api-31cdf6d8-0.telnyxcompute.com";
+const { values, positionals } = parseArgs({
+  options: { url: { type: "string" } },
+  allowPositionals: true,
+});
+const [invite] = positionals;
+const BASE = (values.url ?? process.env.MONYX_API_URL ?? "").trim().replace(/\/+$/, "");
 
-if (!invite) {
-  console.error("usage: node scripts/smoke-test.mjs <invite_code> [--url …]");
+if (!invite || positionals.length !== 1 || !BASE) {
+  console.error("usage: node scripts/smoke-test.mjs <invite_code> [--url …]; otherwise set MONYX_API_URL");
+  process.exit(2);
+}
+const backendUrl = URL.parse(BASE);
+if (!backendUrl || backendUrl.protocol !== "https:" || backendUrl.username || backendUrl.password
+    || backendUrl.search || backendUrl.hash) {
+  console.error("Backend URL must be an HTTPS URL without credentials, query parameters or a fragment.");
   process.exit(2);
 }
 

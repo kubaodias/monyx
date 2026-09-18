@@ -1,5 +1,6 @@
 package com.monyx.sync
 
+import com.monyx.BuildConfig
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
@@ -20,14 +21,7 @@ import java.util.concurrent.TimeUnit
  * stack. Not java.net.http.HttpClient: it does not exist on Android.
  */
 object Api {
-    /**
-     * A new host, not a renamed one. Telnyx mints an invoke URL from a
-     * function's name and id and has no rename, so monyx-api is a different
-     * function from monio-api with a different id — which is why the old host
-     * is still up and still serving whatever is installed on a phone that has
-     * not been updated. It is the rollback, not a leftover.
-     */
-    const val BASE_URL = "https://monyx-api-31cdf6d8-0.telnyxcompute.com"
+    val BASE_URL: String = BuildConfig.API_BASE_URL
 
     val json = Json {
         ignoreUnknownKeys = true

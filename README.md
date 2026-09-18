@@ -146,6 +146,26 @@ further invites from Settings.
 
 ## Android
 
+Set the backend address in an ignored `android/backend.properties` file:
+
+```properties
+apiUrl=https://your-backend.example.com
+```
+
+Alternatively, export `MONYX_API_URL`; it takes precedence over the file and
+works for CI builds too. A missing or invalid URL stops the build with a setup
+error. Use HTTPS, without credentials, query parameters or a fragment; trailing
+slashes are removed. The address is compiled into the APK, so changing it requires
+a rebuild. Keeping it outside Git does not make it a secret on an installed phone.
+
+The deployed smoke test also requires `MONYX_API_URL` or an explicit `--url`:
+
+```sh
+node scripts/smoke-test.mjs <invite_code> --url https://your-backend.example.com
+```
+
+This test enrolls devices and writes test data; use a test household.
+
 ```sh
 cd android
 ./gradlew assembleDebug     # use the wrapper: it pins Gradle 8.11.1, and

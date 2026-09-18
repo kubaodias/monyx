@@ -1,3 +1,4 @@
+import java.net.URI
 import java.util.Properties
 
 plugins {
@@ -61,6 +62,20 @@ val voiceProps = Properties().apply {
 }
 val assistantNumber: String = voiceProps.getProperty("assistantNumber").orEmpty()
 
+// Deployment configuration stays local. CI can override it through the environment.
+val backendPropsFile = rootProject.file("backend.properties")
+val backendProps = Properties().apply {
+    if (backendPropsFile.exists()) backendPropsFile.inputStream().use { load(it) }
+}
+val apiUrl = (providers.environmentVariable("MONYX_API_URL").orNull
+    ?: backendProps.getProperty("apiUrl"))?.trim()?.trimEnd('/')
+    ?: error("Set MONYX_API_URL or apiUrl in android/backend.properties before building.")
+val apiUri = runCatching { URI(apiUrl) }.getOrNull()
+require(apiUri != null && apiUri.scheme == "https" && !apiUri.host.isNullOrEmpty()
+    && apiUri.rawUserInfo == null && apiUri.rawQuery == null && apiUri.rawFragment == null) {
+    "Backend URL must be an HTTPS URL without credentials, query parameters or a fragment."
+}
+
 android {
     namespace = "com.monyx"
     compileSdk = 35
@@ -78,6 +93,7 @@ android {
         ksp { arg("room.schemaLocation", "$projectDir/schemas") }
 
         buildConfigField("String", "ASSISTANT_NUMBER", "\"$assistantNumber\"")
+        buildConfigField("String", "API_BASE_URL", "\"${apiUri!!.toASCIIString()}\"")
     }
 
     signingConfigs {

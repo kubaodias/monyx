@@ -17,13 +17,38 @@ keystore.properties
 # The assistant's phone number. Kept out of the repo because a phone
 # number is personal data; the call button hides itself without it.
 android/voice.properties
+# Deployment URL used by Android builds.
+android/backend.properties
 
 # Telnyx generated types (regenerate with `telnyx-edge types`)
 server/telnyx-env.d.ts
 
 # Local backups / exports
+*.sql
+!server/migrations/*.sql
+!server/seed/*.sql
 *.sql.gz
+*.dump
+*.db
+*.db-*
+*.sqlite
+*.sqlite3
+*.sqlite-*
+*.sqlite3-*
 backups/
 
 # Secrets
 .wallet.token
+.env
+.env.*
+!.env.example
+!.env.*.example
+*.pem
+*.key
+*.p12
+*.pfx
+*service-account*.json
+*service_account*.json
+*serviceAccount*.json
+*firebase-adminsdk*.json
+credentials.json

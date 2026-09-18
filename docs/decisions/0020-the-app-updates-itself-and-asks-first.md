@@ -89,5 +89,5 @@ so rather than showing a button that cannot work.
   it stays: Android does not downgrade.
 - The release keystore is now also the update channel. Losing it means every
   phone uninstalls — the same consequence as before, reached more often.
-- Phones still on `com.monio.debug` need one manual install of a release build.
+- Phones still on `com.monyx.debug` need one manual install of a release build.
   Every update after that comes through the app.
