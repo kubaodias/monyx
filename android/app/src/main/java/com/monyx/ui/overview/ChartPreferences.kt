@@ -34,7 +34,7 @@ class ChartPreferences(private val context: Context) {
 
     private val key = stringSetPreferencesKey("history_hidden_categories")
     private val budgetKey = booleanPreferencesKey("history_budget_hidden")
-    private val monthLegendKey = booleanPreferencesKey("history_legend_shows_month")
+    private val showsMonthKey = booleanPreferencesKey("breakdown_shows_month")
 
     val hidden: Flow<Set<String>> = context.chartStore.data.map { it[key] ?: emptySet() }
 
@@ -42,16 +42,29 @@ class ChartPreferences(private val context: Context) {
     val budgetHidden: Flow<Boolean> = context.chartStore.data.map { it[budgetKey] ?: false }
 
     /**
-     * Whether the legend prints the selected month rather than the year's
-     * average. Remembered for the same reason hiding is: somebody who reads the
-     * chart one way reads it that way every time, and having to say so again on
-     * every launch is the app forgetting something it was told.
+     * Whether the breakdown card counts the selected month or a normal one.
      *
-     * Average is the default — it is what a twelve-month chart is for, and it is
-     * what this list meant before there was a choice.
+     * ONE answer for both faces. The pie and the twelve-month legend ask the
+     * same question of the same categories, and a card whose two sides were set
+     * differently would make turning it over change the subject silently.
+     *
+     * Remembered, for the same reason hiding is: somebody who reads this card
+     * one way reads it that way every time, and being asked again on every
+     * launch is the app forgetting what it was told.
+     *
+     * Defaults to the month, which is what the pie has always shown and what
+     * the month switcher directly above the card is pointing at.
      */
-    val legendShowsMonth: Flow<Boolean> =
-        context.chartStore.data.map { it[monthLegendKey] ?: false }
+    val showsMonth: Flow<Boolean> = context.chartStore.data.map { it[showsMonthKey] ?: true }
+
+    /**
+     * Set outright rather than flipped: the control is two segments, and
+     * tapping the one already lit has to be a no-op. A toggle behind that would
+     * turn "I want the average" into "give me the other one".
+     */
+    suspend fun setShowsMonth(value: Boolean) {
+        context.chartStore.edit { it[showsMonthKey] = value }
+    }
 
     suspend fun toggle(id: String) {
         context.chartStore.edit { prefs ->
@@ -68,7 +81,5 @@ class ChartPreferences(private val context: Context) {
         context.chartStore.edit { it[budgetKey] = !(it[budgetKey] ?: false) }
     }
 
-    suspend fun toggleLegendAmount() {
-        context.chartStore.edit { it[monthLegendKey] = !(it[monthLegendKey] ?: false) }
-    }
+
 }

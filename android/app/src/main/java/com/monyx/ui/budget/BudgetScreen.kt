@@ -124,22 +124,23 @@ fun BudgetScreen(
     }
 
     Column(modifier = Modifier.fillMaxSize()) {
+        // Outside the list, so it stays put while the budgets scroll under it.
+        // It is the control that says which month every row below belongs to,
+        // and scrolling it away left a screen of figures with nothing on it
+        // saying what they were figures FOR — the same reason Transactions has
+        // always kept it pinned.
+        MonthSwitcher(
+            period = period,
+            onSelect = viewModel::setPeriod,
+            // Matches Overview and Transactions: the switcher is one control on
+            // three screens and has to start at the same x on each.
+            modifier = Modifier.padding(horizontal = 20.dp, vertical = 20.dp),
+        )
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(16.dp),
+            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            item {
-                MonthSwitcher(
-                    period = period,
-                    onSelect = viewModel::setPeriod,
-                    // This list is padded 16, Overview's is padded 20. The four
-                    // that are missing are added back here so the switcher lands
-                    // in the same place on both screens without widening every
-                    // budget row to match.
-                    modifier = Modifier.padding(start = 4.dp, end = 4.dp, top = 4.dp),
-                )
-            }
 
             item {
                 PlanCard(

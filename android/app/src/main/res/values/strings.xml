@@ -52,7 +52,7 @@
     <string name="overview_breakdown_history">Spending over 12 months</string>
     <string name="overview_show_history">Show the last 12 months</string>
     <string name="overview_show_breakdown">Back to this month</string>
-    <string name="overview_history_switch_amount">Show the month instead of the average</string>
+    <string name="overview_history_this_month">Spent this month</string>
     <string name="overview_history_average">Average per month</string>
     <string name="overview_history_hide_all">Hide all</string>
     <string name="overview_history_show_all">Show all</string>

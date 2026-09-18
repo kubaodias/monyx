@@ -142,18 +142,20 @@ class OverviewViewModel(
     }
 
     /**
-     * Whether the legend prints the selected month or the year's average.
-     * Remembered on this phone, like the other two — see [ChartPreferences].
+     * Whether the breakdown card counts the selected month or a normal one —
+     * one answer for both of its faces. See [ChartPreferences.showsMonth].
      */
-    val legendShowsMonth: StateFlow<Boolean> = chartPreferences.legendShowsMonth
+    val showsMonth: StateFlow<Boolean> = chartPreferences.showsMonth
         .stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5_000),
-            initialValue = false,
+            initialValue = true,
         )
 
-    fun toggleLegendAmount() {
-        viewModelScope.launch { chartPreferences.toggleLegendAmount() }
+    fun setAmountMode(mode: LegendAmount) {
+        viewModelScope.launch {
+            chartPreferences.setShowsMonth(mode == LegendAmount.SelectedMonth)
+        }
     }
 
     /**

@@ -15,7 +15,7 @@
 <table>
   <tr>
     <td align="center" width="16%"><img src="docs/screenshots/overview.png" alt="The month's income, spending and the difference between them, with account filters and a category breakdown" width="100%"></td>
-    <td align="center" width="16%"><img src="docs/screenshots/trends.png" alt="Twelve months of spending as stacked bars by category, the budget as a red line over them, and a legend that switches between the yearly average and one month" width="100%"></td>
+    <td align="center" width="16%"><img src="docs/screenshots/trends.png" alt="Twelve months of spending as stacked bars by category, the budget as a red line over them, and a switch between a normal month and the selected one" width="100%"></td>
     <td align="center" width="16%"><img src="docs/screenshots/add.png" alt="Adding an expense on the built-in keypad" width="100%"></td>
     <td align="center" width="16%"><img src="docs/screenshots/history.png" alt="Transaction history with search, category and subcategory filters, and what the filtered rows add up to" width="100%"></td>
     <td align="center" width="16%"><img src="docs/screenshots/budget.png" alt="Monthly plan and per-category budgets" width="100%"></td>
@@ -43,8 +43,8 @@ with the new row on screen.
   the budget drawn over them as a red line so a month that went over is one you
   can see. Tapping a bar moves the whole screen to that month. The legend gives
   each category's monthly average — over the months the ledger actually covers —
-  or that one month's spending, whichever you switched it to last; it re-sorts
-  itself to match, and remembers the choice. The eye at the end of a row hides
+  or that one month's spending, whichever the card is set to — one switch, shared
+  by both faces and remembered, and the legend re-sorts itself to match. The eye at the end of a row hides
   the category from the chart; what is hidden sinks to the bottom and stays
   hidden on that phone alone, across launches.
 - **Add** — a keypad that is also a calculator, a note, any date including the
@@ -62,8 +62,8 @@ with the new row on screen.
   rules, language, backup health, the update check and what every release
   changed.
 
-One month switcher, the same control in the same place on Summary, History and
-Budget: three views of one month, not three months. The arrows step to a
+One month switcher, pinned above the scroll so it never leaves the screen, the
+same control in the same place on Summary, History and Budget: three views of one month, not three months. The arrows step to a
 neighbour; the title opens a picker for anything else.
 
 Money moved between accounts is a transfer — no category, and never counted as
