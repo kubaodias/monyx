@@ -9,6 +9,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.filled.KeyboardArrowRight
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -40,6 +42,13 @@ import com.monyx.data.Dates
  * label: tapping it opens [MonthPickerDialog], which needs the month it is
  * editing. Every way of changing the month — either arrow, any cell of the
  * grid, the jump to today — arrives at the caller through the one [onSelect].
+ *
+ * On a card, like every other panel on these screens. It used to float on the
+ * background, which made the one control that governs all three screens the
+ * only thing on them that did not look like a thing — it read as a heading
+ * rather than as something to press. The card is the same shape, colour and
+ * elevation the balance and breakdown cards use, and it is applied here rather
+ * than at the three call sites so the control cannot drift apart again.
  */
 @Composable
 fun MonthSwitcher(
@@ -50,37 +59,47 @@ fun MonthSwitcher(
     var picking by remember { mutableStateOf(false) }
     val openPicker = stringResource(R.string.month_picker_open)
 
-    Row(
+    Card(
+        shape = RoundedCornerShape(24.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
         modifier = modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically,
     ) {
-        IconButton(onClick = { onSelect(Dates.shiftPeriod(period, -1)) }) {
-            Icon(
-                imageVector = Icons.Filled.KeyboardArrowLeft,
-                contentDescription = stringResource(R.string.overview_previous_month),
+        Row(
+            // Tighter than the other cards' 24: the arrows are 48dp touch
+            // targets that already carry their own space, and padding them
+            // again turns a control into a banner.
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 2.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            IconButton(onClick = { onSelect(Dates.shiftPeriod(period, -1)) }) {
+                Icon(
+                    imageVector = Icons.Filled.KeyboardArrowLeft,
+                    contentDescription = stringResource(R.string.overview_previous_month),
+                )
+            }
+            Text(
+                text = Dates.monthLabel(period),
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier
+                    .clip(RoundedCornerShape(12.dp))
+                    // onClickLabel rather than a contentDescription: the label
+                    // describes the ACTION and leaves the month name as the node's
+                    // text. Overriding the description would announce "choose a
+                    // month" and swallow which month is on.
+                    .clickable(onClickLabel = openPicker) { picking = true }
+                    .padding(horizontal = 12.dp, vertical = 4.dp),
             )
-        }
-        Text(
-            text = Dates.monthLabel(period),
-            style = MaterialTheme.typography.titleLarge,
-            fontWeight = FontWeight.SemiBold,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier
-                .clip(RoundedCornerShape(12.dp))
-                // onClickLabel rather than a contentDescription: the label
-                // describes the ACTION and leaves the month name as the node's
-                // text. Overriding the description would announce "choose a
-                // month" and swallow which month is on.
-                .clickable(onClickLabel = openPicker) { picking = true }
-                .padding(horizontal = 12.dp, vertical = 4.dp),
-        )
-        IconButton(onClick = { onSelect(Dates.shiftPeriod(period, 1)) }) {
-            Icon(
-                imageVector = Icons.Filled.KeyboardArrowRight,
-                contentDescription = stringResource(R.string.overview_next_month),
-            )
+            IconButton(onClick = { onSelect(Dates.shiftPeriod(period, 1)) }) {
+                Icon(
+                    imageVector = Icons.Filled.KeyboardArrowRight,
+                    contentDescription = stringResource(R.string.overview_next_month),
+                )
+            }
         }
     }
 
