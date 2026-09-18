@@ -1,6 +1,6 @@
 # 0020 — The app updates itself, and asks first
 
-**Date:** 2026-09-16 · **Status:** accepted
+**Date:** 2026-09-16 · **Status:** accepted · versions and bucket retention amended by [0021](0021-releases-are-semver-and-the-bucket-keeps-two.md)
 
 ## Context
 

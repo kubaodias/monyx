@@ -561,7 +561,7 @@ private fun BuildIdentitySection() {
 
     SectionCard(title = stringResource(R.string.settings_app_version)) {
         Text(
-            stringResource(R.string.settings_build, BuildConfig.VERSION_NAME, BuildConfig.VERSION_CODE),
+            stringResource(R.string.settings_build, BuildConfig.VERSION_NAME),
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -583,7 +583,7 @@ private fun BuildIdentitySection() {
         }
         when {
             offered != null -> Text(
-                stringResource(R.string.settings_update_available, offered.versionName, offered.versionCode),
+                stringResource(R.string.settings_update_available, offered.versionName),
                 style = MaterialTheme.typography.bodySmall,
             )
             state is UpdateState.UpToDate -> Text(

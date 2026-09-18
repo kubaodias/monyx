@@ -156,7 +156,7 @@
     <string name="settings_backup_stale">No backup for more than 3 days</string>
     <string name="settings_backup_unknown">No backup information</string>
     <string name="settings_app_version">App version</string>
-    <string name="settings_build">Version %1$s (%2$d)</string>
+    <string name="settings_build">Version %1$s</string>
     <string name="settings_add_account">Add an account</string>
     <string name="settings_add_category">Add a category</string>
     <string name="settings_account_name">Account name</string>
@@ -295,7 +295,7 @@
     <string name="settings_update_check">Check for updates</string>
     <string name="settings_update_checking">Checking…</string>
     <string name="settings_update_up_to_date">You have the latest version</string>
-    <string name="settings_update_available">Version %1$s (%2$d) is available</string>
+    <string name="settings_update_available">Version %1$s is available</string>
     <string name="settings_update_show">Show update</string>
     <string name="settings_update_check_failed">Couldn\'t check for updates</string>
     <string name="settings_update_debug">Debug builds don\'t update themselves</string>

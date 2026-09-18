@@ -5,8 +5,10 @@ import android.net.Uri
 import android.provider.Settings
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
@@ -27,6 +29,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.monyx.MonyxApp
 import com.monyx.R
 import com.monyx.sync.AvailableUpdate
+import com.monyx.update.NoteItems
 import com.monyx.update.UpdateState
 import java.util.Locale
 
@@ -67,7 +70,7 @@ fun UpdateDialog() {
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text(
-                    stringResource(R.string.settings_build, update.versionName, update.versionCode) +
+                    stringResource(R.string.settings_build, update.versionName) +
                         " · " + stringResource(R.string.update_size, megabytes(update.sizeBytes)),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -105,10 +108,13 @@ fun UpdateDialog() {
     )
 }
 
-/** Every skipped release's notes, newest first. A heading only when there is more than one. */
+/**
+ * Every skipped release's notes, newest first, one bullet per line. A heading
+ * only when there is more than one release.
+ */
 @Composable
 private fun ReleaseNotes(update: AvailableUpdate) {
-    val notes = update.notes.filter { it.notes.isNotBlank() }
+    val notes = update.notes.map { it to NoteItems.of(it.notes) }.filter { (_, items) -> items.isNotEmpty() }
     if (notes.isEmpty()) return
     Column(
         modifier = Modifier
@@ -117,16 +123,27 @@ private fun ReleaseNotes(update: AvailableUpdate) {
             .verticalScroll(rememberScrollState()),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        notes.forEach { note ->
+        notes.forEach { (note, items) ->
             if (notes.size > 1) {
                 Text(
-                    stringResource(R.string.settings_build, note.versionName, note.versionCode),
+                    stringResource(R.string.settings_build, note.versionName),
                     style = MaterialTheme.typography.labelLarge,
                     fontWeight = FontWeight.SemiBold,
                 )
             }
-            Text(note.notes, style = MaterialTheme.typography.bodyMedium)
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                items.forEach { item -> Bullet(item) }
+            }
         }
+    }
+}
+
+/** The text hangs off the bullet, so a wrapped line starts under the text, not under the dot. */
+@Composable
+private fun Bullet(text: String) {
+    Row {
+        Text("•", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.width(16.dp))
+        Text(text, style = MaterialTheme.typography.bodyMedium)
     }
 }
 

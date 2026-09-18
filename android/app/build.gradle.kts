@@ -9,19 +9,38 @@ plugins {
 }
 
 /**
- * versionCode is the one that matters, and it is not the one people display.
- * Android refuses any APK whose versionCode is lower than the
- * installed one, so a bad release cannot be rolled back without an uninstall —
- * which destroys local data, including anything not yet synced.
+ * The version is semver, and versionCode is derived from it:
+ * major * 1_000_000 + minor * 1_000 + patch. Android compares only the code and
+ * refuses any APK whose code is lower than the installed one, so a bad release
+ * cannot be rolled back without an uninstall — which destroys local data,
+ * including anything not yet synced.
+ *
+ * scripts/release.mjs passes the version it is publishing as -PmonyxVersion and
+ * tags the commit v<version>. Any other build takes the newest such tag, so a
+ * local build reports the release it grew from; with no tag at all it is 0.0.0.
+ * Keep the arithmetic in step with scripts/release-version.mjs.
  */
-fun gitCommitCount(): Int = try {
-    val process = ProcessBuilder("git", "rev-list", "--count", "HEAD")
+val semver = Regex("""^(\d+)\.(\d+)\.(\d+)$""")
+
+fun latestTaggedVersion(): String? = try {
+    val process = ProcessBuilder("git", "describe", "--tags", "--abbrev=0", "--match", "v[0-9]*")
         .directory(rootProject.projectDir)
         .redirectErrorStream(true)
         .start()
-    process.inputStream.bufferedReader().readText().trim().toIntOrNull() ?: 1
+    process.inputStream.bufferedReader().readText().trim().removePrefix("v")
+        .takeIf { process.waitFor() == 0 && semver.matches(it) }
 } catch (_: Exception) {
-    1
+    null
+}
+
+val appVersion: String = (findProperty("monyxVersion") as String?) ?: latestTaggedVersion() ?: "0.0.0"
+
+fun versionCodeOf(version: String): Int {
+    val (major, minor, patch) = semver.matchEntire(version)?.destructured
+        ?: error("monyxVersion must be MAJOR.MINOR.PATCH, got '$version'")
+    require(minor.toInt() < 1000 && patch.toInt() < 1000) { "minor and patch must stay below 1000" }
+    // Android wants a positive code; 0.0.0 is only ever a build nobody released.
+    return maxOf(1, major.toInt() * 1_000_000 + minor.toInt() * 1_000 + patch.toInt())
 }
 
 // Keep the release keystore backed up somewhere that survives a laptop dying:
@@ -50,8 +69,8 @@ android {
         applicationId = "com.monyx"
         minSdk = 26
         targetSdk = 35
-        versionCode = gitCommitCount()
-        versionName = "1.0"
+        versionCode = versionCodeOf(appVersion)
+        versionName = appVersion
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         // Schemas are still exported and committed. No hand-written Migration

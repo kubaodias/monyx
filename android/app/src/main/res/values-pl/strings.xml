@@ -155,7 +155,7 @@
     <string name="settings_backup_stale">Brak kopii zapasowej od ponad 3 dni</string>
     <string name="settings_backup_unknown">Brak informacji o kopii zapasowej</string>
     <string name="settings_app_version">Wersja aplikacji</string>
-    <string name="settings_build">Wersja %1$s (%2$d)</string>
+    <string name="settings_build">Wersja %1$s</string>
     <string name="settings_add_account">Dodaj konto</string>
     <string name="settings_add_category">Dodaj kategorię</string>
     <string name="settings_account_name">Nazwa konta</string>
@@ -292,7 +292,7 @@
     <string name="settings_update_check">Sprawdź aktualizacje</string>
     <string name="settings_update_checking">Sprawdzanie…</string>
     <string name="settings_update_up_to_date">Masz najnowszą wersję</string>
-    <string name="settings_update_available">Dostępna jest wersja %1$s (%2$d)</string>
+    <string name="settings_update_available">Dostępna jest wersja %1$s</string>
     <string name="settings_update_show">Pokaż aktualizację</string>
     <string name="settings_update_check_failed">Nie udało się sprawdzić aktualizacji</string>
     <string name="settings_update_debug">Wersje debug nie aktualizują się same</string>
