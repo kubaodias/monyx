@@ -46,6 +46,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
@@ -81,11 +82,12 @@ fun OverviewScreen(
 ) {
     val app = LocalContext.current.applicationContext as MonyxApp
     val viewModel: OverviewViewModel = viewModel(
-        factory = OverviewViewModel.factory(app.repository, app.selectedMonth, app.hiddenCategories),
+        factory = OverviewViewModel.factory(app.repository, app.selectedMonth, app.chartPreferences),
     )
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val history by viewModel.history.collectAsStateWithLifecycle()
     val hidden by viewModel.hidden.collectAsStateWithLifecycle()
+    val budgetHidden by viewModel.budgetHidden.collectAsStateWithLifecycle()
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -120,7 +122,9 @@ fun OverviewScreen(
                 breakdown = state.breakdown,
                 history = history,
                 hidden = hidden,
+                budgetHidden = budgetHidden,
                 onToggleHidden = viewModel::toggleHidden,
+                onToggleBudget = viewModel::toggleBudgetLine,
                 onToggleAllHidden = { viewModel.toggleAllHidden(history.categories.map { it.id }) },
                 // A slice is a question — "what made up that 340 zł?" — so it
                 // opens that category's transactions for the month on screen,
@@ -371,7 +375,9 @@ private fun BreakdownCard(
     breakdown: List<CategorySpend>,
     history: CategoryHistory,
     hidden: Set<String>,
+    budgetHidden: Boolean,
     onToggleHidden: (String) -> Unit,
+    onToggleBudget: () -> Unit,
     onToggleAllHidden: () -> Unit,
     onCategoryClick: (String) -> Unit,
     onSelectMonth: (String) -> Unit,
@@ -422,7 +428,9 @@ private fun BreakdownCard(
                 HistoryFace(
                     history = history,
                     hidden = hidden,
+                    budgetHidden = budgetHidden,
                     onToggle = onToggleHidden,
+                    onToggleBudget = onToggleBudget,
                     onToggleAll = onToggleAllHidden,
                     onCategoryClick = onCategoryClick,
                     onSelectMonth = onSelectMonth,
@@ -454,7 +462,9 @@ private fun BreakdownCard(
 private fun HistoryFace(
     history: CategoryHistory,
     hidden: Set<String>,
+    budgetHidden: Boolean,
     onToggle: (String) -> Unit,
+    onToggleBudget: () -> Unit,
     onToggleAll: () -> Unit,
     onCategoryClick: (String) -> Unit,
     onSelectMonth: (String) -> Unit,
@@ -476,19 +486,28 @@ private fun HistoryFace(
     CategoryHistoryChart(
         history = history,
         hidden = hidden,
+        budgetHidden = budgetHidden,
         onSelectMonth = onSelectMonth,
     )
     // Only where there is a line to explain. A household that has never set a
-    // limit is not told about a red line it cannot see.
+    // limit is not told about a red line it cannot see — and the key stays put
+    // when the line is switched off, dimmed, because it is the way back on.
     if (history.months.any { it.budgetMinor(hidden) != null }) {
         Spacer(modifier = Modifier.height(10.dp))
-        Row(verticalAlignment = Alignment.CenterVertically) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier
+                .clip(MaterialTheme.shapes.small)
+                .clickable(onClick = onToggleBudget)
+                .alpha(if (budgetHidden) 0.38f else 1f)
+                .padding(horizontal = 4.dp, vertical = 4.dp),
+        ) {
             Box(
                 modifier = Modifier
                     .width(14.dp)
                     .height(2.dp)
                     .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.error),
+                    .background(MaterialTheme.colorScheme.error.copy(alpha = 0.55f)),
             )
             Spacer(modifier = Modifier.width(6.dp))
             Text(

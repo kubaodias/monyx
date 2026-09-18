@@ -8,7 +8,7 @@ import com.monyx.data.MonyxDatabase
 import com.monyx.data.MonyxRepository
 import com.monyx.sync.Session
 import com.monyx.ui.SelectedMonth
-import com.monyx.ui.overview.HiddenCategories
+import com.monyx.ui.overview.ChartPreferences
 import com.monyx.update.Updater
 
 class MonyxApp : Application() {
@@ -19,7 +19,7 @@ class MonyxApp : Application() {
     val updater by lazy { Updater(this, session) }
 
     /** This phone's own view of the twelve-month chart. Never synced. */
-    val hiddenCategories by lazy { HiddenCategories(this) }
+    val chartPreferences by lazy { ChartPreferences(this) }
 
     /**
      * Held here because it has to outlive every ViewModel that reads it. Three
