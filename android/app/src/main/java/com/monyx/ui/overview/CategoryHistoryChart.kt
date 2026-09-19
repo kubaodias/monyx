@@ -409,7 +409,7 @@ internal fun visibleTotal(
  * list, labels all of them for the width of the word.
  */
 @Composable
-internal fun LegendTotal(total: Long, trailing: Dp = 36.dp) {
+internal fun LegendTotal(total: Long, column: Dp = 36.dp, gap: Dp = 0.dp) {
     HorizontalDivider(
         modifier = Modifier.padding(top = 6.dp, bottom = 2.dp),
         color = MaterialTheme.colorScheme.outlineVariant,
@@ -431,16 +431,16 @@ internal fun LegendTotal(total: Long, trailing: Dp = 36.dp) {
             style = MaterialTheme.typography.bodyMedium,
             fontWeight = FontWeight.SemiBold,
         )
-        Spacer(modifier = Modifier.width(8.dp))
+        Spacer(modifier = Modifier.width(gap))
         Text(
             text = stringResource(R.string.currency_suffix),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
-            // Against the figure it qualifies, not floating in the middle of
-            // the column: "4 189,24 zł" reads as one amount, "4 189,24   zł"
-            // as a number and a stray word.
-            textAlign = TextAlign.Start,
-            modifier = Modifier.width(trailing - 8.dp),
+            // Centred under the column it heads — the eyes, or the
+            // percentages — so it reads as that column's label, not as a
+            // stray word pushed against one edge.
+            textAlign = TextAlign.Center,
+            modifier = Modifier.width(column),
         )
     }
 }
