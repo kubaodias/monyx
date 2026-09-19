@@ -19,7 +19,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Edit
@@ -30,7 +29,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -47,12 +45,15 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.monyx.MonyxApp
 import com.monyx.R
+import com.monyx.ui.add.AmountDisplay
+import com.monyx.ui.add.AmountInput
+import com.monyx.ui.add.Keypad
+import com.monyx.ui.add.press
 import com.monyx.data.BudgetUsage
 import com.monyx.data.CategoryEntity
 import com.monyx.data.Money
@@ -397,24 +398,23 @@ private fun EditPlanDialog(
     onDismiss: () -> Unit,
     onSave: (Long) -> Unit,
 ) {
-    var text by remember {
-        mutableStateOf(if (initialMinor == 0L) "" else Money.formatForEditing(initialMinor))
-    }
-    val minor = Money.parseToMinor(text)
+    // The add screen's calculator, not the system keyboard: a budget is the same
+    // kind of figure as an expense and is often worked out the same way — "1 500
+    // + 800" for two things the category has to cover.
+    var amount by remember { mutableStateOf(AmountInput.ofMinor(initialMinor)) }
+    val minor = amount.evaluate().toMinor()
 
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.budget_plan_edit)) },
         text = {
             Column {
-                OutlinedTextField(
-                    value = text,
-                    onValueChange = { text = it },
-                    label = { Text(stringResource(R.string.budget_plan_total)) },
-                    singleLine = true,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                    modifier = Modifier.fillMaxWidth(),
+                Text(
+                    text = stringResource(R.string.budget_plan_total),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+                BudgetKeypad(amount = amount, onChange = { amount = it })
                 Spacer(Modifier.height(10.dp))
                 Text(
                     text = stringResource(
@@ -529,6 +529,23 @@ private fun BudgetRow(
     }
 }
 
+/**
+ * The figure and the add screen's keys under it, sized for a dialog. The keys
+ * are always up: in a dialog whose only question is a number there is nothing
+ * else for them to make way for.
+ */
+@Composable
+private fun BudgetKeypad(amount: AmountInput, onChange: (AmountInput) -> Unit) {
+    Column {
+        AmountDisplay(amount = amount, onClick = {})
+        Keypad(
+            onKey = { onChange(amount.press(it)) },
+            equalsEnabled = amount.hasPendingOperation,
+            modifier = Modifier.height(188.dp),
+        )
+    }
+}
+
 @Composable
 private fun EditBudgetLimitDialog(
     target: EditTarget,
@@ -536,17 +553,17 @@ private fun EditBudgetLimitDialog(
     onSave: (Long) -> Unit,
     onClear: () -> Unit,
 ) {
-    var text by remember(target.categoryId) {
-        mutableStateOf(target.limitMinor?.let { Money.formatForEditing(it) } ?: "")
+    var amount by remember(target.categoryId) {
+        mutableStateOf(AmountInput.ofMinor(target.limitMinor ?: 0L))
     }
+    var touched by remember(target.categoryId) { mutableStateOf(false) }
     val hasExisting = target.limitMinor != null
 
-    // Zero is a limit like any other, so the field cannot use "parses to 0" as
-    // its shorthand for "nothing typed" any more: an empty box and a typed 0 are
-    // different answers. A digit somewhere in the text is what separates them.
-    // Negative is still refused — there is no such thing as owing yourself a
-    // budget, and clearing a limit is the Remove button, not a minus sign.
-    val parsed = if (text.any { it.isDigit() }) Money.parseToMinor(text) else null
+    // Zero is a limit like any other, so "shows 0" cannot mean "nothing typed":
+    // a new limit is savable once a key has been pressed, an existing one from
+    // the start. Negative is still refused — there is no such thing as owing
+    // yourself a budget, and clearing a limit is the Remove button, not a minus.
+    val parsed = if (hasExisting || touched) amount.evaluate().toMinor() else null
     val canSave = parsed != null && parsed >= 0
 
     AlertDialog(
@@ -557,13 +574,17 @@ private fun EditBudgetLimitDialog(
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(target.name, style = MaterialTheme.typography.titleMedium)
-                OutlinedTextField(
-                    value = text,
-                    onValueChange = { text = it },
-                    label = { Text(stringResource(R.string.budget_limit)) },
-                    singleLine = true,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                    modifier = Modifier.fillMaxWidth(),
+                Text(
+                    text = stringResource(R.string.budget_limit),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                BudgetKeypad(
+                    amount = amount,
+                    onChange = {
+                        amount = it
+                        touched = true
+                    },
                 )
                 Text(
                     text = stringResource(R.string.budget_carries_forward),
