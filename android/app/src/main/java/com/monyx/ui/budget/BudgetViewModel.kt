@@ -137,6 +137,10 @@ class BudgetViewModel(
         repository.setMonthPlan(_period.value, plannedMinor)
     }
 
+    suspend fun clearPlan() {
+        repository.clearMonthPlan(_period.value)
+    }
+
     /** What to prefill the plan field with when the month has none yet. */
     suspend fun suggestedPlanMinor(): Long = repository.suggestedPlanMinor(_period.value)
 

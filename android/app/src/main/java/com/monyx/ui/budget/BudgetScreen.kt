@@ -243,7 +243,15 @@ fun BudgetScreen(
         EditPlanDialog(
             initialMinor = if (plan.hasPlan) plan.plannedMinor else planSuggestionMinor,
             assignedMinor = plan.assignedMinor,
+            hasPlan = plan.hasPlan,
             onDismiss = { editingPlan = false },
+            onClear = {
+                scope.launch {
+                    viewModel.clearPlan()
+                    SyncWorker.enqueue(context)
+                }
+                editingPlan = false
+            },
             onSave = { minor ->
                 scope.launch {
                     viewModel.setPlan(minor)
@@ -353,10 +361,7 @@ private fun PlanCard(plan: PlanState, onEditPlan: () -> Unit) {
             )
             if (plan.hasCarryOver) {
                 PlanFigure(
-                    label = stringResource(
-                        R.string.budget_plan_carry_over,
-                        plan.carryOverAccounts.joinToString(", "),
-                    ),
+                    label = stringResource(R.string.budget_plan_carry_over),
                     value = (if (plan.carryOverMinor > 0) "+" else "") +
                         Money.formatWithCurrency(plan.carryOverMinor),
                     valueColor = if (plan.carryOverMinor < 0) MaterialTheme.colorScheme.error else null,
@@ -576,8 +581,10 @@ private fun BudgetAmountSheet(
 private fun EditPlanDialog(
     initialMinor: Long,
     assignedMinor: Long,
+    hasPlan: Boolean,
     onDismiss: () -> Unit,
     onSave: (Long) -> Unit,
+    onClear: () -> Unit,
 ) {
     BudgetAmountSheet(
         initialMinor = initialMinor,
@@ -601,6 +608,17 @@ private fun EditPlanDialog(
                     MaterialTheme.colorScheme.onSurfaceVariant
                 },
             )
+        },
+        // A month planned too early — before its income is known — has to be
+        // able to go back to having no plan, not to a plan of zero.
+        extraAction = if (hasPlan) {
+            {
+                TextButton(onClick = onClear) {
+                    Text(stringResource(R.string.budget_plan_remove), color = MaterialTheme.colorScheme.error)
+                }
+            }
+        } else {
+            null
         },
     )
 }
