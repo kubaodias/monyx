@@ -13,6 +13,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.stateIn
+import java.time.YearMonth
 
 /**
  * Backs the Budget screen. Reads are always local — the phone's number is the
@@ -35,6 +36,16 @@ data class PlanState(
     val hasPlan: Boolean = false,
     val assignedMinor: Long = 0,
     val spentMinor: Long = 0,
+    /**
+     * What last month left behind in the accounts it was paid from: their
+     * combined balance on its last day. Negative when the month ended in the
+     * red — that shortfall is already spent, so it comes out of this month's
+     * room before anything new does. Zero when last month has no spending to
+     * say which accounts count.
+     */
+    val carryOverMinor: Long = 0,
+    /** The accounts [carryOverMinor] was read from, for the line that shows it. */
+    val carryOverAccounts: List<String> = emptyList(),
 ) {
     /**
      * Null when the month has no plan, and that is not the same as zero.
@@ -46,7 +57,8 @@ data class PlanState(
      * assign" until somebody says how much there is.
      */
     val leftToAssignMinor: Long? get() = if (hasPlan) plannedMinor - assignedMinor else null
-    val leftToSpendMinor: Long? get() = if (hasPlan) plannedMinor - spentMinor else null
+    val leftToSpendMinor: Long? get() = if (hasPlan) plannedMinor + carryOverMinor - spentMinor else null
+    val hasCarryOver: Boolean get() = carryOverAccounts.isNotEmpty()
     val overAssigned: Boolean get() = (leftToAssignMinor ?: 0) < 0
 }
 
@@ -65,17 +77,27 @@ class BudgetViewModel(
 
     val plan: StateFlow<PlanState> = _period
         .flatMapLatest { p ->
+            val previous = YearMonth.parse(p).minusMonths(1)
+            val carryOver = combine(
+                repository.spendingAccountIds(previous.toString()),
+                repository.accountBalancesThrough(previous.atEndOfMonth().toString()),
+            ) { ids, balances ->
+                balances.filter { it.id in ids && it.archived == 0 }
+            }
             combine(
                 repository.monthPlan(p),
                 repository.budgetUsage(p),
                 repository.monthTotals(p),
-            ) { planRow, usage, totals ->
+                carryOver,
+            ) { planRow, usage, totals, carried ->
                 PlanState(
                     period = p,
                     plannedMinor = planRow?.plannedMinor ?: 0,
                     hasPlan = planRow != null,
                     assignedMinor = usage.sumOf { it.limitMinor },
                     spentMinor = totals.expenseMinor,
+                    carryOverMinor = carried.sumOf { it.balanceMinor },
+                    carryOverAccounts = carried.map { it.name },
                 )
             }
         }

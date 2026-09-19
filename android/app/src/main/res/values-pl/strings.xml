@@ -105,6 +105,7 @@
     <string name="budget_plan_none">Brak planu. Ustal, ile masz do wydania w tym miesiącu.</string>
     <string name="budget_plan_total">Do wydania w tym miesiącu</string>
     <string name="budget_plan_assigned">Przypisane do kategorii</string>
+    <string name="budget_plan_carry_over">Z poprzedniego miesiąca (%1$s)</string>
     <string name="budget_plan_spent">Wydane</string>
     <string name="budget_plan_left_to_spend">Pozostało do wydania</string>
     <string name="budget_plan_assigned_hint">Już przypisane: %1$s · do zaplanowania: %2$s</string>

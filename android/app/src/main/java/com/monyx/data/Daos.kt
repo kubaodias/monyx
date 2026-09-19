@@ -418,6 +418,18 @@ interface MonyxDao {
     fun accountBalancesThrough(through: String): Flow<List<AccountBalance>>
 
     /**
+     * The accounts the month's spending came out of — the ones whose closing
+     * balance is money that was there to spend. A savings account nobody pays
+     * from never appears here, which is what keeps it out of the budget's
+     * carry-over without the household having to label it.
+     */
+    @Query(
+        """SELECT DISTINCT accountId FROM transactions
+           WHERE deleted = 0 AND kind = 'expense' AND substr(occurredOn, 1, 7) = :period"""
+    )
+    fun spendingAccountIds(period: String): Flow<List<String>>
+
+    /**
      * Every top-level spending category, whether or not anything was spent on it.
      *
      * The breakdown queries below start FROM transactions, so a category with no

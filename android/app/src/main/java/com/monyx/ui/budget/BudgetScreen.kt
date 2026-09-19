@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
@@ -23,6 +24,10 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
@@ -49,6 +54,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.monyx.MonyxApp
+import androidx.compose.ui.text.style.TextOverflow
 import com.monyx.R
 import com.monyx.ui.add.AmountDisplay
 import com.monyx.ui.add.AmountInput
@@ -345,6 +351,17 @@ private fun PlanCard(plan: PlanState, onEditPlan: () -> Unit) {
                 label = stringResource(R.string.budget_plan_assigned),
                 value = Money.formatWithCurrency(plan.assignedMinor),
             )
+            if (plan.hasCarryOver) {
+                PlanFigure(
+                    label = stringResource(
+                        R.string.budget_plan_carry_over,
+                        plan.carryOverAccounts.joinToString(", "),
+                    ),
+                    value = (if (plan.carryOverMinor > 0) "+" else "") +
+                        Money.formatWithCurrency(plan.carryOverMinor),
+                    valueColor = if (plan.carryOverMinor < 0) MaterialTheme.colorScheme.error else null,
+                )
+            }
             PlanFigure(
                 label = stringResource(R.string.budget_plan_spent),
                 value = Money.formatWithCurrency(plan.spentMinor),
@@ -371,73 +388,24 @@ private fun PlanFigure(
         modifier = Modifier.fillMaxWidth().padding(vertical = 3.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {
+        // The label gives way, never the figure: a long carry-over label
+        // ellipsises instead of wrapping the amount onto a second line.
         Text(
             text = label,
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f, fill = false).padding(end = 12.dp),
         )
         Text(
             text = value,
+            softWrap = false,
             style = MaterialTheme.typography.bodyMedium.copy(fontFeatureSettings = "tnum"),
             fontWeight = if (emphasis) FontWeight.SemiBold else FontWeight.Normal,
             color = valueColor ?: MaterialTheme.colorScheme.onSurface,
         )
     }
-}
-
-/**
- * Setting the month's total. The already-assigned figure is shown alongside so
- * the number being typed can be judged against it without leaving the dialog —
- * typing less than you have already handed out is a real mistake, and it should
- * be visible while you make it, not after.
- */
-@Composable
-private fun EditPlanDialog(
-    initialMinor: Long,
-    assignedMinor: Long,
-    onDismiss: () -> Unit,
-    onSave: (Long) -> Unit,
-) {
-    // The add screen's calculator, not the system keyboard: a budget is the same
-    // kind of figure as an expense and is often worked out the same way — "1 500
-    // + 800" for two things the category has to cover.
-    var amount by remember { mutableStateOf(AmountInput.ofMinor(initialMinor)) }
-    val minor = amount.evaluate().toMinor()
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.budget_plan_edit)) },
-        text = {
-            Column {
-                Text(
-                    text = stringResource(R.string.budget_plan_total),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                BudgetKeypad(amount = amount, onChange = { amount = it })
-                Spacer(Modifier.height(10.dp))
-                Text(
-                    text = stringResource(
-                        R.string.budget_plan_assigned_hint,
-                        Money.formatWithCurrency(assignedMinor),
-                        Money.formatWithCurrency(minor - assignedMinor),
-                    ),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = if (minor < assignedMinor) {
-                        MaterialTheme.colorScheme.error
-                    } else {
-                        MaterialTheme.colorScheme.onSurfaceVariant
-                    },
-                )
-            }
-        },
-        confirmButton = {
-            TextButton(onClick = { onSave(minor) }) { Text(stringResource(R.string.settings_save)) }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) { Text(stringResource(R.string.settings_cancel)) }
-        },
-    )
 }
 
 @Composable
@@ -530,20 +498,111 @@ private fun BudgetRow(
 }
 
 /**
- * The figure and the add screen's keys under it, sized for a dialog. The keys
- * are always up: in a dialog whose only question is a number there is nothing
- * else for them to make way for.
+ * Typing a budget figure, on the same keys the add screen uses and laid out the
+ * same way: the figure, then the full-width keypad along the bottom, then the
+ * button that saves. A dialog squeezed the keys into two thirds of the width and
+ * onto a different background, and a number typed in two places should not
+ * feel like two different calculators.
+ *
+ * [header] names what is being set — the category, with its icon, or the month.
+ * [footnote] is re-evaluated on every key, so it can react to the figure.
+ * [savable] gets the evaluated figure and whether a key has been pressed yet.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun BudgetAmountSheet(
+    initialMinor: Long,
+    label: String,
+    onDismiss: () -> Unit,
+    onSave: (Long) -> Unit,
+    header: @Composable () -> Unit,
+    footnote: @Composable (minor: Long) -> Unit,
+    savable: (minor: Long, touched: Boolean) -> Boolean = { minor, _ -> minor >= 0 },
+    extraAction: (@Composable () -> Unit)? = null,
+) {
+    var amount by remember { mutableStateOf(AmountInput.ofMinor(initialMinor)) }
+    var touched by remember { mutableStateOf(false) }
+    val minor = amount.evaluate().toMinor()
+    val canSave = savable(minor, touched)
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        containerColor = MaterialTheme.colorScheme.background,
+    ) {
+        Column(modifier = Modifier.fillMaxWidth().navigationBarsPadding()) {
+            Box(modifier = Modifier.padding(horizontal = 20.dp)) { header() }
+            Spacer(Modifier.height(12.dp))
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = 20.dp),
+            )
+            AmountDisplay(amount = amount, onClick = {})
+            Box(modifier = Modifier.padding(horizontal = 20.dp)) { footnote(minor) }
+            Spacer(Modifier.height(12.dp))
+            Keypad(
+                onKey = {
+                    amount = amount.press(it)
+                    touched = true
+                },
+                equalsEnabled = amount.hasPendingOperation,
+                modifier = Modifier.height(188.dp),
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                extraAction?.invoke()
+                Spacer(Modifier.weight(1f))
+                TextButton(onClick = onDismiss) { Text(stringResource(R.string.budget_cancel)) }
+                Spacer(Modifier.width(8.dp))
+                Button(onClick = { onSave(minor) }, enabled = canSave) {
+                    Text(stringResource(R.string.budget_save))
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Setting the month's total. The already-assigned figure is shown alongside so
+ * the number being typed can be judged against it without leaving the sheet —
+ * typing less than you have already handed out is a real mistake, and it should
+ * be visible while you make it, not after.
  */
 @Composable
-private fun BudgetKeypad(amount: AmountInput, onChange: (AmountInput) -> Unit) {
-    Column {
-        AmountDisplay(amount = amount, onClick = {})
-        Keypad(
-            onKey = { onChange(amount.press(it)) },
-            equalsEnabled = amount.hasPendingOperation,
-            modifier = Modifier.height(188.dp),
-        )
-    }
+private fun EditPlanDialog(
+    initialMinor: Long,
+    assignedMinor: Long,
+    onDismiss: () -> Unit,
+    onSave: (Long) -> Unit,
+) {
+    BudgetAmountSheet(
+        initialMinor = initialMinor,
+        label = stringResource(R.string.budget_plan_total),
+        onDismiss = onDismiss,
+        onSave = onSave,
+        header = {
+            Text(stringResource(R.string.budget_plan_edit), style = MaterialTheme.typography.titleLarge)
+        },
+        footnote = { minor ->
+            Text(
+                text = stringResource(
+                    R.string.budget_plan_assigned_hint,
+                    Money.formatWithCurrency(assignedMinor),
+                    Money.formatWithCurrency(minor - assignedMinor),
+                ),
+                style = MaterialTheme.typography.bodySmall,
+                color = if (minor < assignedMinor) {
+                    MaterialTheme.colorScheme.error
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                },
+            )
+        },
+    )
 }
 
 @Composable
@@ -553,65 +612,51 @@ private fun EditBudgetLimitDialog(
     onSave: (Long) -> Unit,
     onClear: () -> Unit,
 ) {
-    var amount by remember(target.categoryId) {
-        mutableStateOf(AmountInput.ofMinor(target.limitMinor ?: 0L))
-    }
-    var touched by remember(target.categoryId) { mutableStateOf(false) }
     val hasExisting = target.limitMinor != null
+    val tint = Palette.colorFor(target.color, target.categoryId)
 
-    // Zero is a limit like any other, so "shows 0" cannot mean "nothing typed":
-    // a new limit is savable once a key has been pressed, an existing one from
-    // the start. Negative is still refused — there is no such thing as owing
-    // yourself a budget, and clearing a limit is the Remove button, not a minus.
-    val parsed = if (hasExisting || touched) amount.evaluate().toMinor() else null
-    val canSave = parsed != null && parsed >= 0
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = {
-            Text(stringResource(if (hasExisting) R.string.budget_edit_limit else R.string.budget_set_limit))
-        },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(target.name, style = MaterialTheme.typography.titleMedium)
-                Text(
-                    text = stringResource(R.string.budget_limit),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                BudgetKeypad(
-                    amount = amount,
-                    onChange = {
-                        amount = it
-                        touched = true
-                    },
-                )
-                Text(
-                    text = stringResource(R.string.budget_carries_forward),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        },
-        confirmButton = {
-            TextButton(
-                onClick = { parsed?.let(onSave) },
-                enabled = canSave,
-            ) {
-                Text(stringResource(R.string.budget_save))
-            }
-        },
-        dismissButton = {
-            Row {
-                if (hasExisting) {
-                    TextButton(onClick = onClear) {
-                        Text(stringResource(R.string.budget_remove_limit))
-                    }
+    BudgetAmountSheet(
+        initialMinor = target.limitMinor ?: 0L,
+        label = stringResource(if (hasExisting) R.string.budget_edit_limit else R.string.budget_set_limit),
+        onDismiss = onDismiss,
+        onSave = onSave,
+        // The same circle the budget row shows, so the sheet plainly belongs
+        // to the row that opened it.
+        header = {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    modifier = Modifier
+                        .size(44.dp)
+                        .clip(CircleShape)
+                        .background(tint.copy(alpha = 0.18f)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(imageVector = Palette.icon(target.icon), contentDescription = null, tint = tint)
                 }
-                TextButton(onClick = onDismiss) {
-                    Text(stringResource(R.string.budget_cancel))
+                Spacer(Modifier.width(12.dp))
+                Text(target.name, style = MaterialTheme.typography.titleLarge)
+            }
+        },
+        footnote = {
+            Text(
+                text = stringResource(R.string.budget_carries_forward),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        },
+        // Zero is a limit like any other, so "shows 0" cannot mean "nothing
+        // typed": a new limit is savable once a key has been pressed, an existing
+        // one from the start. Negative is still refused — clearing a limit is the
+        // Remove button, not a minus sign.
+        savable = { minor, touched -> minor >= 0 && (hasExisting || touched) },
+        extraAction = if (hasExisting) {
+            {
+                TextButton(onClick = onClear) {
+                    Text(stringResource(R.string.budget_remove_limit), color = MaterialTheme.colorScheme.error)
                 }
             }
+        } else {
+            null
         },
     )
 }

@@ -199,6 +199,30 @@ class InteractionTest {
         assertEquals("an unplanned month must not look over-assigned", false, carriedForward.overAssigned)
     }
 
+    @Test
+    fun `a month that ended in the red takes the shortfall out of this one`() {
+        // September 2026: Portfel closed August at -1 111,86, the plan is 19 600
+        // and 16 640,32 has gone. Without the carry-over this read 2 959,68 left.
+        val september = plan(planned = 19_600_00, assigned = 0, spent = 16_640_32)
+            .copy(carryOverMinor = -1_111_86, carryOverAccounts = listOf("Portfel"))
+        assertEquals(1_847_82L, september.leftToSpendMinor)
+        assertEquals(true, september.hasCarryOver)
+    }
+
+    @Test
+    fun `money left over last month adds to this one`() {
+        val carried = plan(planned = 1_000_00, assigned = 0, spent = 200_00)
+            .copy(carryOverMinor = 300_00, carryOverAccounts = listOf("Portfel"))
+        assertEquals(1_100_00L, carried.leftToSpendMinor)
+    }
+
+    @Test
+    fun `no spending last month means nothing is carried`() {
+        val first = plan(planned = 1_000_00, assigned = 0, spent = 200_00)
+        assertEquals(false, first.hasCarryOver)
+        assertEquals(800_00L, first.leftToSpendMinor)
+    }
+
     // ------------------------------------------------- what the server kept
 
     private fun rejection(id: String?, reason: String) = Rejection("month_plans", id, reason)
