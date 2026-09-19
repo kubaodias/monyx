@@ -48,6 +48,7 @@
     <string name="overview_income">Przychody</string>
     <string name="overview_expenses">Wydatki</string>
     <string name="overview_account_total">Stan kont</string>
+    <string name="overview_account_total_through">Stan kont na koniec %1$s</string>
     <string name="overview_balance">Bilans</string>
     <string name="overview_breakdown">Na co idą pieniądze</string>
     <string name="overview_breakdown_history">Wydatki przez 12 miesięcy</string>
@@ -57,6 +58,7 @@
     <string name="overview_history_average">Średnio na miesiąc</string>
     <string name="overview_history_hide_all">Ukryj wszystkie</string>
     <string name="overview_history_show_all">Pokaż wszystkie</string>
+    <string name="overview_history_total">Razem</string>
     <string name="overview_history_hide_one">Ukryj: %1$s</string>
     <string name="overview_history_show_one">Pokaż: %1$s</string>
     <string name="overview_history_empty">Brak wydatków w ostatnich 12 miesiącach</string>
@@ -98,14 +100,14 @@
     <string name="transactions_delete_confirm_message">Tej operacji nie można cofnąć.</string>
 
     <!-- Budget -->
-    <string name="budget_plan_to_assign">Do rozdysponowania</string>
+    <string name="budget_plan_to_assign">Do zaplanowania</string>
     <string name="budget_plan_edit">Plan na ten miesiąc</string>
     <string name="budget_plan_none">Brak planu. Ustal, ile masz do wydania w tym miesiącu.</string>
     <string name="budget_plan_total">Do wydania w tym miesiącu</string>
     <string name="budget_plan_assigned">Przypisane do kategorii</string>
     <string name="budget_plan_spent">Wydane</string>
     <string name="budget_plan_left_to_spend">Pozostało do wydania</string>
-    <string name="budget_plan_assigned_hint">Już przypisane: %1$s · do rozdysponowania: %2$s</string>
+    <string name="budget_plan_assigned_hint">Już przypisane: %1$s · do zaplanowania: %2$s</string>
     <string name="budget_empty">Nie ustawiono jeszcze żadnych limitów</string>
     <string name="budget_set_limit">Ustaw limit</string>
     <string name="budget_edit_limit">Zmień limit</string>

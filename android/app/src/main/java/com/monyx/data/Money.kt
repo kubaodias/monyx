@@ -281,6 +281,32 @@ object Dates {
         LocalDate.parse("$period-01").format(formatters().second)
             .replaceFirstChar { it.uppercase() }
 
+    private var inMonthLocale: Locale? = null
+    private var cachedInMonth: DateTimeFormatter? = null
+
+    /**
+     * "sierpnia 2026" — the month as it reads INSIDE a sentence.
+     *
+     * [monthLabel] is the standalone form ("Sierpień 2026"), which is what a
+     * heading wants and what Polish gives for `LLLL`. Dropped into "Stan kont na
+     * koniec …" it comes out as "na koniec Sierpień 2026", which is not a
+     * sentence in Polish. `MMMM` is the format context and inflects — genitive
+     * here — and in English the two forms are the same word, so nothing is lost
+     * by using it wherever the month is part of a phrase.
+     */
+    fun monthInLabel(period: String): String {
+        val formatter = synchronized(this) {
+            val locale = Locale.getDefault()
+            cachedInMonth?.takeIf { inMonthLocale == locale } ?: run {
+                DateTimeFormatter.ofPattern("MMMM yyyy", locale).also {
+                    inMonthLocale = locale
+                    cachedInMonth = it
+                }
+            }
+        }
+        return LocalDate.parse("$period-01").format(formatter)
+    }
+
     fun shiftPeriod(period: String, months: Long): String =
         LocalDate.parse("$period-01").plusMonths(months).format(PERIOD)
 

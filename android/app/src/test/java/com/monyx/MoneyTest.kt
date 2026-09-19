@@ -227,6 +227,29 @@ class DatesTest {
         assertEquals("18 września", withLocale("pl-PL") { Dates.dayLabel("2026-09-18") })
     }
 
+    /**
+     * Polish inflects a month by where it sits in the sentence, and Java gives
+     * the two forms under different pattern letters. "Stan kont na koniec
+     * Sierpień 2026" is the standalone form dropped into a phrase, and it is
+     * not Polish — which is the whole reason this second label exists.
+     */
+    @Test
+    fun `a month inside a phrase takes the form a phrase needs`() {
+        assertEquals("sierpnia 2026", withLocale("pl-PL") { Dates.monthInLabel("2026-08") })
+        assertEquals("stycznia 2026", withLocale("pl-PL") { Dates.monthInLabel("2026-01") })
+        // English has one form for both, so the heading and the phrase agree.
+        assertEquals("August 2026", withLocale("en-GB") { Dates.monthInLabel("2026-08") })
+    }
+
+    @Test
+    fun `the standalone month is still the one a heading uses`() {
+        assertEquals("Sierpień 2026", withLocale("pl-PL") { Dates.monthLabel("2026-08") })
+        assertNotEquals(
+            withLocale("pl-PL") { Dates.monthLabel("2026-08") },
+            withLocale("pl-PL") { Dates.monthInLabel("2026-08") },
+        )
+    }
+
     @Test
     fun `month and day labels follow the interface language`() {
         assertEquals("August 2026", withLocale("en-GB") { Dates.monthLabel("2026-08") })

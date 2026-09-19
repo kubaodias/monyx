@@ -1,6 +1,7 @@
 package com.monyx.ui.overview
 
 import com.monyx.data.BudgetLimit
+import com.monyx.data.CategoryRef
 import com.monyx.data.Dates
 import com.monyx.data.MonthlyCategorySpend
 import java.time.LocalDate
@@ -85,7 +86,16 @@ data class CategoryHistory(
     val categories: List<HistoryCategory>,
     val selectedPeriod: String,
 ) {
-    val isEmpty: Boolean get() = categories.isEmpty()
+    /**
+     * Nothing was spent in the whole window — not "there are no categories".
+     *
+     * The two stopped being the same thing once the legend started listing
+     * categories nobody has spent on: a household that has just created its
+     * categories and entered no transactions has a full list and an empty chart,
+     * and what belongs on screen then is the placeholder, not twelve bare rows
+     * of zero.
+     */
+    val isEmpty: Boolean get() = months.all { it.byCategory.isEmpty() }
 
     /** Where the highlight goes, or null when the selection is off the window. */
     val selectedIndex: Int? get() = months.indexOfFirst { it.period == selectedPeriod }.takeIf { it >= 0 }
@@ -129,6 +139,17 @@ fun categoryHistory(
     selectedPeriod: String,
     today: LocalDate = Dates.today(),
     budgets: List<BudgetLimit> = emptyList(),
+    /**
+     * Every top-level spending category the household has, so the ones nothing
+     * was spent on in the whole window still get a legend row — at zero, sorted
+     * to the bottom, and tappable like any other.
+     *
+     * The query cannot supply them: it starts from transactions, and a category
+     * with no transactions produces no row. Leaving it out made "we spent
+     * nothing on Zabawki this year" indistinguishable from "there is no such
+     * category", and the two want opposite reactions.
+     */
+    allCategories: List<CategoryRef> = emptyList(),
 ): CategoryHistory {
     val currentPeriod = Dates.periodOf(today)
     val inWindow = periods.toSet()
@@ -171,9 +192,20 @@ fun categoryHistory(
                 averageMinor = countedTotal / divisor,
             )
         }
-        .sortedByDescending { it.averageMinor }
 
-    return CategoryHistory(months = months, categories = categories, selectedPeriod = selectedPeriod)
+    // The untouched ones, at zero. Appended rather than merged: everything the
+    // rows produced keeps the name and colour the JOIN resolved, and only a
+    // category the window never saw takes its identity from here.
+    val spentOn = categories.map { it.id }.toSet()
+    val untouched = allCategories
+        .filterNot { it.id in spentOn }
+        .map { HistoryCategory(id = it.id, name = it.name, color = it.color, totalMinor = 0L, averageMinor = 0L) }
+
+    return CategoryHistory(
+        months = months,
+        categories = (categories + untouched).sortedByDescending { it.averageMinor },
+        selectedPeriod = selectedPeriod,
+    )
 }
 
 /**

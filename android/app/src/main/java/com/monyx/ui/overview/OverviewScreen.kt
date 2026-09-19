@@ -122,6 +122,7 @@ fun OverviewScreen(
                 windowIncome = state.windowIncomeMinor,
                 windowExpense = state.windowExpenseMinor,
                 balance = state.balanceMinor,
+                balanceThroughPeriod = state.balanceThroughPeriod,
                 trend = state.trend,
             )
         }
@@ -172,6 +173,7 @@ private fun SummaryCard(
     windowIncome: Long,
     windowExpense: Long,
     balance: Long,
+    balanceThroughPeriod: String?,
     trend: TrendSeries,
 ) {
     var showTrend by rememberSaveable { mutableStateOf(false) }
@@ -212,6 +214,7 @@ private fun SummaryCard(
                     income = windowIncome,
                     expense = windowExpense,
                     balance = balance,
+                    balanceThroughPeriod = balanceThroughPeriod,
                     focused = focused,
                     onFocus = { focused = it },
                     onBack = {
@@ -239,22 +242,27 @@ private fun TotalsFace(income: Long, expense: Long, net: Long, onOpenTrend: () -
             .clickable(onClick = onOpenTrend)
             .padding(24.dp),
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
             Text(
                 text = stringResource(R.string.overview_balance),
                 style = MaterialTheme.typography.labelLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.weight(1f),
             )
-            Spacer(modifier = Modifier.width(6.dp))
-            // The only sign that the card has a back. Without it the flip is a
-            // feature nobody finds, because nothing else about a number
-            // suggests it can be turned over.
-            Icon(
-                imageVector = Icons.Filled.ShowChart,
-                contentDescription = stringResource(R.string.overview_show_trend),
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(16.dp),
-            )
+            // The only sign that the card has a back. In the top-right corner
+            // rather than tucked against the label, which is where the
+            // breakdown card below already puts the same affordance — two cards
+            // that turn over should not hide the handle in two different
+            // places. The whole face stays tappable, so this is a signpost
+            // first and a button second.
+            IconButton(onClick = onOpenTrend, modifier = Modifier.size(32.dp)) {
+                Icon(
+                    imageVector = Icons.Filled.ShowChart,
+                    contentDescription = stringResource(R.string.overview_show_trend),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(20.dp),
+                )
+            }
         }
         Text(
             text = Money.formatWithCurrency(net),
@@ -296,6 +304,7 @@ private fun TrendFace(
     income: Long,
     expense: Long,
     balance: Long,
+    balanceThroughPeriod: String?,
     focused: Int?,
     onFocus: (Int?) -> Unit,
     onBack: () -> Unit,
@@ -308,9 +317,17 @@ private fun TrendFace(
     // net. This face headlines what is actually in the accounts, and a card
     // whose two sides print different numbers under one label is the confusion
     // the flip was built to avoid.
-    val label = point
-        ?.let { stringResource(R.string.overview_trend_through, Dates.dayLabel(it.date.toString())) }
-        ?: stringResource(R.string.overview_account_total)
+    val label = when {
+        point != null ->
+            stringResource(R.string.overview_trend_through, Dates.dayLabel(point.date.toString()))
+        // A month that is over closed at a figure; the current one has not
+        // closed at anything yet, so it is still just "where we stand".
+        balanceThroughPeriod != null -> stringResource(
+            R.string.overview_account_total_through,
+            Dates.monthInLabel(balanceThroughPeriod),
+        )
+        else -> stringResource(R.string.overview_account_total)
+    }
     val headline = if (point == null) balance else trend.runningAt(focused)
     val shownIncome = point?.incomeMinor ?: income
     val shownExpense = point?.expenseMinor ?: expense

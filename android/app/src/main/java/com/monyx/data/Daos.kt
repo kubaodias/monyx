@@ -6,6 +6,17 @@ import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import kotlinx.coroutines.flow.Flow
 
+/**
+ * A category with nothing attached to it yet: the identity the charts need in
+ * order to show a category that cost nothing. See [MonyxDao.rootExpenseCategories].
+ */
+data class CategoryRef(
+    val id: String,
+    val name: String,
+    val color: String?,
+    val icon: String?,
+)
+
 /** A category slice of a month's spending, for the pie chart and the budget bars. */
 data class CategorySpend(
     val categoryId: String,
@@ -361,6 +372,57 @@ interface MonyxDao {
            FROM accounts a WHERE a.deleted = 0 ORDER BY a.archived, a.sortOrder, a.name"""
     )
     fun accountBalances(): Flow<List<AccountBalance>>
+
+    /**
+     * The same balances, as they stood at the end of [through].
+     *
+     * An account's position is a running total, so asking about a past month
+     * means asking what had happened by the end of it — the opening balance plus
+     * everything dated on or before that day, and nothing after. This is the
+     * only honest answer to "how did we stand in June": the plain balance above
+     * is today's, and printing it under a month switcher set to June is the bug
+     * this query exists to fix.
+     *
+     * Bounded on occurredOn rather than occurredAt, like every other aggregate
+     * here, so an expense entered at half past midnight lands in the day the
+     * household says it happened.
+     */
+    @Query(
+        """SELECT a.id AS id, a.name AS name, a.icon AS icon, a.color AS color,
+                  a.initialBalanceMinor
+                  + COALESCE((SELECT SUM(CASE
+                        WHEN t.kind = 'income'   THEN  t.amountMinor
+                        WHEN t.kind = 'expense'  THEN -t.amountMinor
+                        WHEN t.kind = 'transfer' THEN -t.amountMinor
+                     END) FROM transactions t
+                     WHERE t.accountId = a.id AND t.deleted = 0
+                       AND t.occurredOn <= :through), 0)
+                  + COALESCE((SELECT SUM(t.amountMinor) FROM transactions t
+                     WHERE t.transferAccountId = a.id AND t.kind = 'transfer'
+                       AND t.deleted = 0 AND t.occurredOn <= :through), 0) AS balanceMinor,
+                  a.archived AS archived
+           FROM accounts a WHERE a.deleted = 0 ORDER BY a.archived, a.sortOrder, a.name"""
+    )
+    fun accountBalancesThrough(through: String): Flow<List<AccountBalance>>
+
+    /**
+     * Every top-level spending category, whether or not anything was spent on it.
+     *
+     * The breakdown queries below start FROM transactions, so a category with no
+     * expenses in the window has no row and vanishes from the chart's legend
+     * entirely. That is wrong in both directions: a household cannot see that it
+     * spent nothing on Zabawki this month, and cannot tap the category to check.
+     * The callers pad the query results with these at zero.
+     *
+     * Top-level only, because that is what the breakdown rolls up to — a
+     * subcategory is already counted inside its parent's slice.
+     */
+    @Query(
+        """SELECT id, name, color, icon FROM categories
+           WHERE deleted = 0 AND kind = 'expense' AND parentId IS NULL
+           ORDER BY sortOrder, name"""
+    )
+    fun rootExpenseCategories(): Flow<List<CategoryRef>>
 
     /**
      * The overview's account filter, shared by the three queries below.
