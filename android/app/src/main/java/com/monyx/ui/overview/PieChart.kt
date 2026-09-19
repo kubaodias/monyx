@@ -167,13 +167,15 @@ fun PieChart(
                         text = Money.format(slice.amountMinor),
                         style = MaterialTheme.typography.bodyMedium,
                     )
-                    Spacer(modifier = Modifier.width(8.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    // Just wide enough for "100%" at this size, so the amount
+                    // sits right up against its share instead of a gap apart.
                     Text(
                         text = stringResource(R.string.overview_percent, percent),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         textAlign = TextAlign.End,
-                        modifier = Modifier.width(40.dp),
+                        modifier = Modifier.width(32.dp),
                     )
                 }
             }
@@ -182,7 +184,7 @@ fun PieChart(
             // it is needed again here: a column of numbers the eye has just
             // been reading down ends with the question "so how much is that
             // altogether" — asking it should not mean looking back up.
-            LegendTotal(total = total, column = 40.dp, gap = 8.dp)
+            LegendTotal(total = total, column = 32.dp, gap = 4.dp)
         }
     }
 }
