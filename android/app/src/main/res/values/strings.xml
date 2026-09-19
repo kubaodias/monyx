@@ -48,6 +48,8 @@
     <string name="overview_expenses">Expenses</string>
     <string name="overview_account_total">In the accounts</string>
     <string name="overview_account_total_through">In the accounts, end of %1$s</string>
+    <string name="overview_carry_over">From last month</string>
+    <string name="overview_other">Transfers &amp; other</string>
     <string name="overview_balance">Balance</string>
     <string name="overview_breakdown">Where the money goes</string>
     <string name="overview_breakdown_history">Spending over 12 months</string>
