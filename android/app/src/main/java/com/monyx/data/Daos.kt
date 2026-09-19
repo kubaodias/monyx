@@ -95,6 +95,18 @@ data class DailyTotals(
     val expenseMinor: Long,
 )
 
+/**
+ * How much the selected accounts' balance MOVED on one day.
+ *
+ * Not the same question as [DailyTotals], which is about earning and spending:
+ * a transfer is neither, and it still takes money out of one account and puts it
+ * into another. With every account selected the two cancel and this is the net
+ * of the day; with one account selected the transfer is the whole story.
+ *
+ * Quiet days are missing, like the totals above — the chart fills its own gaps.
+ */
+data class DailyDelta(val day: String, val deltaMinor: Long)
+
 data class AccountBalance(
     val id: String,
     val name: String,
@@ -528,6 +540,44 @@ interface MonyxDao {
         allAccounts: Int,
         accountIds: List<String>,
     ): Flow<List<DailyTotals>>
+
+    /**
+     * How far the selected accounts' balance moved on each day of a range.
+     *
+     * The same three signs [accountBalances] adds up — income in, expense out,
+     * transfer out of the account it left — plus the fourth the totals above
+     * have no place for: a transfer ARRIVING, which is a row belonging to the
+     * other account. Hence the union: one row of the ledger can move two
+     * accounts, and the second one is keyed by transferAccountId.
+     *
+     * Unfiltered, the two halves of a transfer cancel and this is simply income
+     * minus expense. Under a filter it is not, and that difference is the whole
+     * reason the query exists: a line drawn from earning and spending alone
+     * would ignore the 2 000 zł that left the current account for the savings
+     * one, and then disagree with the balance printed above it.
+     */
+    @Query(
+        """SELECT day, SUM(deltaMinor) AS deltaMinor FROM (
+             SELECT occurredOn AS day,
+                    CASE WHEN kind = 'income' THEN amountMinor ELSE -amountMinor END AS deltaMinor
+               FROM transactions
+              WHERE deleted = 0 AND occurredOn >= :fromDay AND occurredOn <= :toDay
+                AND (:allAccounts = 1 OR accountId IN (:accountIds))
+             UNION ALL
+             SELECT occurredOn AS day, amountMinor AS deltaMinor
+               FROM transactions
+              WHERE deleted = 0 AND kind = 'transfer' AND transferAccountId IS NOT NULL
+                AND occurredOn >= :fromDay AND occurredOn <= :toDay
+                AND (:allAccounts = 1 OR transferAccountId IN (:accountIds))
+           )
+           GROUP BY day ORDER BY day"""
+    )
+    fun dailyDeltas(
+        fromDay: String,
+        toDay: String,
+        allAccounts: Int,
+        accountIds: List<String>,
+    ): Flow<List<DailyDelta>>
 
     /**
      * Budgets carry forward, resolved lazily at query time. This is the

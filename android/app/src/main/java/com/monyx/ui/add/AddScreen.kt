@@ -73,10 +73,14 @@ import com.monyx.ui.theme.Palette
  * Which input the bottom of the screen is currently giving to.
  *
  * Only one of the two can be useful at a time, and neither is useful all of the
- * time. The keypad is 236dp of screen that means nothing once the amount is
+ * time. The keypad is 188dp of screen that means nothing once the amount is
  * typed, and it used to sit there through the category tap and under the note's
  * own keyboard — so the grid was scrolling four rows at a time in a window it
  * did not need to be sharing.
+ *
+ * The note FIELD is always on screen now; this is only about which keyboard is
+ * up. Starting with the note is allowed — tapping it takes the keys down — and
+ * so is starting with a category.
  */
 private enum class Editing {
     /** Typing the amount. */
@@ -212,48 +216,48 @@ fun AddScreen(
             modifier = Modifier.weight(1f),
         )
 
-        // Last, lowest, and behind the calculator until the calculator is done.
+        // Last, lowest, and ALWAYS there.
         //
-        // The default screen is icons and keys: a note is wanted on maybe one
-        // transaction in ten, and a field between the grid and the keypad
-        // charges the other nine 56dp of category space for it. The keypad
-        // standing down is what reveals it, so the space it takes is space that
-        // was just freed — and it lands directly above Save, a whole grid away
-        // from the subcategories, which is where the last thing you type
-        // belongs.
+        // It used to appear only once the keypad stood down, which made the
+        // screen a sequence: amount first, then everything else. That is the
+        // common order and it is not the only one — "wpisz co to było, zanim
+        // zapomnisz" is a real way to start, and so is tapping the category you
+        // are standing in front of. Nothing here needs to be filled in before
+        // anything else, and the screen should not have implied otherwise.
+        //
+        // The space it costs came out of the keypad and the save bar rather
+        // than out of the grid, which is what makes it affordable.
         //
         // It is also the same field as the edit sheet's, down to the padding.
         // Two screens that both mean "anything to add?" have to look the same
         // or the second one reads as a different question.
-        if (editing != Editing.Amount) {
-            OutlinedTextField(
-                value = state.note,
-                onValueChange = viewModel::setNote,
-                label = { Text(stringResource(R.string.add_note_hint)) },
-                singleLine = true,
-                // A note is a sentence fragment ("Zakupy na weekend"), so the
-                // keyboard opens shifted. A hint only: shift still wins for
-                // "iPhone".
-                keyboardOptions = KeyboardOptions(
-                    capitalization = KeyboardCapitalization.Sentences,
-                ),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 12.dp, vertical = 4.dp)
-                    // The keys and the note are both bottom-of-screen inputs and
-                    // only one of them can be the one being answered. Tapping
-                    // the amount comes back the other way, and editAmount()
-                    // drops this field's focus first so the system keyboard goes
-                    // with it.
-                    .onFocusChanged { if (it.isFocused) editing = Editing.Note },
-            )
-        }
+        OutlinedTextField(
+            value = state.note,
+            onValueChange = viewModel::setNote,
+            label = { Text(stringResource(R.string.add_note_hint)) },
+            singleLine = true,
+            // A note is a sentence fragment ("Zakupy na weekend"), so the
+            // keyboard opens shifted. A hint only: shift still wins for
+            // "iPhone".
+            keyboardOptions = KeyboardOptions(
+                capitalization = KeyboardCapitalization.Sentences,
+            ),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 4.dp)
+                // The keys and the note are both bottom-of-screen inputs and
+                // only one of them can be the one being answered. Tapping
+                // the amount comes back the other way, and editAmount()
+                // drops this field's focus first so the system keyboard goes
+                // with it.
+                .onFocusChanged { if (it.isFocused) editing = Editing.Note },
+        )
 
         if (editing == Editing.Amount) {
             Keypad(
                 onKey = viewModel::onKey,
                 equalsEnabled = state.amount.hasPendingOperation,
-                modifier = Modifier.height(236.dp),
+                modifier = Modifier.height(188.dp),
             )
         }
 
@@ -329,16 +333,30 @@ private fun KindSelector(selected: EntryKind, onSelect: (EntryKind) -> Unit) {
 }
 
 /**
- * What the keypad screen is still missing, in the order the screen is filled
- * in, handed to the shared save bar. Naming the NEXT thing to do beats naming
- * an arbitrary one of several.
+ * The save bar, once there is something to save.
+ *
+ * It used to stand there from the first frame saying "Podaj kwotę", then
+ * "Wybierz kategorię" — narrating a screen that is already showing both. The
+ * amount is the largest thing on it and the categories fill the middle of it;
+ * a button spelling out that neither has been touched yet costs 62dp to tell
+ * you what you are looking at. So while those two are what is missing, there is
+ * no bar at all, and it arrives — filled, green, with the figure on it — at the
+ * moment the transaction becomes savable. An arriving button is a better
+ * signal than a dead one, and the space goes to the category grid.
+ *
+ * The two blockers that are NOT on screen still get said out loud: no account
+ * and no member are states nothing else here would explain, and a screen that
+ * simply refused to save would be a bug report.
  */
 @Composable
 private fun SaveBar(state: AddUiState, hasMember: Boolean, onSave: () -> Unit) {
+    val unfinished = state.amountMinor <= 0 || state.categoryId == null
+    if (unfinished && state.accountId != null && hasMember) return
+
     SaveBar(
         blocker = when {
-            state.amountMinor <= 0 -> R.string.add_needs_amount
             state.accountId == null -> R.string.add_needs_account
+            state.amountMinor <= 0 -> R.string.add_needs_amount
             state.categoryId == null -> R.string.add_needs_category
             else -> null
         },

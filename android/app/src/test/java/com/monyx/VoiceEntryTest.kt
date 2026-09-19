@@ -14,6 +14,7 @@ import com.monyx.voice.NoteRequest
 import com.monyx.voice.NoteWriter
 import com.monyx.voice.VoiceEntryState
 import com.monyx.voice.VoiceEntryViewModel
+import com.monyx.voice.SpeechListener
 import com.monyx.voice.SpokenTransaction
 import com.monyx.voice.VoiceLedger
 import kotlinx.coroutines.CoroutineScope
@@ -25,6 +26,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.flowOf
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -832,5 +834,42 @@ class VoiceEntryTest {
         /** Longer than any test will wait for. The coroutine parks and is never
          *  joined, so the state under test is the one left on screen. */
         const val FOREVER = 60_000L
+    }
+}
+
+/**
+ * The one decision the real recogniser makes that can be checked off a device.
+ *
+ * EXTRA_PREFER_OFFLINE does not mean "prefer": Google's engine treats it as
+ * "only", and a phone that has never downloaded the Polish pack answers with a
+ * language error in the first frame. The feature was then dead on that phone
+ * forever, under a message that blamed the language.
+ */
+class SpeechRetryTest {
+
+    private val languageNotSupported = 12
+    private val languageUnavailable = 13
+
+    @Test
+    fun `a missing language pack is worth one try over the network`() {
+        assertTrue(SpeechListener.retriesOnline(languageNotSupported))
+        assertTrue(SpeechListener.retriesOnline(languageUnavailable))
+    }
+
+    /**
+     * Silence is not retried. Nothing was said, the microphone is already shut,
+     * and reopening it would be a recorder that will not take no for an answer.
+     */
+    @Test
+    fun `everything else is simply the answer`() {
+        listOf(
+            android.speech.SpeechRecognizer.ERROR_NO_MATCH,
+            android.speech.SpeechRecognizer.ERROR_SPEECH_TIMEOUT,
+            android.speech.SpeechRecognizer.ERROR_NETWORK,
+            android.speech.SpeechRecognizer.ERROR_AUDIO,
+            android.speech.SpeechRecognizer.ERROR_RECOGNIZER_BUSY,
+            android.speech.SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS,
+            android.speech.SpeechRecognizer.ERROR_CLIENT,
+        ).forEach { assertFalse(it.toString(), SpeechListener.retriesOnline(it)) }
     }
 }

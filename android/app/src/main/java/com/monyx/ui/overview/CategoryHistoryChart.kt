@@ -45,6 +45,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.monyx.R
@@ -401,16 +402,21 @@ internal fun visibleTotal(
  * Indented to the same column as the category names — the coloured dot's width
  * plus its gap — so the figure lines up under the figures it adds, which is the
  * only thing that makes it readable as a total rather than one more row.
+ *
+ * The currency goes where the eyes are, and it is the only row that says it.
+ * Every figure in the column is złote and none of them could say so without
+ * making the column twice as wide; naming it once, on the line that closes the
+ * list, labels all of them for the width of the word.
  */
 @Composable
-private fun LegendTotal(total: Long) {
+internal fun LegendTotal(total: Long, trailing: Dp = 36.dp) {
     HorizontalDivider(
         modifier = Modifier.padding(top = 6.dp, bottom = 2.dp),
         color = MaterialTheme.colorScheme.outlineVariant,
     )
     Row(
         verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier.fillMaxWidth().padding(end = 36.dp, top = 2.dp, bottom = 6.dp),
+        modifier = Modifier.fillMaxWidth().padding(top = 2.dp, bottom = 6.dp),
     ) {
         Spacer(modifier = Modifier.width(20.dp))
         Text(
@@ -424,6 +430,14 @@ private fun LegendTotal(total: Long) {
             text = Money.format(total),
             style = MaterialTheme.typography.bodyMedium,
             fontWeight = FontWeight.SemiBold,
+        )
+        Spacer(modifier = Modifier.width(8.dp))
+        Text(
+            text = stringResource(R.string.currency_suffix),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.width(trailing - 8.dp),
         )
     }
 }

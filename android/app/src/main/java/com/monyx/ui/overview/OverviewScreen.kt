@@ -102,7 +102,11 @@ fun OverviewScreen(
         )
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = 20.dp),
+            // Room at the bottom for the call button to float over. The legends
+            // now END in a total, and the last line of a list is exactly what
+            // the button was sitting on: the figure was legible and the "zł"
+            // beside it was under a green circle.
+            contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = 96.dp),
             verticalArrangement = Arrangement.spacedBy(20.dp),
         ) {
         if (state.accounts.size > 1) {
@@ -289,14 +293,14 @@ private fun TotalsFace(income: Long, expense: Long, net: Long, onOpenTrend: () -
 /**
  * The back: where the balance stood, and what moved to put it there.
  *
- * Untouched, it prints the month's own three figures — the same three the front
- * prints — so turning the card over never changes a number. All the back adds
- * is the path: the line arrives at the headline rather than restating it.
+ * Untouched, it prints what is in the accounts and the thirty days that got
+ * there. All the back adds is the path: the line ARRIVES at the headline —
+ * it is counted backwards from it — rather than restating it.
  *
- * Touched, header and footer switch together to the one day being pointed at,
- * and the header says so. Letting the big number mean the month while the two
- * figures under the chart meant a single day would have been two answers to one
- * question.
+ * Touched, header and footer switch together to the day being pointed at: the
+ * balance at the end of it, and what the month had earned and spent by then.
+ * Both are "as of that day", which is the only way one card can carry one
+ * answer.
  */
 @Composable
 private fun TrendFace(
@@ -310,9 +314,9 @@ private fun TrendFace(
     onBack: () -> Unit,
 ) {
     val point = focused?.let { trend.points.getOrNull(it) }
-    // "Through 25 August", not "25 August". The number under it is the balance
-    // as it stood at the END of that day, while the two figures below are what
-    // moved on the day itself — a bare date would have read as both.
+    // "Through 25 August", not "25 August". Everything on the face is then as
+    // of the end of that day — the balance above, and the month so far below —
+    // and a bare date would have read as the day's own figures.
     // Not "Bilans": the front of the card owns that word now, for the month's
     // net. This face headlines what is actually in the accounts, and a card
     // whose two sides print different numbers under one label is the confusion
@@ -329,8 +333,13 @@ private fun TrendFace(
         else -> stringResource(R.string.overview_account_total)
     }
     val headline = if (point == null) balance else trend.runningAt(focused)
-    val shownIncome = point?.incomeMinor ?: income
-    val shownExpense = point?.expenseMinor ?: expense
+    // The month up to that day, not the day itself. A single day's two figures
+    // are "0,00 and 0,00" on five days out of six, and on the sixth they are
+    // one shop — neither of which says anything about the balance printed above
+    // them. What had come in and gone out since the 1st does: it is the
+    // arithmetic that got the line to where the finger is.
+    val shownIncome = focused?.let { trend.monthIncomeAt(it) } ?: income
+    val shownExpense = focused?.let { trend.monthExpenseAt(it) } ?: expense
 
     Column(modifier = Modifier.fillMaxWidth().padding(24.dp)) {
         Row(

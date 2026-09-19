@@ -177,6 +177,12 @@ fun PieChart(
                     )
                 }
             }
+            // The same closing line the twelve-month legend has, in the same
+            // shape. The figure is already in the hole of the donut above, and
+            // it is needed again here: a column of numbers the eye has just
+            // been reading down ends with the question "so how much is that
+            // altogether" — asking it should not mean looking back up.
+            LegendTotal(total = total, trailing = 48.dp)
         }
     }
 }

@@ -49,6 +49,10 @@ class MonyxRepository(private val dao: MonyxDao) {
     fun dailyTotals(fromDay: String, toDay: String, accountIds: Set<String> = emptySet()) =
         dao.dailyTotals(fromDay, toDay, allAccounts(accountIds), accountIds.toList())
 
+    /** How far the selected accounts' balance moved each day — transfers and all. */
+    fun dailyDeltas(fromDay: String, toDay: String, accountIds: Set<String> = emptySet()) =
+        dao.dailyDeltas(fromDay, toDay, allAccounts(accountIds), accountIds.toList())
+
     fun budgetUsage(period: String) = dao.budgetUsage(period)
 
     /** Raw budget rows for the history chart's limit line. No account filter:
