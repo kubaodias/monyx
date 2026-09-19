@@ -22,6 +22,7 @@ class MonyxRepository(private val dao: MonyxDao) {
 
     /** Balances as they stood at the end of [through] (an ISO local date). */
     fun accountBalancesThrough(through: String) = dao.accountBalancesThrough(through)
+    fun spendingAccountIds(period: String) = dao.spendingAccountIds(period)
 
     /** Every top-level spending category, spent on or not — the charts pad with these. */
     fun rootExpenseCategories() = dao.rootExpenseCategories()

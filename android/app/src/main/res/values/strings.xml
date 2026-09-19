@@ -106,6 +106,7 @@
     <string name="budget_plan_none">No plan yet. Set how much there is to spend this month.</string>
     <string name="budget_plan_total">To spend this month</string>
     <string name="budget_plan_assigned">Assigned to categories</string>
+    <string name="budget_plan_carry_over">From last month (%1$s)</string>
     <string name="budget_plan_spent">Spent</string>
     <string name="budget_plan_left_to_spend">Left to spend</string>
     <string name="budget_plan_assigned_hint">Already assigned: %1$s · left to plan: %2$s</string>
