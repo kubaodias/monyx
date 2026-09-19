@@ -49,6 +49,8 @@
     <string name="overview_expenses">Wydatki</string>
     <string name="overview_account_total">Stan kont</string>
     <string name="overview_account_total_through">Stan kont na koniec %1$s</string>
+    <string name="overview_carry_over">Z poprzedniego miesiąca</string>
+    <string name="overview_other">Przelewy i inne</string>
     <string name="overview_balance">Bilans</string>
     <string name="overview_breakdown">Na co idą pieniądze</string>
     <string name="overview_breakdown_history">Wydatki przez 12 miesięcy</string>

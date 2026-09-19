@@ -459,7 +459,7 @@ fun EditTransactionSheet(
                 Keypad(
                     onKey = { action -> amount = amount.press(action) },
                     equalsEnabled = amount.hasPendingOperation,
-                    modifier = Modifier.height(236.dp),
+                    modifier = Modifier.height(188.dp),
                 )
             }
 

@@ -123,6 +123,8 @@ fun OverviewScreen(
                 income = state.incomeMinor,
                 expense = state.expenseMinor,
                 net = state.netMinor,
+                carryOver = state.carryOverMinor,
+                other = state.otherMinor,
                 windowIncome = state.windowIncomeMinor,
                 windowExpense = state.windowExpenseMinor,
                 balance = state.balanceMinor,
@@ -174,6 +176,8 @@ private fun SummaryCard(
     income: Long,
     expense: Long,
     net: Long,
+    carryOver: Long,
+    other: Long,
     windowIncome: Long,
     windowExpense: Long,
     balance: Long,
@@ -228,8 +232,10 @@ private fun SummaryCard(
                 )
             } else {
                 TotalsFace(
+                    carryOver = carryOver,
                     income = income,
                     expense = expense,
+                    other = other,
                     net = net,
                     onOpenTrend = { showTrend = true },
                 )
@@ -239,7 +245,14 @@ private fun SummaryCard(
 }
 
 @Composable
-private fun TotalsFace(income: Long, expense: Long, net: Long, onOpenTrend: () -> Unit) {
+private fun TotalsFace(
+    carryOver: Long,
+    income: Long,
+    expense: Long,
+    other: Long,
+    net: Long,
+    onOpenTrend: () -> Unit,
+) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -274,19 +287,53 @@ private fun TotalsFace(income: Long, expense: Long, net: Long, onOpenTrend: () -
             fontWeight = FontWeight.Bold,
             color = amountColor(net),
         )
-        Spacer(modifier = Modifier.height(24.dp))
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            SummaryStat(
-                label = stringResource(R.string.overview_income),
-                amountMinor = income,
-                tint = MaterialTheme.colorScheme.primary,
-            )
-            SummaryStat(
-                label = stringResource(R.string.overview_expenses),
-                amountMinor = expense,
-                tint = MaterialTheme.colorScheme.error,
+        Spacer(modifier = Modifier.height(20.dp))
+        // The month as a statement, top to bottom, adding up to the headline:
+        // where it started, what came in, what went out. The same figure as
+        // Stan kont on the back, broken down instead of drawn.
+        StatementLine(
+            label = stringResource(R.string.overview_carry_over),
+            text = Money.formatWithCurrency(carryOver),
+            tint = if (carryOver < 0) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface,
+        )
+        StatementLine(
+            label = stringResource(R.string.overview_income),
+            text = "+" + Money.formatWithCurrency(income),
+            tint = MaterialTheme.colorScheme.primary,
+        )
+        StatementLine(
+            label = stringResource(R.string.overview_expenses),
+            text = "−" + Money.formatWithCurrency(expense),
+            tint = MaterialTheme.colorScheme.error,
+        )
+        if (other != 0L) {
+            StatementLine(
+                label = stringResource(R.string.overview_other),
+                text = (if (other > 0) "+" else "") + Money.formatWithCurrency(other),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
+    }
+}
+
+@Composable
+private fun StatementLine(label: String, text: String, tint: Color) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 3.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.weight(1f),
+        )
+        Text(
+            text = text,
+            style = MaterialTheme.typography.titleMedium.copy(fontFeatureSettings = "tnum"),
+            fontWeight = FontWeight.SemiBold,
+            color = tint,
+        )
     }
 }
 

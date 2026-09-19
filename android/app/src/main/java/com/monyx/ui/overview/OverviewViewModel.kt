@@ -39,18 +39,25 @@ data class OverviewUiState(
     val incomeMinor: Long = 0,
     val expenseMinor: Long = 0,
     /**
-     * Earned minus spent, for the selected month — whether the month came out
-     * ahead or behind.
+     * Where the selected accounts stood when the month began: their position
+     * at the end of the month before, counted the same way as [balanceMinor].
      *
-     * This is the front of the card, and it is deliberately a rate rather than
-     * a position. The card used to headline the account balance instead, on the
-     * grounds that "we are 900 zł up in September" is not what "Bilans" means
-     * next to a strip of account buttons. True — but it made the month switcher
-     * above it pointless: September and March printed the same number, because
-     * what is in the account today has nothing to do with the month being
-     * looked at. Position has not been lost; it is on the account chips, and on
-     * the back of this card.
+     * The front of the card is a statement, not a rate. It opens with this,
+     * adds what came in, takes away what went out, and lands on the same figure
+     * as Stan kont on the back — the same money, laid out as the month that
+     * produced it. Earned-minus-spent on its own hid the fact that a month can
+     * start in the red, and read as room to spend that was not there.
      */
+    val carryOverMinor: Long = 0,
+    /**
+     * Whatever else moved the position this month: transfers to or from an
+     * account outside the selection (an archived trip fund, Poduszka when only
+     * Portfel is selected), income or spending booked on an archived account,
+     * and anything dated later this month. Zero most months, and not shown then.
+     * It is what makes the statement add up, by definition, rather than by luck.
+     */
+    val otherMinor: Long = 0,
+    /** carry-over + income − expenses + other, which is [balanceMinor]. */
     val netMinor: Long = 0,
     /** The thirty-day window, for the trend face only. See [balanceMinor]. */
     val windowIncomeMinor: Long = 0,
@@ -266,18 +273,25 @@ class OverviewViewModel(
                     Dates.iso(window.endInclusive),
                     accountIds,
                 ),
-                repository.monthTotals(selectedPeriod, accountIds),
+                combine(
+                    repository.monthTotals(selectedPeriod, accountIds),
+                    repository.accountBalancesThrough(
+                        Dates.iso(Dates.lastDayOf(Dates.shiftPeriod(selectedPeriod, -1))),
+                    ),
+                    ::Pair,
+                ),
                 repository.rootExpenseCategories(),
-            ) { spend, (accounts, asOf, deltas), daily, month, allCategories ->
+            ) { spend, (accounts, asOf, deltas), daily, (month, opening), allCategories ->
                 val breakdown = padBreakdown(spend, allCategories)
                 // Open accounts only, when nothing is filtered. An archived
                 // account is a closed envelope — Wallet's per-trip funds come
                 // across as these — and what is left in one is not money the
                 // household can reach. Spending on it still counts everywhere
                 // else on this screen; only the POSITION leaves it out.
-                val balanceMinor = asOf
-                    .filter { if (accountIds.isEmpty()) it.archived == 0 else it.id in accountIds }
-                    .sumOf { it.balanceMinor }
+                val counted: (AccountBalance) -> Boolean =
+                    { if (accountIds.isEmpty()) it.archived == 0 else it.id in accountIds }
+                val balanceMinor = asOf.filter(counted).sumOf { it.balanceMinor }
+                val carryOverMinor = opening.filter(counted).sumOf { it.balanceMinor }
                 val trend = trendSeries(
                     rows = daily,
                     from = window.start,
@@ -297,7 +311,9 @@ class OverviewViewModel(
                     // its budget is the whole reason to look back at one.
                     incomeMinor = month.incomeMinor,
                     expenseMinor = month.expenseMinor,
-                    netMinor = month.incomeMinor - month.expenseMinor,
+                    carryOverMinor = carryOverMinor,
+                    otherMinor = balanceMinor - carryOverMinor - month.incomeMinor + month.expenseMinor,
+                    netMinor = balanceMinor,
                     // The thirty days the chart on the back actually draws —
                     // the drawn window, not the query's, which reaches further
                     // back than the chart shows.
