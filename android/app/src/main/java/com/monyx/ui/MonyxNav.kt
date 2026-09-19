@@ -63,6 +63,9 @@ import com.monyx.DeepLink
 import com.monyx.Destinations
 import com.monyx.MonyxApp
 import com.monyx.R
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.foundation.shape.CircleShape
 import com.monyx.sync.SyncWorker
 import com.monyx.ui.add.AddScreen
 import com.monyx.ui.add.AddViewModel
@@ -545,46 +548,43 @@ private fun RowScope.AddTabItem(
                 this.selected = selected
                 contentDescription = addLabel
             },
-        contentAlignment = Alignment.TopCenter,
+        contentAlignment = Alignment.Center,
     ) {
-        // No label: a green plus is the whole message, and the word under it
-        // only pushed the button up off the bar's centre line. The name is
-        // still read out by TalkBack, from the semantics below.
-        // On the icons' line, not the bar's middle. Material draws the other
-        // tabs' 32dp indicator 12dp from the top, so their icons are centred
-        // 28dp down; a 44dp pill starting at 6dp shares that centre, and the
-        // five read as one row rather than four and a button dropped below.
-        AddIcon(modifier = Modifier.padding(top = 6.dp))
+        AddIcon()
     }
 }
 
 /**
- * The Add tab's icon, in a filled green pill that does not wait to be selected.
+ * The Add tab: a green disc as tall as the bar, with the plus and the word in it.
  *
- * A green glyph on the bar was still a glyph among four other glyphs — the same
- * size, the same weight, one hue apart. This is the tab the app exists for and
- * it is now the only filled shape down there, which is the difference between
- * "coloured differently" and "visible".
- *
- * Bigger than Material's 64x32 active indicator on purpose: it is the tab used
- * most, several times a day, and it should be the easiest thing on the bar to
- * hit with a thumb. 80x44 still fits the 80dp bar with its label.
+ * It is the tab used most, several times a day, so it takes the most room — top
+ * to bottom of the bar, 4dp short at each edge. A pill on the icons' line kept
+ * it the same height as the other tabs and read as one more tab; a disc filling
+ * the bar is the button. The label goes inside, where it is part of the button,
+ * rather than under it pushing the plus off-centre.
  */
 @Composable
 private fun AddIcon(modifier: Modifier = Modifier) {
-    Box(
+    Column(
         modifier = modifier
-            .width(80.dp)
-            .height(44.dp)
-            .clip(RoundedCornerShape(22.dp))
+            .size(NavigationBarHeight - 8.dp)
+            .clip(CircleShape)
             .background(ADD_ACCENT),
-        contentAlignment = Alignment.Center,
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
     ) {
         Icon(
             Icons.Filled.Add,
             contentDescription = null,
             tint = ADD_ON_ACCENT,
-            modifier = Modifier.size(30.dp),
+            modifier = Modifier.size(28.dp),
+        )
+        Text(
+            text = stringResource(R.string.nav_add),
+            color = ADD_ON_ACCENT,
+            style = MaterialTheme.typography.labelSmall,
+            fontWeight = FontWeight.SemiBold,
+            maxLines = 1,
         )
     }
 }
