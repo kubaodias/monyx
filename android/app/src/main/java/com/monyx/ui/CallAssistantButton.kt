@@ -7,20 +7,13 @@ import androidx.compose.material.icons.filled.Call
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.core.net.toUri
 import com.monyx.BuildConfig
 import com.monyx.R
-
-/**
- * Telnyx green. Bright enough that the icon on it has to be dark — the mark
- * belongs to the platform the assistant runs on, so it is a literal rather
- * than a theme colour, and it stays itself in the dark theme.
- */
-private val TelnyxGreen = Color(0xFF00E3AA)
-private val OnTelnyxGreen = Color(0xFF10201B)
+import com.monyx.ui.theme.OnTelnyxGreen
+import com.monyx.ui.theme.TelnyxGreen
 
 /**
  * Calls the voice assistant.

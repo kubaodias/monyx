@@ -436,7 +436,10 @@ internal fun LegendTotal(total: Long, trailing: Dp = 36.dp) {
             text = stringResource(R.string.currency_suffix),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center,
+            // Against the figure it qualifies, not floating in the middle of
+            // the column: "4 189,24 zł" reads as one amount, "4 189,24   zł"
+            // as a number and a stray word.
+            textAlign = TextAlign.Start,
             modifier = Modifier.width(trailing - 8.dp),
         )
     }
