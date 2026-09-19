@@ -62,6 +62,9 @@ data class OverviewUiState(
      * Follows the account filter, so with everything selected — the default —
      * it is the household's total, and selecting one account narrows it to that
      * account's own balance.
+     *
+     * "Everything" is every OPEN account. An archived one is a closed envelope,
+     * and its leftover is not part of where the household stands.
      */
     val balanceMinor: Long = 0,
     /**
@@ -267,8 +270,13 @@ class OverviewViewModel(
                 repository.rootExpenseCategories(),
             ) { spend, (accounts, asOf, deltas), daily, month, allCategories ->
                 val breakdown = padBreakdown(spend, allCategories)
+                // Open accounts only, when nothing is filtered. An archived
+                // account is a closed envelope — Wallet's per-trip funds come
+                // across as these — and what is left in one is not money the
+                // household can reach. Spending on it still counts everywhere
+                // else on this screen; only the POSITION leaves it out.
                 val balanceMinor = asOf
-                    .filter { accountIds.isEmpty() || it.id in accountIds }
+                    .filter { if (accountIds.isEmpty()) it.archived == 0 else it.id in accountIds }
                     .sumOf { it.balanceMinor }
                 val trend = trendSeries(
                     rows = daily,

@@ -555,6 +555,14 @@ interface MonyxDao {
      * reason the query exists: a line drawn from earning and spending alone
      * would ignore the 2 000 zł that left the current account for the savings
      * one, and then disagree with the balance printed above it.
+     *
+     * "Every account" means every OPEN one here, and this is the one place it
+     * does. A balance is money you can still reach, and an archived account is
+     * a closed envelope: the holiday fund that paid for July is not part of
+     * where the household stands in September. So unfiltered, a set-aside moved
+     * INTO an archived fund is money leaving the total, and the fund's own
+     * spending moves nothing — the same rule the balance above the line
+     * follows, or the line would not end where the figure does.
      */
     @Query(
         """SELECT day, SUM(deltaMinor) AS deltaMinor FROM (
@@ -562,13 +570,17 @@ interface MonyxDao {
                     CASE WHEN kind = 'income' THEN amountMinor ELSE -amountMinor END AS deltaMinor
                FROM transactions
               WHERE deleted = 0 AND occurredOn >= :fromDay AND occurredOn <= :toDay
-                AND (:allAccounts = 1 OR accountId IN (:accountIds))
+                AND ((:allAccounts = 1 AND accountId IN
+                        (SELECT id FROM accounts WHERE archived = 0 AND deleted = 0))
+                     OR accountId IN (:accountIds))
              UNION ALL
              SELECT occurredOn AS day, amountMinor AS deltaMinor
                FROM transactions
               WHERE deleted = 0 AND kind = 'transfer' AND transferAccountId IS NOT NULL
                 AND occurredOn >= :fromDay AND occurredOn <= :toDay
-                AND (:allAccounts = 1 OR transferAccountId IN (:accountIds))
+                AND ((:allAccounts = 1 AND transferAccountId IN
+                        (SELECT id FROM accounts WHERE archived = 0 AND deleted = 0))
+                     OR transferAccountId IN (:accountIds))
            )
            GROUP BY day ORDER BY day"""
     )

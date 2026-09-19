@@ -20,6 +20,14 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 import androidx.core.view.WindowCompat
 
+/**
+ * Telnyx green. Bright enough that anything drawn ON it has to be dark — it
+ * belongs to the platform the assistant runs on, so it is a literal rather
+ * than a theme colour, and it stays itself in the dark theme.
+ */
+val TelnyxGreen = Color(0xFF00E3AA)
+val OnTelnyxGreen = Color(0xFF10201B)
+
 private val Green = Color(0xFF00875A)
 private val GreenLight = Color(0xFF57C99A)
 private val Ink = Color(0xFF14181F)

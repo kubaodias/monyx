@@ -1,5 +1,11 @@
 package com.monyx.ui.add
 
+import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -19,10 +25,10 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.Repeat
 import androidx.compose.material.icons.filled.Wallet
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -213,44 +219,22 @@ fun AddScreen(
                     editAmount()
                 }
             },
+            // Last, below the subcategories, and always there: amount, note and
+            // category can be filled in in any order. It lives INSIDE the grid
+            // so that it scrolls with the categories instead of covering them —
+            // see CategoryGrid's footer.
+            footer = {
+                NoteField(
+                    value = state.note,
+                    onValueChange = viewModel::setNote,
+                    // The keys and the note are both bottom-of-screen inputs and
+                    // only one of them can be the one being answered. Tapping the
+                    // amount comes back the other way, and editAmount() drops
+                    // this field's focus first so the system keyboard goes with it.
+                    onFocused = { editing = Editing.Note },
+                )
+            },
             modifier = Modifier.weight(1f),
-        )
-
-        // Last, lowest, and ALWAYS there.
-        //
-        // It used to appear only once the keypad stood down, which made the
-        // screen a sequence: amount first, then everything else. That is the
-        // common order and it is not the only one — "wpisz co to było, zanim
-        // zapomnisz" is a real way to start, and so is tapping the category you
-        // are standing in front of. Nothing here needs to be filled in before
-        // anything else, and the screen should not have implied otherwise.
-        //
-        // The space it costs came out of the keypad and the save bar rather
-        // than out of the grid, which is what makes it affordable.
-        //
-        // It is also the same field as the edit sheet's, down to the padding.
-        // Two screens that both mean "anything to add?" have to look the same
-        // or the second one reads as a different question.
-        OutlinedTextField(
-            value = state.note,
-            onValueChange = viewModel::setNote,
-            label = { Text(stringResource(R.string.add_note_hint)) },
-            singleLine = true,
-            // A note is a sentence fragment ("Zakupy na weekend"), so the
-            // keyboard opens shifted. A hint only: shift still wins for
-            // "iPhone".
-            keyboardOptions = KeyboardOptions(
-                capitalization = KeyboardCapitalization.Sentences,
-            ),
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 4.dp)
-                // The keys and the note are both bottom-of-screen inputs and
-                // only one of them can be the one being answered. Tapping
-                // the amount comes back the other way, and editAmount()
-                // drops this field's focus first so the system keyboard goes
-                // with it.
-                .onFocusChanged { if (it.isFocused) editing = Editing.Note },
         )
 
         if (editing == Editing.Amount) {
@@ -423,6 +407,54 @@ private fun ContextRow(
             icon = { Icon(Icons.Filled.Repeat, contentDescription = null, modifier = Modifier.size(16.dp)) },
             label = stringResource(R.string.add_make_recurring),
             onClick = onMakeRecurring,
+        )
+    }
+}
+
+/**
+ * The note, at 44dp rather than a text field's usual 56.
+ *
+ * The full-size field carries a floating label, and the label is what costs the
+ * height: it needs a line of its own once there is text under it. A note is one
+ * short line wanted on one transaction in ten, so it gets a hint instead — the
+ * word "Notatka" in the empty box, gone the moment anything is typed — and the
+ * same outline every other field in the app has.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun NoteField(
+    value: String,
+    onValueChange: (String) -> Unit,
+    onFocused: () -> Unit,
+) {
+    val interaction = remember { MutableInteractionSource() }
+    val colors = OutlinedTextFieldDefaults.colors()
+    BasicTextField(
+        value = value,
+        onValueChange = onValueChange,
+        singleLine = true,
+        textStyle = MaterialTheme.typography.bodyLarge.copy(color = MaterialTheme.colorScheme.onSurface),
+        cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+        // A note is a sentence fragment ("Zakupy na weekend"), so the keyboard
+        // opens shifted. A hint only: shift still wins for "iPhone".
+        keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
+        interactionSource = interaction,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 4.dp, vertical = 4.dp)
+            .height(44.dp)
+            .onFocusChanged { if (it.isFocused) onFocused() },
+    ) { inner ->
+        OutlinedTextFieldDefaults.DecorationBox(
+            value = value,
+            innerTextField = inner,
+            enabled = true,
+            singleLine = true,
+            visualTransformation = VisualTransformation.None,
+            interactionSource = interaction,
+            placeholder = { Text(stringResource(R.string.add_note_hint)) },
+            colors = colors,
+            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 10.dp),
         )
     }
 }

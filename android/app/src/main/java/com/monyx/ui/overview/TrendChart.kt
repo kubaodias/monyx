@@ -136,8 +136,10 @@ data class TrendSeries(
  *
  * [deltas] is how far the balance moved each day, which is not the same as what
  * was earned and spent: a transfer between two accounts is neither, and it
- * still moves each of them. Empty means the unfiltered case, where the two
- * halves of every transfer cancel and the day's net is the day's move.
+ * still moves each of them. Null means "use the day's net", which is only
+ * right when every account is counted and none is archived — tests use it for
+ * brevity. The screen always passes a list, and an EMPTY list means what it
+ * says: nothing moved the balance, even on a day an archived fund spent money.
  *
  * [rows] may reach back before [from] — the caller extends it to the 1st of the
  * window's first month — so that a day in the window's leading tail can still
@@ -151,7 +153,7 @@ fun trendSeries(
     from: LocalDate,
     to: LocalDate,
     endBalanceMinor: Long = 0L,
-    deltas: List<DailyDelta> = emptyList(),
+    deltas: List<DailyDelta>? = null,
 ): TrendSeries {
     val byDay = rows.associateBy { it.day }
     val last = if (to.isBefore(from)) from else to
@@ -181,13 +183,13 @@ fun trendSeries(
         day = day.plusDays(1)
     }
 
-    val deltaByDay = deltas.associate { it.day to it.deltaMinor }
+    val deltaByDay = deltas?.associate { it.day to it.deltaMinor }
     val running = arrayOfNulls<Long>(points.size)
     var balance = endBalanceMinor
     for (index in points.indices.reversed()) {
         running[index] = balance
         val point = points[index]
-        balance -= if (deltas.isEmpty()) point.netMinor else deltaByDay[point.date.toString()] ?: 0L
+        balance -= if (deltaByDay == null) point.netMinor else deltaByDay[point.date.toString()] ?: 0L
     }
 
     return TrendSeries(

@@ -213,6 +213,16 @@ internal fun CategoryGrid(
     colorOf: (CategoryEntity) -> Color,
     onSelect: (String) -> Unit,
     modifier: Modifier = Modifier,
+    /**
+     * Full width, after everything else — the add screen puts its note here.
+     *
+     * Inside the grid rather than under it, because under it the note took its
+     * height out of the grid's window and sat on top of the subcategories: the
+     * family you had just opened slid behind a text field. As the last item it
+     * scrolls WITH the categories, never covers one, and the only thing that
+     * can hide it is the keypad below.
+     */
+    footer: (@Composable () -> Unit)? = null,
 ) {
     val roots = remember(categories) {
         categories.filter { it.parentId == null }.sortedBy { it.sortOrder }
@@ -265,6 +275,9 @@ internal fun CategoryGrid(
                     onClick = { onSelect(if (category.id == selectedId) openRootId else category.id) },
                 )
             }
+        }
+        footer?.let { content ->
+            item(key = "footer", span = { GridItemSpan(maxLineSpan) }) { content() }
         }
     }
 }

@@ -1,6 +1,5 @@
 package com.monyx.ui
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
@@ -30,6 +29,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.monyx.R
 import com.monyx.data.Dates
+import com.monyx.ui.theme.TelnyxGreen
 
 /**
  * A month with an arrow either side, and a picker behind the title.
@@ -84,30 +84,23 @@ fun MonthSwitcher(
                 text = Dates.monthLabel(period),
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold,
-                // The accent, not plain onSurface. It is the one word on the
-                // screen that says what every figure below it is about, and it
-                // is also a button — the colour does both jobs at once, and
-                // matches the other things on these screens you can tap.
-                //
-                // On the accent's own wash, which is what finally makes it look
-                // like the control it is. Green text alone was the same weight
-                // of ink as the two arrows beside it; a pill has an edge, and
-                // an edge is what the eye reads as "press here". The text stays
-                // the deep green rather than going bright: the brand's green is
-                // a fill colour, and the same hue as type on a near-white card
-                // is a legibility problem before it is a branding one.
-                color = MaterialTheme.colorScheme.primary,
+                // Telnyx green, the same literal the call button is filled
+                // with. It is the one word on the screen that says what every
+                // figure below it is about, and it is also a button; bare text
+                // in the brand colour does both jobs. A pill behind it was
+                // tried and taken back out — it made the switcher read as a
+                // badge rather than as a heading.
+                color = TelnyxGreen,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier
-                    .clip(RoundedCornerShape(14.dp))
-                    .background(MaterialTheme.colorScheme.primaryContainer)
+                    .clip(RoundedCornerShape(12.dp))
                     // onClickLabel rather than a contentDescription: the label
                     // describes the ACTION and leaves the month name as the node's
                     // text. Overriding the description would announce "choose a
                     // month" and swallow which month is on.
                     .clickable(onClickLabel = openPicker) { picking = true }
-                    .padding(horizontal = 16.dp, vertical = 6.dp),
+                    .padding(horizontal = 12.dp, vertical = 4.dp),
             )
             IconButton(onClick = { onSelect(Dates.shiftPeriod(period, 1)) }) {
                 Icon(
