@@ -545,12 +545,16 @@ private fun RowScope.AddTabItem(
                 this.selected = selected
                 contentDescription = addLabel
             },
-        contentAlignment = Alignment.Center,
+        contentAlignment = Alignment.TopCenter,
     ) {
         // No label: a green plus is the whole message, and the word under it
         // only pushed the button up off the bar's centre line. The name is
         // still read out by TalkBack, from the semantics below.
-        AddIcon()
+        // On the icons' line, not the bar's middle. Material draws the other
+        // tabs' 32dp indicator 12dp from the top, so their icons are centred
+        // 28dp down; a 44dp pill starting at 6dp shares that centre, and the
+        // five read as one row rather than four and a button dropped below.
+        AddIcon(modifier = Modifier.padding(top = 6.dp))
     }
 }
 
@@ -567,9 +571,9 @@ private fun RowScope.AddTabItem(
  * hit with a thumb. 80x44 still fits the 80dp bar with its label.
  */
 @Composable
-private fun AddIcon() {
+private fun AddIcon(modifier: Modifier = Modifier) {
     Box(
-        modifier = Modifier
+        modifier = modifier
             .width(80.dp)
             .height(44.dp)
             .clip(RoundedCornerShape(22.dp))
