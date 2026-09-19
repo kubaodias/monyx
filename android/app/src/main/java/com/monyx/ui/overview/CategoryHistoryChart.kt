@@ -20,6 +20,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -376,6 +377,54 @@ fun CategoryHistoryLegend(
                 }
             }
         }
+        LegendTotal(total = visibleTotal(categories, hidden, amounts))
+    }
+}
+
+/**
+ * What the rows above add up to — the hidden ones left out.
+ *
+ * Hidden is the whole point of the figure. The list is a set of categories you
+ * have chosen to look at, and a total that quietly included the ones you took
+ * off the chart would not be the total of anything on screen. It is the same
+ * rule the bars and the budget line already follow.
+ */
+internal fun visibleTotal(
+    categories: List<HistoryCategory>,
+    hidden: Set<String>,
+    amounts: Map<String, Long>,
+): Long = categories.filterNot { it.id in hidden }.sumOf { amounts[it.id] ?: 0L }
+
+/**
+ * The sum, set off from the list by a rule rather than by weight alone.
+ *
+ * Indented to the same column as the category names — the coloured dot's width
+ * plus its gap — so the figure lines up under the figures it adds, which is the
+ * only thing that makes it readable as a total rather than one more row.
+ */
+@Composable
+private fun LegendTotal(total: Long) {
+    HorizontalDivider(
+        modifier = Modifier.padding(top = 6.dp, bottom = 2.dp),
+        color = MaterialTheme.colorScheme.outlineVariant,
+    )
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier.fillMaxWidth().padding(end = 36.dp, top = 2.dp, bottom = 6.dp),
+    ) {
+        Spacer(modifier = Modifier.width(20.dp))
+        Text(
+            text = stringResource(R.string.overview_history_total),
+            style = MaterialTheme.typography.bodyMedium,
+            fontWeight = FontWeight.SemiBold,
+            modifier = Modifier.weight(1f),
+        )
+        Spacer(modifier = Modifier.width(8.dp))
+        Text(
+            text = Money.format(total),
+            style = MaterialTheme.typography.bodyMedium,
+            fontWeight = FontWeight.SemiBold,
+        )
     }
 }
 

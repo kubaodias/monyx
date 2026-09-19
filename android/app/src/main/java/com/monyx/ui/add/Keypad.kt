@@ -64,11 +64,18 @@ fun Keypad(
     // language recomposes the key instead of leaving a stale comma behind.
     val separator = AmountInput.decimalSeparator(LocalConfiguration.current.locales[0])
 
+    // Phone order — 1 2 3 on top — not calculator order. This is a phone, and
+    // the layout every other number on it is typed into ascends downward; a
+    // household entering an expense is dialling a figure, not operating a till.
+    //
+    // The right-hand column does NOT flip with them. Those are three unrelated
+    // controls that happen to share a column, and the only thing moving them
+    // would achieve is putting backspace somewhere new.
     val rows = listOf(
         listOf(
-            Key("7", KeyAction.Digit('7')),
-            Key("8", KeyAction.Digit('8')),
-            Key("9", KeyAction.Digit('9')),
+            Key("1", KeyAction.Digit('1')),
+            Key("2", KeyAction.Digit('2')),
+            Key("3", KeyAction.Digit('3')),
             Key("−", KeyAction.Operator('-'), Emphasis.Function),
         ),
         listOf(
@@ -78,9 +85,9 @@ fun Keypad(
             Key("+", KeyAction.Operator('+'), Emphasis.Function),
         ),
         listOf(
-            Key("1", KeyAction.Digit('1')),
-            Key("2", KeyAction.Digit('2')),
-            Key("3", KeyAction.Digit('3')),
+            Key("7", KeyAction.Digit('7')),
+            Key("8", KeyAction.Digit('8')),
+            Key("9", KeyAction.Digit('9')),
             Key("⌫", KeyAction.Backspace, Emphasis.Function),
         ),
         // Zero takes the width the "00" key used to have. Two zeros in one tap

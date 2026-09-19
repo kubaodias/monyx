@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.monyx.data.AccountBalance
+import com.monyx.data.CategoryRef
 import com.monyx.data.CategorySpend
 import com.monyx.data.Dates
 import com.monyx.data.MonyxRepository
@@ -63,6 +64,16 @@ data class OverviewUiState(
      * account's own balance.
      */
     val balanceMinor: Long = 0,
+    /**
+     * The month [balanceMinor] is the closing position OF, or null when it is
+     * simply where the accounts stand right now.
+     *
+     * Non-null for any month already over. A position is a running total, so
+     * "what is in the accounts" under a switcher set to June has to mean what
+     * was in them at the end of June — and the card has to say which of the two
+     * it is showing, because the numbers are equally plausible either way.
+     */
+    val balanceThroughPeriod: String? = null,
     val breakdown: List<CategorySpend> = emptyList(),
     /** Everything still open, for the selector at the top. */
     val accounts: List<AccountBalance> = emptyList(),
@@ -85,6 +96,27 @@ private fun emptyState(period: String): OverviewUiState {
         period = period,
         trend = trendSeries(emptyList(), window.start, window.endInclusive),
     )
+}
+
+/**
+ * The month's breakdown with every untouched category appended at zero.
+ *
+ * The query starts from transactions, so a category nothing was spent on in the
+ * month has no row at all and drops out of the legend. That is a real answer —
+ * "nothing" — and it was being shown as absence. The pie itself is unaffected: a
+ * zero slice sweeps zero degrees.
+ *
+ * Order is preserved: the query already sorts by amount descending, and the
+ * zeros go after it in the household's own category order.
+ */
+internal fun padBreakdown(
+    spend: List<CategorySpend>,
+    allCategories: List<CategoryRef>,
+): List<CategorySpend> {
+    val seen = spend.map { it.categoryId }.toSet()
+    return spend + allCategories
+        .filterNot { it.id in seen }
+        .map { CategorySpend(categoryId = it.id, name = it.name, color = it.color, icon = it.icon, spentMinor = 0L) }
 }
 
 /** A window with its months but no spending in them yet, for the first frame. */
@@ -194,16 +226,30 @@ class OverviewViewModel(
     val uiState: StateFlow<OverviewUiState> = combine(period, selectedAccounts, ::Pair)
         .flatMapLatest { (selectedPeriod, accountIds) ->
             val window = trendWindow(selectedPeriod)
+            // A month already over gets its own closing position; the current one
+            // — and any dated forward — keeps meaning "right now", which is what
+            // the account chips beside it mean too.
+            val closed = selectedPeriod < Dates.currentPeriod()
+            val balances = if (closed) {
+                repository.accountBalancesThrough(Dates.iso(Dates.lastDayOf(selectedPeriod)))
+            } else {
+                repository.accountBalances()
+            }
             combine(
                 repository.spendByCategory(selectedPeriod, accountIds),
-                repository.accountBalances(),
+                // Two balance queries, zipped: the chips always show where the
+                // accounts stand today, whatever month the card's headline is
+                // about. One list cannot answer both.
+                combine(repository.accountBalances(), balances, ::Pair),
                 repository.dailyTotals(
                     Dates.iso(window.start),
                     Dates.iso(window.endInclusive),
                     accountIds,
                 ),
                 repository.monthTotals(selectedPeriod, accountIds),
-            ) { breakdown, accounts, daily, month ->
+                repository.rootExpenseCategories(),
+            ) { spend, (accounts, asOf), daily, month, allCategories ->
+                val breakdown = padBreakdown(spend, allCategories)
                 OverviewUiState(
                     period = selectedPeriod,
                     // The MONTH, because that is the question the card is under:
@@ -220,9 +266,10 @@ class OverviewViewModel(
                     // which one it is answering.
                     windowIncomeMinor = daily.sumOf { it.incomeMinor },
                     windowExpenseMinor = daily.sumOf { it.expenseMinor },
-                    balanceMinor = accounts
+                    balanceMinor = asOf
                         .filter { accountIds.isEmpty() || it.id in accountIds }
                         .sumOf { it.balanceMinor },
+                    balanceThroughPeriod = selectedPeriod.takeIf { closed },
                     breakdown = breakdown,
                     // An archived account is not offered as a chip, but its
                     // transactions are still in every unfiltered figure above.
@@ -250,12 +297,18 @@ class OverviewViewModel(
      * Follows the account filter, so flipping the card cannot quietly widen
      * what is being counted.
      *
-     * The budget limits it draws over the bars do NOT follow that filter,
-     * because they cannot: a limit is the household's, and there is no such
-     * thing as the grocery budget for the current account. So with an account
-     * filter on, the limits are dropped rather than drawn over a fraction of
-     * the spending — a household line above one account's bars would read as
-     * comfortably under budget every month of the year.
+     * The budget limits it draws over the bars cannot follow that filter — a
+     * limit is the household's, and there is no such thing as the grocery budget
+     * for the current account — so they are drawn whatever the filter says.
+     *
+     * They used to be dropped instead, on the argument that a household line
+     * above one account's bars reads as comfortably under budget all year. The
+     * argument is sound and the behaviour was still wrong: turning an account
+     * off made the red line vanish with no explanation on screen, which reads as
+     * a bug rather than as a refusal to answer. The line is the one fixed
+     * reference on the chart, and a reference that disappears when you narrow
+     * the view is worse than one you have to interpret. Filtering accounts
+     * narrows the bars; the household's limit is what it always was.
      */
     @OptIn(ExperimentalCoroutinesApi::class)
     val history: StateFlow<CategoryHistory> = combine(period, selectedAccounts, ::Pair)
@@ -264,12 +317,14 @@ class OverviewViewModel(
             combine(
                 repository.spendByCategoryPerMonth(periods.first(), periods.last(), accountIds),
                 repository.budgetLimitsThrough(periods.last()),
-            ) { rows, limits ->
+                repository.rootExpenseCategories(),
+            ) { rows, limits, allCategories ->
                 categoryHistory(
                     rows = rows,
                     periods = periods,
                     selectedPeriod = selectedPeriod,
-                    budgets = if (accountIds.isEmpty()) limits else emptyList(),
+                    budgets = limits,
+                    allCategories = allCategories,
                 )
             }
         }

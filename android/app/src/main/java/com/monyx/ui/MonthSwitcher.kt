@@ -83,6 +83,11 @@ fun MonthSwitcher(
                 text = Dates.monthLabel(period),
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.SemiBold,
+                // The accent, not plain onSurface. It is the one word on the
+                // screen that says what every figure below it is about, and it
+                // is also a button — the colour does both jobs at once, and
+                // matches the other things on these screens you can tap.
+                color = MaterialTheme.colorScheme.primary,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier

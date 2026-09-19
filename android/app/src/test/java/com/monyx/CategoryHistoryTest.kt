@@ -1,6 +1,8 @@
 package com.monyx
 
 import com.monyx.data.BudgetLimit
+import com.monyx.data.CategoryRef
+import com.monyx.data.CategorySpend
 import com.monyx.data.MonthlyCategorySpend
 import com.monyx.ui.overview.HISTORY_MONTHS
 import com.monyx.ui.overview.LegendAmount
@@ -11,7 +13,10 @@ import com.monyx.ui.overview.historyWindow
 import com.monyx.ui.overview.legendAmounts
 import com.monyx.ui.overview.legendOrder
 import com.monyx.ui.overview.monthIndexAt
+import com.monyx.ui.overview.padBreakdown
+import com.monyx.ui.overview.visibleTotal
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -614,5 +619,155 @@ class CategoryHistoryTest {
         // Hiding the funded one leaves the zero behind, which is a line at the
         // floor rather than no line: the household still budgeted for food.
         assertEquals(0L, months.last().budgetMinor(setOf("fun")))
+    }
+}
+
+// ---------------------------------------------------------------------------
+
+/**
+ * A category nobody spent on this month is an ANSWER — "nothing" — and it was
+ * being shown as absence. Both charts pad their query results with the full
+ * category list so the row is there to read and to tap.
+ */
+class UntouchedCategoriesTest {
+
+    private val today = LocalDate.of(2026, 9, 17)
+
+    private fun spend(period: String, id: String, minor: Long) =
+        MonthlyCategorySpend(period, id, id.replaceFirstChar { it.uppercase() }, null, minor)
+
+    private fun ref(id: String) = CategoryRef(id, id.replaceFirstChar { it.uppercase() }, null, null)
+
+    @Test
+    fun `a category with no spending all year still gets a legend row`() {
+        val history = categoryHistory(
+            rows = listOf(spend("2026-07", "food", 30000)),
+            periods = historyWindow("2026-09", today),
+            selectedPeriod = "2026-09",
+            today = today,
+            allCategories = listOf(ref("food"), ref("toys")),
+        )
+        assertEquals(listOf("food", "toys"), history.categories.map { it.id })
+        assertEquals(0L, history.categories.last().averageMinor)
+        assertEquals(0L, history.categories.last().totalMinor)
+    }
+
+    /** It must not displace the real row, or the name and colour the JOIN
+     *  resolved would be replaced by the bare category's. */
+    @Test
+    fun `a category that was spent on keeps the row the query built`() {
+        val history = categoryHistory(
+            rows = listOf(spend("2026-07", "food", 30000)),
+            periods = historyWindow("2026-09", today),
+            selectedPeriod = "2026-09",
+            today = today,
+            allCategories = listOf(ref("food")),
+        )
+        assertEquals(1, history.categories.size)
+        assertTrue(history.categories.single().averageMinor > 0)
+    }
+
+    /** The zeros sink: the list is still ordered by what things cost. */
+    @Test
+    fun `untouched categories sort below everything that cost something`() {
+        val history = categoryHistory(
+            rows = listOf(spend("2026-07", "fuel", 10000), spend("2026-07", "food", 30000)),
+            periods = historyWindow("2026-09", today),
+            selectedPeriod = "2026-09",
+            today = today,
+            allCategories = listOf(ref("toys"), ref("food"), ref("fuel")),
+        )
+        assertEquals(listOf("food", "fuel", "toys"), history.categories.map { it.id })
+    }
+
+    /**
+     * Padding must not make an untouched household look like a busy one. The
+     * placeholder is what belongs on screen when nothing has been spent, and it
+     * used to be chosen by "are there any categories" — which padding makes
+     * true for every household on earth.
+     */
+    @Test
+    fun `a full category list with no spending is still an empty chart`() {
+        val history = categoryHistory(
+            rows = emptyList(),
+            periods = historyWindow("2026-09", today),
+            selectedPeriod = "2026-09",
+            today = today,
+            allCategories = listOf(ref("food"), ref("toys")),
+        )
+        assertTrue(history.isEmpty)
+        assertEquals(2, history.categories.size)
+    }
+
+    @Test
+    fun `one spent penny anywhere in the window is not an empty chart`() {
+        val history = categoryHistory(
+            rows = listOf(spend("2026-03", "food", 1)),
+            periods = historyWindow("2026-09", today),
+            selectedPeriod = "2026-09",
+            today = today,
+            allCategories = listOf(ref("food"), ref("toys")),
+        )
+        assertFalse(history.isEmpty)
+    }
+
+    // ------------------------------------------------------------- the pie
+
+    @Test
+    fun `the pie's untouched categories land after the ones with spending`() {
+        val padded = padBreakdown(
+            spend = listOf(CategorySpend("food", "Food", null, null, 30000)),
+            allCategories = listOf(ref("food"), ref("toys"), ref("fuel")),
+        )
+        assertEquals(listOf("food", "toys", "fuel"), padded.map { it.categoryId })
+        assertEquals(30000L, padded.first().spentMinor)
+        assertTrue(padded.drop(1).all { it.spentMinor == 0L })
+    }
+
+    @Test
+    fun `padding the pie never duplicates a category`() {
+        val padded = padBreakdown(
+            spend = listOf(CategorySpend("food", "Food", null, null, 30000)),
+            allCategories = listOf(ref("food")),
+        )
+        assertEquals(1, padded.size)
+    }
+}
+
+/**
+ * The legend's total. It adds up what is ON the chart, which is the whole
+ * reason it is worth printing: a figure that quietly included the categories
+ * you had just switched off would not be the total of anything visible.
+ */
+class LegendTotalTest {
+
+    private fun category(id: String) = HistoryCategory(id, id, null, 0L, 0L)
+
+    @Test
+    fun `the total is what the visible rows add up to`() {
+        val categories = listOf(category("food"), category("fuel"), category("toys"))
+        val amounts = mapOf("food" to 30000L, "fuel" to 10000L, "toys" to 500L)
+        assertEquals(40500L, visibleTotal(categories, emptySet(), amounts))
+    }
+
+    @Test
+    fun `a hidden category is left out of it`() {
+        val categories = listOf(category("food"), category("fuel"))
+        val amounts = mapOf("food" to 30000L, "fuel" to 10000L)
+        assertEquals(30000L, visibleTotal(categories, setOf("fuel"), amounts))
+    }
+
+    @Test
+    fun `hiding everything totals nothing, rather than everything`() {
+        val categories = listOf(category("food"), category("fuel"))
+        val amounts = mapOf("food" to 30000L, "fuel" to 10000L)
+        assertEquals(0L, visibleTotal(categories, setOf("food", "fuel"), amounts))
+    }
+
+    /** A padded row has no entry in the amounts map for a month it never
+     *  appeared in; it must count as zero, not blow up the sum. */
+    @Test
+    fun `a category the amounts map has never heard of counts as nothing`() {
+        assertEquals(30000L, visibleTotal(listOf(category("food"), category("toys")), emptySet(), mapOf("food" to 30000L)))
     }
 }

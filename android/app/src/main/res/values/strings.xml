@@ -47,6 +47,7 @@
     <string name="overview_income">Income</string>
     <string name="overview_expenses">Expenses</string>
     <string name="overview_account_total">In the accounts</string>
+    <string name="overview_account_total_through">In the accounts, end of %1$s</string>
     <string name="overview_balance">Balance</string>
     <string name="overview_breakdown">Where the money goes</string>
     <string name="overview_breakdown_history">Spending over 12 months</string>
@@ -56,6 +57,7 @@
     <string name="overview_history_average">Average per month</string>
     <string name="overview_history_hide_all">Hide all</string>
     <string name="overview_history_show_all">Show all</string>
+    <string name="overview_history_total">Total</string>
     <string name="overview_history_hide_one">Hide %1$s</string>
     <string name="overview_history_show_one">Show %1$s</string>
     <string name="overview_history_empty">Nothing spent in the last 12 months</string>
@@ -99,14 +101,14 @@
     <string name="transactions_delete_confirm_message">This cannot be undone.</string>
 
     <!-- Budget -->
-    <string name="budget_plan_to_assign">Left to assign</string>
+    <string name="budget_plan_to_assign">Left to plan</string>
     <string name="budget_plan_edit">Plan for this month</string>
     <string name="budget_plan_none">No plan yet. Set how much there is to spend this month.</string>
     <string name="budget_plan_total">To spend this month</string>
     <string name="budget_plan_assigned">Assigned to categories</string>
     <string name="budget_plan_spent">Spent</string>
     <string name="budget_plan_left_to_spend">Left to spend</string>
-    <string name="budget_plan_assigned_hint">Already assigned: %1$s · left to assign: %2$s</string>
+    <string name="budget_plan_assigned_hint">Already assigned: %1$s · left to plan: %2$s</string>
     <string name="budget_empty">No limits set yet</string>
     <string name="budget_set_limit">Set a limit</string>
     <string name="budget_edit_limit">Change limit</string>
