@@ -8,6 +8,7 @@ import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
@@ -27,6 +28,20 @@ import androidx.core.view.WindowCompat
  */
 val TelnyxGreen = Color(0xFF00E3AA)
 val OnTelnyxGreen = Color(0xFF10201B)
+
+/**
+ * Telnyx green for TEXT. The literal glows — right for a button face, too
+ * loud for a heading that sits there all the time — so type takes the same
+ * hue pulled back: deeper on the light background, softer on the dark one.
+ */
+val TelnyxGreenText: Color
+    @Composable
+    @ReadOnlyComposable
+    get() = if (MaterialTheme.colorScheme.background.luminance() < 0.5f) {
+        Color(0xFF5FC7A6)
+    } else {
+        Color(0xFF00805F)
+    }
 
 private val Green = Color(0xFF00875A)
 private val GreenLight = Color(0xFF57C99A)
