@@ -182,7 +182,7 @@ fun PieChart(
             // it is needed again here: a column of numbers the eye has just
             // been reading down ends with the question "so how much is that
             // altogether" — asking it should not mean looking back up.
-            LegendTotal(total = total, trailing = 48.dp)
+            LegendTotal(total = total, column = 40.dp, gap = 8.dp)
         }
     }
 }
