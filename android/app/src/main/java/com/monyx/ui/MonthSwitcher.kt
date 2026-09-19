@@ -29,7 +29,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.monyx.R
 import com.monyx.data.Dates
-import com.monyx.ui.theme.TelnyxGreenText
+import com.monyx.ui.theme.AddGreen
 
 /**
  * A month with an arrow either side, and a picker behind the title.
@@ -90,7 +90,7 @@ fun MonthSwitcher(
                 // in the brand colour does both jobs. A pill behind it was
                 // tried and taken back out — it made the switcher read as a
                 // badge rather than as a heading.
-                color = TelnyxGreenText,
+                color = AddGreen,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier

@@ -70,7 +70,9 @@ import com.monyx.ui.onboarding.OnboardingScreen
 import com.monyx.ui.overview.OverviewScreen
 import com.monyx.ui.settings.SettingsScreen
 import com.monyx.ui.theme.MonyxMark
-import com.monyx.ui.theme.Palette
+import androidx.compose.foundation.layout.size
+import androidx.compose.ui.text.font.FontWeight
+import com.monyx.ui.theme.AddGreen
 import com.monyx.ui.transactions.TransactionsScreen
 import com.monyx.ui.update.UpdateDialog
 import com.monyx.voice.EdgeNoteWriter
@@ -547,7 +549,8 @@ private fun RowScope.AddTabItem(
             Text(
                 text = stringResource(R.string.nav_add),
                 color = ADD_ACCENT,
-                style = MaterialTheme.typography.labelMedium,
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.SemiBold,
             )
         }
     }
@@ -561,22 +564,28 @@ private fun RowScope.AddTabItem(
  * it is now the only filled shape down there, which is the difference between
  * "coloured differently" and "visible".
  *
- * 64x32 is Material's own active-indicator size, so the pill sits exactly where
- * the other tabs' selection indicators sit and the row of five reads as one row.
+ * Bigger than Material's 64x32 active indicator on purpose: it is the tab used
+ * most, several times a day, and it should be the easiest thing on the bar to
+ * hit with a thumb. 80x44 still fits the 80dp bar with its label.
  */
 @Composable
 private fun AddIcon() {
     Box(
         modifier = Modifier
-            .width(64.dp)
-            .height(32.dp)
-            .clip(RoundedCornerShape(16.dp))
+            .width(80.dp)
+            .height(44.dp)
+            .clip(RoundedCornerShape(22.dp))
             .background(ADD_ACCENT),
         contentAlignment = Alignment.Center,
     ) {
-        Icon(Icons.Filled.Add, contentDescription = null, tint = ADD_ON_ACCENT)
+        Icon(
+            Icons.Filled.Add,
+            contentDescription = null,
+            tint = ADD_ON_ACCENT,
+            modifier = Modifier.size(30.dp),
+        )
     }
 }
 
-private val ADD_ACCENT = Palette.color("green")
+private val ADD_ACCENT = AddGreen
 private val ADD_ON_ACCENT = Color.White
