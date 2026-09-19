@@ -5,6 +5,9 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
@@ -102,8 +105,12 @@ private data class Tab(
  * screen, and the other four icons centre themselves in the middle of it. That
  * shipped once; the bounds were [441,0][640,2337] against [0,1064][200,1274]
  * for its neighbours.
+ *
+ * 72 rather than Material's 80: the stock row left more air under the labels
+ * than above the icons. The items centre their icon-and-label block, so eight
+ * dp off the row comes four off each side, and the bar sits lower on the screen.
  */
-private val NavigationBarHeight = 80.dp
+private val NavigationBarHeight = 72.dp
 
 private val TABS = listOf(
     Tab(Destinations.OVERVIEW, R.string.nav_overview, MonyxMark),
@@ -328,7 +335,10 @@ private fun MainScaffold(
             if (route != Destinations.ADD) CallAssistantButton()
         },
         bottomBar = {
-            NavigationBar {
+            val navInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+            // A fixed height is the only way to take the row below Material's 80dp
+            // minimum; the system bar's inset is added back so it stays under it.
+            NavigationBar(modifier = Modifier.height(NavigationBarHeight + navInset)) {
                 TABS.forEach { tab ->
                     val selected = currentRoute?.hierarchy?.any { it.route == tab.route } == true
                     val isAdd = tab.route == Destinations.ADD
@@ -555,34 +565,41 @@ private fun RowScope.AddTabItem(
 }
 
 /**
- * The Add tab: a green disc as tall as the bar, with the plus and the word in it.
+ * The Add tab: a filled green rounded rectangle, cornered like the call button,
+ * holding the plus and the word.
  *
- * It is the tab used most, several times a day, so it takes the most room — top
- * to bottom of the bar, 4dp short at each edge. A pill on the icons' line kept
- * it the same height as the other tabs and read as one more tab; a disc filling
- * the bar is the button. The label goes inside, where it is part of the button,
- * rather than under it pushing the plus off-centre.
+ * Laid out exactly as the other tabs lay out theirs — a 32dp icon slot, 4dp, the
+ * label — and centred the same way, so the plus sits on the icons' line and
+ * "Dodaj" on the labels' line. The green is what sets it apart, not a different
+ * baseline. 4dp of bar shows above and below it.
  */
 @Composable
 private fun AddIcon(modifier: Modifier = Modifier) {
     Column(
         modifier = modifier
-            .size(NavigationBarHeight - 8.dp)
-            .clip(CircleShape)
-            .background(ADD_ACCENT),
+            .width(76.dp)
+            .height(NavigationBarHeight - 8.dp)
+            .clip(RoundedCornerShape(16.dp))
+            .background(ADD_ACCENT)
+            // Material's items sit their block 2dp above true centre; measured
+            // on a device, without this the plus and the word ride 2dp low.
+            .padding(bottom = 4.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
-        Icon(
-            Icons.Filled.Add,
-            contentDescription = null,
-            tint = ADD_ON_ACCENT,
-            modifier = Modifier.size(28.dp),
-        )
+        Box(modifier = Modifier.height(32.dp), contentAlignment = Alignment.Center) {
+            Icon(
+                Icons.Filled.Add,
+                contentDescription = null,
+                tint = ADD_ON_ACCENT,
+                modifier = Modifier.size(28.dp),
+            )
+        }
+        Spacer(Modifier.height(4.dp))
         Text(
             text = stringResource(R.string.nav_add),
             color = ADD_ON_ACCENT,
-            style = MaterialTheme.typography.labelSmall,
+            style = MaterialTheme.typography.labelMedium,
             fontWeight = FontWeight.SemiBold,
             maxLines = 1,
         )
