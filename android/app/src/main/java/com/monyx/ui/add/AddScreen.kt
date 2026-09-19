@@ -442,7 +442,7 @@ private fun ContextRow(
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun NoteField(
+internal fun NoteField(
     value: String,
     onValueChange: (String) -> Unit,
     onFocused: () -> Unit,
