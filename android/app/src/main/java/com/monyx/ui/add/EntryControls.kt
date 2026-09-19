@@ -48,6 +48,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.monyx.R
@@ -245,7 +246,7 @@ internal fun CategoryGrid(
         // line, and four columns multiply the saving by four.
         contentPadding = PaddingValues(horizontal = 8.dp, vertical = 10.dp),
         horizontalArrangement = Arrangement.spacedBy(4.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
+        verticalArrangement = if (footer != null) FooterToBottom else Arrangement.spacedBy(10.dp),
     ) {
         items(roots, key = { it.id }) { category ->
             CategoryCell(
@@ -278,6 +279,33 @@ internal fun CategoryGrid(
         }
         footer?.let { content ->
             item(key = "footer", span = { GridItemSpan(maxLineSpan) }) { content() }
+        }
+    }
+}
+
+/**
+ * 10dp between lines, like the grid without a footer — except the last line,
+ * which drops to the bottom edge when there is room for it to.
+ *
+ * With a short grid the note used to hang in the middle of the screen, just
+ * under the last row, with blank space between it and the keypad. Its place is
+ * the bottom of the window, right above the keys. A lazy grid only asks its
+ * arrangement where lines go when they all fit; once the categories are long
+ * enough to scroll, the note simply follows them, still last.
+ */
+private val FooterToBottom = object : Arrangement.Vertical {
+    override val spacing = 10.dp
+
+    override fun Density.arrange(totalSize: Int, sizes: IntArray, outPositions: IntArray) {
+        val gap = spacing.roundToPx()
+        var y = 0
+        sizes.forEachIndexed { i, size ->
+            outPositions[i] = y
+            y += size + gap
+        }
+        if (sizes.isNotEmpty()) {
+            val last = sizes.lastIndex
+            outPositions[last] = maxOf(outPositions[last], totalSize - sizes[last])
         }
     }
 }
