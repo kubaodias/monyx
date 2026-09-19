@@ -43,6 +43,7 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.res.stringResource
@@ -71,7 +72,6 @@ import com.monyx.ui.overview.OverviewScreen
 import com.monyx.ui.settings.SettingsScreen
 import com.monyx.ui.theme.MonyxMark
 import androidx.compose.foundation.layout.size
-import androidx.compose.ui.text.font.FontWeight
 import com.monyx.ui.theme.AddGreen
 import com.monyx.ui.transactions.TransactionsScreen
 import com.monyx.ui.update.UpdateDialog
@@ -520,6 +520,7 @@ private fun RowScope.AddTabItem(
 ) {
     val haptics = LocalHapticFeedback.current
     val holdLabel = stringResource(R.string.voice_hold_to_talk)
+    val addLabel = stringResource(R.string.nav_add)
     Box(
         modifier = Modifier
             .weight(1f)
@@ -540,19 +541,16 @@ private fun RowScope.AddTabItem(
                 },
                 onClick = onClick,
             )
-            .semantics { this.selected = selected },
+            .semantics {
+                this.selected = selected
+                contentDescription = addLabel
+            },
         contentAlignment = Alignment.Center,
     ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            AddIcon()
-            Spacer(Modifier.height(4.dp))
-            Text(
-                text = stringResource(R.string.nav_add),
-                color = ADD_ACCENT,
-                style = MaterialTheme.typography.labelLarge,
-                fontWeight = FontWeight.SemiBold,
-            )
-        }
+        // No label: a green plus is the whole message, and the word under it
+        // only pushed the button up off the bar's centre line. The name is
+        // still read out by TalkBack, from the semantics below.
+        AddIcon()
     }
 }
 
