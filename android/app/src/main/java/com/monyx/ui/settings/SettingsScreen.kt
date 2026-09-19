@@ -375,7 +375,7 @@ private fun MembersSection(members: List<MemberEntity>, myMemberId: String?) {
                         Text(
                             stringResource(
                                 R.string.settings_member_since,
-                                Dates.dayLabel(Dates.localDate(member.createdAt)),
+                                Dates.fullDayLabel(Dates.localDate(member.createdAt)),
                             ),
                             style = MaterialTheme.typography.bodySmall,
                             color = if (isMe) {
