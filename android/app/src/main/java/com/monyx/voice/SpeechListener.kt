@@ -78,10 +78,12 @@ interface Recogniser {
  * phone, and returns partial results while the sentence is still being said.
  *
  * `EXTRA_PREFER_OFFLINE` rather than createOnDeviceSpeechRecognizer(): the
- * on-device constructor is API 33 and a phone without the Polish pack would
- * fail outright, where this one quietly falls back to the network — which is
- * the better default when there IS a signal. An SDK branch that changes the
- * failure mode is more ways to be wrong than mapping the error codes.
+ * on-device constructor is API 33 and would not compile away cleanly below it.
+ *
+ * The flag does NOT fall back on its own, whatever its name suggests — a phone
+ * without the language downloaded fails with a language error and stops there.
+ * The fallback is [retriesOnline]: one more attempt without the flag, which is
+ * the behaviour this was always assumed to have.
  *
  * The recogniser must be created and driven on the main thread and delivers its
  * callbacks there, which is why every caller is a UI event and nothing here
@@ -94,7 +96,27 @@ class SpeechListener(private val context: Context) : Recogniser {
 
     private var recognizer: SpeechRecognizer? = null
 
+    /** The language of the listen in progress, for the one retry below. */
+    private var listeningTo: String? = null
+
+    /** Whether that listen asked for the on-device engine. */
+    private var preferredOffline = false
+
+    /**
+     * Whether the finger has come off the button since this listen began.
+     *
+     * The retry below reopens the microphone, and reopening it after the hold
+     * has ended would be a recorder nobody is talking into. The failure it
+     * retries arrives within a frame or two of starting, so in practice the
+     * hold is still down — and when it is not, the honest answer is the error.
+     */
+    private var released = false
+
     override fun start(languageTag: String) {
+        start(languageTag, offline = true)
+    }
+
+    private fun start(languageTag: String, offline: Boolean) {
         if (!isAvailable(context)) {
             _state.value = ListenState.Failed(ListenFailure.NoService)
             return
@@ -107,15 +129,21 @@ class SpeechListener(private val context: Context) : Recogniser {
             it.setRecognitionListener(listener)
             recognizer = it
         }
+        listeningTo = languageTag
+        preferredOffline = offline
+        released = false
         _state.value = ListenState.Listening
-        active.startListening(intentFor(languageTag))
+        active.startListening(intentFor(languageTag, offline))
     }
 
     override fun stop() {
+        released = true
         recognizer?.stopListening()
     }
 
     override fun cancel() {
+        released = true
+        listeningTo = null
         recognizer?.cancel()
         _state.value = ListenState.Idle
     }
@@ -126,7 +154,7 @@ class SpeechListener(private val context: Context) : Recogniser {
         _state.value = ListenState.Idle
     }
 
-    private fun intentFor(languageTag: String) =
+    private fun intentFor(languageTag: String, offline: Boolean) =
         Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
             putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
             putExtra(RecognizerIntent.EXTRA_LANGUAGE, languageTag)
@@ -135,7 +163,7 @@ class SpeechListener(private val context: Context) : Recogniser {
             // alternatives is the cheapest accuracy the parser will ever get.
             putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, MAX_RESULTS)
             putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
-            putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, true)
+            putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, offline)
             putExtra(RecognizerIntent.EXTRA_CALLING_PACKAGE, context.packageName)
         }
 
@@ -160,6 +188,22 @@ class SpeechListener(private val context: Context) : Recogniser {
         }
 
         override fun onError(error: Int) {
+            // One more go, over the network, before giving up.
+            //
+            // EXTRA_PREFER_OFFLINE does not mean "prefer". On Google's
+            // recogniser it means only, and a phone without the Polish pack
+            // downloaded answers ERROR_LANGUAGE_UNAVAILABLE instantly — so the
+            // feature was dead on exactly the phones it had never been tested
+            // on, under a message ("Speech is not available in this language")
+            // that blamed the language rather than a missing download. Asking
+            // again without the flag is what the comment above always claimed
+            // this did.
+            val retry = listeningTo
+            if (retry != null && preferredOffline && !released && retriesOnline(error)) {
+                start(retry, offline = false)
+                return
+            }
+            listeningTo = null
             _state.value = ListenState.Failed(failureOf(error))
         }
 
@@ -202,6 +246,21 @@ class SpeechListener(private val context: Context) : Recogniser {
          * this returns false on a phone that does have one.
          */
         fun isAvailable(context: Context): Boolean = SpeechRecognizer.isRecognitionAvailable(context)
+
+        /**
+         * Whether a failed on-device listen is worth one more try over the
+         * network.
+         *
+         * Only the two language codes. They are the ones that mean "this engine
+         * has not got that language", which the network engine usually has —
+         * everything else means the attempt itself went wrong, and asking a
+         * second time would only fail a second time more slowly. Silence in
+         * particular is NOT retried: nothing was said, and reopening the
+         * microphone on it would be a recorder that would not take no for an
+         * answer.
+         */
+        internal fun retriesOnline(error: Int): Boolean =
+            error == ERROR_LANGUAGE_NOT_SUPPORTED || error == ERROR_LANGUAGE_UNAVAILABLE
 
         private fun failureOf(error: Int): ListenFailure = when (error) {
             SpeechRecognizer.ERROR_NETWORK,

@@ -104,13 +104,15 @@ fun Keypad(
     )
 
     Column(
-        modifier = modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+        // A little air under the bottom row. The save bar used to provide it and
+        // is not always there any more, which left "0" sitting on the tab bar.
+        modifier = modifier.fillMaxWidth().padding(start = 8.dp, end = 8.dp, top = 2.dp, bottom = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         rows.forEach { row ->
             Row(
                 modifier = Modifier.fillMaxWidth().weight(1f),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
             ) {
                 row.forEach { key ->
                     KeyButton(
@@ -144,7 +146,7 @@ private fun KeyButton(
 
     Box(
         modifier = modifier
-            .clip(RoundedCornerShape(18.dp))
+            .clip(RoundedCornerShape(14.dp))
             .background(background)
             .clickable(enabled = enabled, onClick = onClick),
         contentAlignment = Alignment.Center,
@@ -158,7 +160,7 @@ private fun KeyButton(
             else -> Text(
                 text = key.label,
                 color = foreground,
-                fontSize = 26.sp,
+                fontSize = 22.sp,
                 fontWeight = FontWeight.Medium,
             )
         }

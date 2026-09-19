@@ -1,5 +1,6 @@
 package com.monyx
 
+import com.monyx.data.DailyDelta
 import com.monyx.data.DailyTotals
 import com.monyx.data.Dates
 import com.monyx.ui.overview.TREND_DAYS
@@ -146,20 +147,55 @@ class TrendTest {
             ),
             LocalDate.of(2026, 8, 3),
             LocalDate.of(2026, 8, 6),
+            endBalanceMinor = 5_000,
         )
         assertEquals(listOf(10_000L, 10_000L, 6_000L, 5_000L), series.runningMinor)
     }
 
+    /**
+     * The whole point of anchoring. The card prints a balance above the chart
+     * and the chart has to end on it — not approximately, not "the same if the
+     * window happens to line up", but by construction, because the line is
+     * counted backwards from that very figure.
+     *
+     * This is the bug the household actually hit: the headline read 7 975,30
+     * and the last day of the line, tapped, answered 2 820,63 — September's net,
+     * under a heading that said "Stan kont".
+     */
     @Test
-    fun `the last running figure is where the line ends, which is what the card shows`() {
+    fun `the line ends on the balance it was given, whatever moved during the window`() {
         val series = trendSeries(
-            listOf(day("2026-08-03", income = 3_000), day("2026-08-04", expense = 8_000)),
-            LocalDate.of(2026, 8, 3),
-            LocalDate.of(2026, 8, 4),
+            listOf(day("2026-09-10", income = 194_500), day("2026-09-15", expense = 40_000)),
+            LocalDate.of(2026, 9, 1),
+            LocalDate.of(2026, 9, 19),
+            endBalanceMinor = 797_530,
         )
-        assertEquals(-5_000L, series.monthToDateMinor)
-        assertEquals(series.monthToDateMinor, series.runningMinor.last())
-        assertEquals(series.monthToDateMinor, series.runningAt(1))
+        assertEquals(797_530L, series.closingMinor)
+        assertEquals(797_530L, series.runningMinor.last())
+        // And before the salary landed, it was 154 500 lower.
+        assertEquals(797_530L - 194_500L + 40_000L, series.runningMinor.first())
+    }
+
+    /**
+     * A transfer is neither earned nor spent, and it still empties an account.
+     * With one account selected the daily net says nothing happened on the day
+     * 2 000 zł left it for the savings account; the delta says it did.
+     */
+    @Test
+    fun `transfers move the line even though they are neither income nor expense`() {
+        val series = trendSeries(
+            rows = listOf(day("2026-09-02", expense = 5_000)),
+            from = LocalDate.of(2026, 9, 1),
+            to = LocalDate.of(2026, 9, 3),
+            endBalanceMinor = 93_000,
+            deltas = listOf(
+                DailyDelta("2026-09-02", -5_000),
+                DailyDelta("2026-09-03", -200_000),
+            ),
+        )
+        assertEquals(listOf(298_000L, 293_000L, 93_000L), series.runningMinor)
+        // The readout under the chart is unchanged: nothing was SPENT on the 3rd.
+        assertEquals(0L, series.points.last().expenseMinor)
     }
 
     @Test
@@ -168,20 +204,44 @@ class TrendTest {
             listOf(day("2026-08-03", income = 3_000)),
             LocalDate.of(2026, 8, 3),
             LocalDate.of(2026, 8, 4),
+            endBalanceMinor = 3_000,
         )
-        assertEquals(series.monthToDateMinor, series.runningAt(7))
+        assertEquals(series.closingMinor, series.runningAt(7))
     }
 
     // --------------------------------------------------- the turn of the month
 
     /**
-     * The reason any of this exists. The card's front prints the SELECTED
-     * month's balance; before the reset the back headlined the whole window's
-     * net, so a September that had barely started read 0,00 on one face and
-     * last month's payday on the other.
+     * A balance is not reset by the calendar. The line used to drop to zero on
+     * the 1st — correct for a chart of the month's net, and a cliff nobody's
+     * money ever went over for a chart of what is in the account.
      */
     @Test
-    fun `the run restarts on the first, so the line ends on the month's own balance`() {
+    fun `the line runs straight through the first of the month`() {
+        val series = trendSeries(
+            listOf(
+                day("2026-08-30", income = 800_000),
+                day("2026-08-31", expense = 50_000),
+                day("2026-09-01", expense = 12_000),
+                day("2026-09-02", expense = 3_000),
+            ),
+            LocalDate.of(2026, 8, 30),
+            LocalDate.of(2026, 9, 2),
+            endBalanceMinor = 735_000,
+        )
+        assertEquals(
+            listOf(800_000L, 750_000L, 738_000L, 735_000L),
+            series.runningMinor,
+        )
+    }
+
+    /**
+     * The two figures under the chart, once a day is being pointed at: what the
+     * MONTH had earned and spent by then. A single day's own pair is "0,00 and
+     * 0,00" five times out of six.
+     */
+    @Test
+    fun `the readout is the month to date, and it restarts on the first`() {
         val series = trendSeries(
             listOf(
                 day("2026-08-30", income = 800_000),
@@ -192,12 +252,32 @@ class TrendTest {
             LocalDate.of(2026, 8, 30),
             LocalDate.of(2026, 9, 2),
         )
-        assertEquals(
-            listOf(800_000L, 750_000L, -12_000L, -15_000L),
-            series.runningMinor,
+        assertEquals(listOf(800_000L, 800_000L, 0L, 0L), series.monthIncomeMinor)
+        assertEquals(listOf(0L, 50_000L, 12_000L, 15_000L), series.monthExpenseMinor)
+        assertEquals(15_000L, series.monthExpenseAt(3))
+        assertEquals(0L, series.monthIncomeAt(3))
+    }
+
+    /**
+     * The window usually starts in the middle of the previous month, and a day
+     * in that leading tail still belongs to a month that began before the chart
+     * did. The caller hands over the rows back to the 1st for exactly this; only
+     * the window is plotted.
+     */
+    @Test
+    fun `a day in the leading tail counts its whole month, not the visible part`() {
+        val series = trendSeries(
+            listOf(
+                day("2026-08-04", expense = 70_000),
+                day("2026-08-22", expense = 5_000),
+            ),
+            LocalDate.of(2026, 8, 21),
+            LocalDate.of(2026, 8, 23),
         )
-        // September's balance, not the four days' net of 735 000.
-        assertEquals(-15_000L, series.monthToDateMinor)
+        assertEquals(3, series.points.size)
+        assertEquals(LocalDate.of(2026, 8, 21), series.from)
+        // 70 000 was spent before the window opened and is still August's.
+        assertEquals(listOf(70_000L, 75_000L, 75_000L), series.monthExpenseMinor)
     }
 
     @Test
@@ -235,38 +315,35 @@ class TrendTest {
             window.start,
             window.endInclusive,
         )
-        assertEquals(-25_000L, series.monthToDateMinor)
+        assertEquals(25_000L, series.monthExpenseMinor.last())
     }
 
     // ----------------------------------------------------- the line's range
 
     /**
-     * Break-even is the only threshold on this chart that means anything, so it
-     * is forced inside the range from both directions — a month that never went
-     * negative still shows the line it stayed above.
+     * The range is the data's own. Forcing zero in was right when the line was
+     * a month's net and is wrong for a balance: a household holding 8 000 zł
+     * would get its line pinned along the top of the box with every move it
+     * made flattened into it.
      */
     @Test
-    fun `zero is always inside the range, above water and below it`() {
-        val up = trendSeries(
-            listOf(day("2026-08-03", income = 10_000), day("2026-08-04", income = 5_000)),
-            LocalDate.of(2026, 8, 3),
-            LocalDate.of(2026, 8, 4),
-        )
-        assertEquals(0L, up.lowRunningMinor)
-        assertEquals(15_000L, up.highRunningMinor)
-
-        val down = trendSeries(
+    fun `a balance well clear of zero is drawn against its own swing`() {
+        val series = trendSeries(
             listOf(day("2026-08-03", expense = 10_000), day("2026-08-04", expense = 5_000)),
             LocalDate.of(2026, 8, 3),
             LocalDate.of(2026, 8, 4),
+            endBalanceMinor = 800_000,
         )
-        assertEquals(-15_000L, down.lowRunningMinor)
-        assertEquals(0L, down.highRunningMinor)
+        assertEquals(listOf(805_000L, 800_000L), series.runningMinor)
+        assertEquals(800_000L, series.lowRunningMinor)
+        assertEquals(805_000L, series.highRunningMinor)
+        assertFalse(series.crossesZero)
     }
 
-    /** A month that dipped under and climbed back out keeps both extremes. */
+    /** An account that actually went under keeps break-even on the chart, because
+     *  the line reaches it. */
     @Test
-    fun `a month that goes under and recovers keeps both ends of its swing`() {
+    fun `an account that goes overdrawn still shows the line it crossed`() {
         val series = trendSeries(
             listOf(
                 day("2026-08-03", expense = 40_000),
@@ -274,10 +351,12 @@ class TrendTest {
             ),
             LocalDate.of(2026, 8, 3),
             LocalDate.of(2026, 8, 5),
+            endBalanceMinor = 60_000,
         )
         assertEquals(listOf(-40_000L, -40_000L, 60_000L), series.runningMinor)
         assertEquals(-40_000L, series.lowRunningMinor)
         assertEquals(60_000L, series.highRunningMinor)
+        assertTrue(series.crossesZero)
     }
 
     @Test
@@ -321,9 +400,10 @@ class TrendTest {
             listOf(day("2026-08-03", income = 400_000, expense = 400_000)),
             LocalDate.of(2026, 8, 3),
             LocalDate.of(2026, 8, 3),
+            endBalanceMinor = 120_000,
         )
-        assertEquals(0L, series.monthToDateMinor)
-        assertEquals(listOf(0L), series.runningMinor)
+        assertEquals(120_000L, series.closingMinor)
+        assertEquals(listOf(120_000L), series.runningMinor)
         assertFalse(series.isEmpty)
         assertEquals(400_000L, series.points.first().incomeMinor)
         assertEquals(400_000L, series.points.first().expenseMinor)

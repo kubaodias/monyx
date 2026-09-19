@@ -235,21 +235,51 @@ class OverviewViewModel(
             } else {
                 repository.accountBalances()
             }
+            // Back to the 1st of the window's first month, which is usually a
+            // few days before the window itself starts. Only the window is
+            // drawn; the extra days are what let a point in the leading tail
+            // report its OWN month to date rather than the part of it that
+            // happens to be on screen.
+            val dataStart = window.start.withDayOfMonth(1)
             combine(
                 repository.spendByCategory(selectedPeriod, accountIds),
-                // Two balance queries, zipped: the chips always show where the
+                // Three queries, zipped: the chips always show where the
                 // accounts stand today, whatever month the card's headline is
-                // about. One list cannot answer both.
-                combine(repository.accountBalances(), balances, ::Pair),
+                // about, and the deltas are how far the selected accounts moved
+                // each day — transfers included, which income and expense are
+                // not. One list cannot answer all three.
+                combine(
+                    repository.accountBalances(),
+                    balances,
+                    repository.dailyDeltas(
+                        Dates.iso(window.start),
+                        Dates.iso(window.endInclusive),
+                        accountIds,
+                    ),
+                    ::Triple,
+                ),
                 repository.dailyTotals(
-                    Dates.iso(window.start),
+                    Dates.iso(dataStart),
                     Dates.iso(window.endInclusive),
                     accountIds,
                 ),
                 repository.monthTotals(selectedPeriod, accountIds),
                 repository.rootExpenseCategories(),
-            ) { spend, (accounts, asOf), daily, month, allCategories ->
+            ) { spend, (accounts, asOf, deltas), daily, month, allCategories ->
                 val breakdown = padBreakdown(spend, allCategories)
+                val balanceMinor = asOf
+                    .filter { accountIds.isEmpty() || it.id in accountIds }
+                    .sumOf { it.balanceMinor }
+                val trend = trendSeries(
+                    rows = daily,
+                    from = window.start,
+                    to = window.endInclusive,
+                    // The line ENDS on the figure printed above it. Anchoring
+                    // rather than agreeing: the two are the same number because
+                    // one is counted back from the other.
+                    endBalanceMinor = balanceMinor,
+                    deltas = deltas,
+                )
                 OverviewUiState(
                     period = selectedPeriod,
                     // The MONTH, because that is the question the card is under:
@@ -260,22 +290,19 @@ class OverviewViewModel(
                     incomeMinor = month.incomeMinor,
                     expenseMinor = month.expenseMinor,
                     netMinor = month.incomeMinor - month.expenseMinor,
-                    // The thirty days the chart on the back actually draws. Kept
-                    // apart from the month rather than reconciled with it: the
-                    // two faces answer different questions now, and each says
-                    // which one it is answering.
-                    windowIncomeMinor = daily.sumOf { it.incomeMinor },
-                    windowExpenseMinor = daily.sumOf { it.expenseMinor },
-                    balanceMinor = asOf
-                        .filter { accountIds.isEmpty() || it.id in accountIds }
-                        .sumOf { it.balanceMinor },
+                    // The thirty days the chart on the back actually draws —
+                    // the drawn window, not the query's, which reaches further
+                    // back than the chart shows.
+                    windowIncomeMinor = trend.points.sumOf { it.incomeMinor },
+                    windowExpenseMinor = trend.points.sumOf { it.expenseMinor },
+                    balanceMinor = balanceMinor,
                     balanceThroughPeriod = selectedPeriod.takeIf { closed },
                     breakdown = breakdown,
                     // An archived account is not offered as a chip, but its
                     // transactions are still in every unfiltered figure above.
                     accounts = accounts.filter { it.archived == 0 },
                     selectedAccountIds = accountIds,
-                    trend = trendSeries(daily, window.start, window.endInclusive),
+                    trend = trend,
                 )
             }
         }
