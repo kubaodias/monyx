@@ -1,5 +1,6 @@
 package com.monyx.data
 
+import kotlinx.coroutines.flow.first
 import java.nio.charset.StandardCharsets
 import java.time.LocalDate
 import java.util.UUID
@@ -282,6 +283,16 @@ class MonyxRepository(private val dao: MonyxDao) {
                 ),
             ),
         )
+    }
+
+    /**
+     * Takes the month back to "no plan yet". A tombstone rather than a zero:
+     * zero is a plan (spend nothing), and an unplanned month shows no figures
+     * at all — a month whose income is not known yet should not have any.
+     */
+    suspend fun clearMonthPlan(period: String) {
+        val existing = dao.monthPlan(period).first() ?: return
+        dao.upsertMonthPlans(listOf(existing.copy(deleted = 1, pending = 1)))
     }
 
     /**
