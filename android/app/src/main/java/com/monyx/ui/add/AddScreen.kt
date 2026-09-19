@@ -12,6 +12,9 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -31,6 +34,7 @@ import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.mutableStateOf
@@ -40,6 +44,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.stringResource
@@ -134,6 +139,20 @@ fun AddScreen(
     var showAccountPicker by remember { mutableStateOf(false) }
     var showDatePicker by remember { mutableStateOf(false) }
     var editing by remember { mutableStateOf(Editing.Amount) }
+
+    // Tapping the note has to leave the note on screen. The keyboard comes up
+    // and the grid's window shrinks under it, and with a family open the note
+    // — the grid's last item — ends up below the fold, typed into blind. So
+    // follow it down: on the tap, and again as the keyboard's height settles,
+    // because every frame of its slide takes a little more of the window.
+    val gridState = rememberLazyGridState()
+    val imeBottom = WindowInsets.ime.getBottom(LocalDensity.current)
+    LaunchedEffect(editing, imeBottom) {
+        if (editing == Editing.Note) {
+            val last = gridState.layoutInfo.totalItemsCount - 1
+            if (last >= 0) gridState.animateScrollToItem(last)
+        }
+    }
     var seed by remember { mutableStateOf<RuleSeed?>(null) }
 
     val focusManager = LocalFocusManager.current
@@ -234,6 +253,7 @@ fun AddScreen(
                     onFocused = { editing = Editing.Note },
                 )
             },
+            state = gridState,
             modifier = Modifier.weight(1f),
         )
 

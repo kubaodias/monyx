@@ -16,7 +16,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -224,6 +226,7 @@ internal fun CategoryGrid(
      * can hide it is the keypad below.
      */
     footer: (@Composable () -> Unit)? = null,
+    state: LazyGridState = rememberLazyGridState(),
 ) {
     val roots = remember(categories) {
         categories.filter { it.parentId == null }.sortedBy { it.sortOrder }
@@ -239,6 +242,7 @@ internal fun CategoryGrid(
     val children = openRootId?.let { childrenOf[it] }.orEmpty()
 
     LazyVerticalGrid(
+        state = state,
         columns = GridCells.Fixed(4),
         modifier = modifier.fillMaxWidth(),
         // Tight, because every dp here is a dp of label width: at 12/6 a name
