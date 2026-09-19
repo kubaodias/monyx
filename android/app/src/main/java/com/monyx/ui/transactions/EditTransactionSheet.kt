@@ -1,5 +1,8 @@
 package com.monyx.ui.transactions
 
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
+import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -16,13 +19,11 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.CloudUpload
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.EditNote
 import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.Wallet
 import androidx.compose.material3.AlertDialog
@@ -32,7 +33,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -45,16 +45,12 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.unit.dp
 import com.monyx.R
 import com.monyx.data.AccountEntity
@@ -64,6 +60,7 @@ import com.monyx.data.TransactionEntity
 import com.monyx.ui.add.AccountPickerDialog
 import com.monyx.ui.add.AmountDisplay
 import com.monyx.ui.add.AmountInput
+import com.monyx.ui.add.NoteField
 import com.monyx.ui.add.press
 import com.monyx.ui.add.CategoryGrid
 import com.monyx.ui.add.ContextChip
@@ -135,10 +132,10 @@ fun EditTransactionSheet(
 
     // The keys are down until the amount is tapped. The row already has an
     // amount — most edits are to the category or the note — so opening on the
-    // keypad would put 236dp of digits over the thing usually being changed.
+    // keypad would put a block of digits over the thing usually being changed.
     var keypadUp by remember(original.id) { mutableStateOf(false) }
-    var wantNoteFocus by remember(original.id) { mutableStateOf(false) }
-    val noteFocus = remember(original.id) { FocusRequester() }
+    val gridState = rememberLazyGridState()
+    val imeBottom = WindowInsets.ime.getBottom(LocalDensity.current)
     var showAccountPicker by remember { mutableStateOf(false) }
     var showDatePicker by remember { mutableStateOf(false) }
     var confirmDelete by remember { mutableStateOf(false) }
@@ -170,24 +167,6 @@ fun EditTransactionSheet(
         focusManager.clearFocus()
         keyboard?.hide()
         keypadUp = true
-    }
-
-    /**
-     * The other direction, and the reason it exists.
-     *
-     * Tapping the amount put the keys up over the note field, and nothing on
-     * screen took them down again: the only control that did was the category
-     * grid, which means changing the category to get at the note — and a
-     * transfer has no grid at all, so its note was unreachable for the rest of
-     * the sheet's life. The button on the amount row is the way back.
-     *
-     * The field does not exist yet when this runs, so the focus is asked for
-     * rather than taken; [wantNoteFocus] is picked up below, once the field is
-     * in the composition and has something to attach a requester to.
-     */
-    fun editNote() {
-        keypadUp = false
-        wantNoteFocus = true
     }
 
     // Only the list matching this row's kind; an expense cannot be filed under a
@@ -362,35 +341,37 @@ fun EditTransactionSheet(
                 )
             }
 
-            AmountDisplay(
-                amount = amount,
-                onClick = { editAmount() },
-                // Only while the keys are up — which is exactly when the note
-                // is not on screen. A control offering to take you somewhere
-                // you are already standing is noise.
-                action = if (!keypadUp) {
-                    null
-                } else {
-                    {
-                        ContextChip(
-                            icon = {
-                                Icon(
-                                    Icons.Filled.EditNote,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(16.dp),
-                                )
-                            },
-                            label = stringResource(R.string.add_note_hint),
-                            onClick = { editNote() },
-                        )
-                    }
-                },
-            )
+            AmountDisplay(amount = amount, onClick = { editAmount() })
+
+            // The note is laid out as on the add screen: last in the grid,
+            // below any subcategories, scrolling with them and covered only by
+            // the keypad. Focusing it takes the keys down and follows it into
+            // view as the system keyboard comes up.
+            val noteField: @Composable () -> Unit = {
+                NoteField(
+                    value = note,
+                    onValueChange = { note = it },
+                    onFocused = { keypadUp = false },
+                )
+            }
+            val noteFocused = !keypadUp && imeBottom > 0
+            LaunchedEffect(noteFocused, imeBottom) {
+                if (noteFocused) {
+                    val last = gridState.layoutInfo.totalItemsCount - 1
+                    if (last >= 0) gridState.animateScrollToItem(last)
+                }
+            }
 
             if (isTransfer) {
-                // A transfer has no category and never had one. The grid would
-                // be empty, so the space goes to the note instead.
-                Spacer(Modifier.weight(1f))
+                // A transfer has no category and never had one, so there is no
+                // grid to carry the note — it sits at the bottom on its own,
+                // right above the keys, where the grid would have put it.
+                Column(
+                    modifier = Modifier.weight(1f).fillMaxWidth().padding(horizontal = 8.dp, vertical = 10.dp),
+                    verticalArrangement = Arrangement.Bottom,
+                ) {
+                    noteField()
+                }
             } else {
                 CategoryGrid(
                     categories = selectable,
@@ -409,50 +390,10 @@ fun EditTransactionSheet(
                             editAmount()
                         }
                     },
+                    footer = noteField,
+                    state = gridState,
                     modifier = Modifier.weight(1f),
                 )
-            }
-
-            // One gate, and it is the keypad. Tapping the note and then tapping
-            // the amount left the field sitting between the grid and the keys
-            // with its label still lit and its cursor gone, which reads as a
-            // field still taking input — the system keyboard had just been
-            // dismissed out from under it. One question at a time at the bottom
-            // of the screen: the keys, or the note, never both.
-            //
-            // It used to also require an amount and a category, which was the
-            // add screen's rule imported into a screen it does not fit: a row
-            // opened for editing HAS both, so the gates only ever fired on a
-            // half-backspaced amount — and then the note button above would take
-            // the keys down and reveal nothing.
-            if (!keypadUp) {
-                OutlinedTextField(
-                    value = note,
-                    onValueChange = { note = it },
-                    label = { Text(stringResource(R.string.add_note_hint)) },
-                    singleLine = true,
-                    keyboardOptions = KeyboardOptions(
-                        capitalization = KeyboardCapitalization.Sentences,
-                    ),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 12.dp, vertical = 4.dp)
-                        .focusRequester(noteFocus)
-                        // The system keyboard and the keypad cannot both have
-                        // the bottom of the screen.
-                        .onFocusChanged { if (it.isFocused) keypadUp = false },
-                )
-                // After composition, not during it: the requester has to be
-                // attached to a node that exists before it can be asked for
-                // anything, and the tap that set this flag happened while the
-                // field above was still gated out.
-                LaunchedEffect(wantNoteFocus) {
-                    if (wantNoteFocus) {
-                        noteFocus.requestFocus()
-                        keyboard?.show()
-                        wantNoteFocus = false
-                    }
-                }
             }
 
             if (keypadUp) {
