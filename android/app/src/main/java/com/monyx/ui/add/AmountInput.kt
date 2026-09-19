@@ -147,3 +147,16 @@ class AmountInput private constructor(
         return if (parts.size == 2) "$grouped${symbols.decimalSeparator}${parts[1]}" else grouped
     }
 }
+
+/**
+ * One key press against the value, for screens with no ViewModel to route the
+ * keys through — the edit sheet and the budget dialogs. The add screen does the
+ * same mapping in AddViewModel.onKey.
+ */
+internal fun AmountInput.press(action: KeyAction): AmountInput = when (action) {
+    is KeyAction.Digit -> digit(action.value)
+    KeyAction.Separator -> separator()
+    KeyAction.Backspace -> backspace()
+    is KeyAction.Operator -> operator(action.op)
+    KeyAction.Equals -> evaluate()
+}

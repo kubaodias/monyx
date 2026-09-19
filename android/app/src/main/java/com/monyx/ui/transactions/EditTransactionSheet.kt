@@ -64,10 +64,10 @@ import com.monyx.data.TransactionEntity
 import com.monyx.ui.add.AccountPickerDialog
 import com.monyx.ui.add.AmountDisplay
 import com.monyx.ui.add.AmountInput
+import com.monyx.ui.add.press
 import com.monyx.ui.add.CategoryGrid
 import com.monyx.ui.add.ContextChip
 import com.monyx.ui.add.DayPickerDialog
-import com.monyx.ui.add.KeyAction
 import com.monyx.ui.add.Keypad
 import com.monyx.ui.add.SaveBar
 import com.monyx.ui.theme.Palette
@@ -566,17 +566,4 @@ private fun StatusRow(icon: ImageVector, tint: Color, text: String) {
         Spacer(Modifier.width(6.dp))
         Text(text = text, style = MaterialTheme.typography.bodyMedium, color = tint)
     }
-}
-
-/**
- * One key press against the value. The add screen does the same thing through
- * its ViewModel; here there is no ViewModel to go through, and the mapping is
- * the whole of it.
- */
-private fun AmountInput.press(action: KeyAction): AmountInput = when (action) {
-    is KeyAction.Digit -> digit(action.value)
-    KeyAction.Separator -> separator()
-    KeyAction.Backspace -> backspace()
-    is KeyAction.Operator -> operator(action.op)
-    KeyAction.Equals -> evaluate()
 }
