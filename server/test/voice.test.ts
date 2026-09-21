@@ -327,3 +327,22 @@ test("an archived account is marked but still counted separately", async () => {
   assert.match(xml, /<accounts total="200.00">/);
   assert.match(xml, /<account name="Karta" balance="100.00" archived="true"\/>/);
 });
+
+test("an account kept out of the summary is listed but not summed", async () => {
+  const { fake, db } = setup();
+  fake.db.exec(
+    "UPDATE accounts SET excluded_from_summary = 1, initial_balance_minor = 10000 WHERE id = 'acc2';" +
+      "UPDATE accounts SET initial_balance_minor = 20000 WHERE id = 'acc1';",
+  );
+  await push(db, [
+    expense("t1", 3_000, "cat1", `${PERIOD}-05`),
+    { table: "transactions", row: { ...expense("t2", 5_000, "cat1", `${PERIOD}-06`).row, account_id: "acc2" } },
+  ]);
+  const digest = await collectDigest(db, PERIOD, TODAY);
+  // Savings held elsewhere: their spending is not the month's, their balance
+  // is not what is there to spend.
+  assert.equal(digest.expense_minor, 3_000);
+  const xml = renderDigest(digest);
+  assert.match(xml, /<accounts total="170.00">/);
+  assert.match(xml, /<account name="Karta" balance="50.00" in_summary="false"\/>/);
+});

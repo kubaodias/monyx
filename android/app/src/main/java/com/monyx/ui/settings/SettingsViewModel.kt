@@ -88,9 +88,9 @@ class SettingsViewModel(private val app: MonyxApp) : ViewModel() {
     private val _reuploadRequested = MutableStateFlow(false)
     val reuploadRequested: StateFlow<Boolean> = _reuploadRequested.asStateFlow()
 
-    fun addAccount(name: String, initialBalanceMinor: Long, icon: String?, color: String?) {
+    fun addAccount(name: String, initialBalanceMinor: Long, icon: String?, color: String?, inSummary: Boolean) {
         viewModelScope.launch {
-            repository.addAccount(name, initialBalanceMinor, icon, color)
+            repository.addAccount(name, initialBalanceMinor, icon, color, inSummary)
             SyncWorker.enqueue(app)
         }
     }

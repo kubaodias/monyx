@@ -86,6 +86,9 @@ data class OverviewUiState(
     val breakdown: List<CategorySpend> = emptyList(),
     /** Everything still open, for the selector at the top. */
     val accounts: List<AccountBalance> = emptyList(),
+    /** Archived accounts: no button, but part of every view that includes all
+     *  the default ones. See [toggledAccounts]. */
+    val archivedIds: Set<String> = emptySet(),
     /** Empty means every account. Never a list of all ids — see the repository. */
     val selectedAccountIds: Set<String> = emptySet(),
     /** The back of the balance card: thirty days ending inside the selected
@@ -284,9 +287,10 @@ class OverviewViewModel(
                 val breakdown = padBreakdown(spend, allCategories)
                 // Every account, archived ones too, when nothing is filtered —
                 // the same accounts income and spending are counted over, so
-                // carry-over + income − expenses lands on the balance.
+                // carry-over + income − expenses lands on the balance. Except
+                // those kept out of the summary, which the queries skip too.
                 val counted: (AccountBalance) -> Boolean =
-                    { accountIds.isEmpty() || it.id in accountIds }
+                    { if (accountIds.isEmpty()) it.excludedFromSummary == 0 else it.id in accountIds }
                 val balanceMinor = asOf.filter(counted).sumOf { it.balanceMinor }
                 val carryOverMinor = opening.filter(counted).sumOf { it.balanceMinor }
                 val trend = trendSeries(
@@ -321,6 +325,7 @@ class OverviewViewModel(
                     // An archived account is not offered as a chip, but its
                     // transactions are still in every unfiltered figure above.
                     accounts = accounts.filter { it.archived == 0 },
+                    archivedIds = accounts.filter { it.archived == 1 }.map { it.id }.toSet(),
                     selectedAccountIds = accountIds,
                     trend = trend,
                 )
@@ -394,20 +399,49 @@ class OverviewViewModel(
      * this one" — with no button standing for "all", a tap on a lit button that
      * lit every other one would be the only tap that did nothing visible.
      *
-     * Two states collapse back to empty, and both are deliberate. Everything
-     * selected IS the unfiltered query and has to be stored as such, or an
-     * archived account's rows would silently drop out of the totals. And
-     * turning the last one off returns to all rather than leaving an empty
-     * screen — an overview showing nothing is never what the tap meant.
+     * See [toggledAccounts] for the rules.
      */
-    fun toggleAccount(id: String, allIds: List<String>) {
-        val all = allIds.toSet()
-        val effective = selectedAccounts.value.ifEmpty { all }
-        val next = if (id in effective) effective - id else effective + id
-        selectedAccounts.value = if (next.isEmpty() || next == all) emptySet() else next
+    fun toggleAccount(id: String, buttons: List<AccountBalance>) {
+        selectedAccounts.value = toggledAccounts(
+            current = selectedAccounts.value,
+            id = id,
+            defaults = buttons.filter { it.excludedFromSummary == 0 }.map { it.id }.toSet(),
+            archived = uiState.value.archivedIds,
+        )
     }
 
     companion object {
+        /**
+         * The selection after tapping [id]. Empty is the default view: every
+         * button except the ones kept out of the summary ([defaults] are the
+         * rest).
+         *
+         * Two states collapse back to empty, and both are deliberate. The
+         * default set IS the unfiltered query and has to be stored as such, or
+         * an archived account's rows would silently drop out of the totals. And
+         * turning the last one off returns to the default rather than leaving
+         * an empty screen — an overview showing nothing is never what the tap
+         * meant.
+         *
+         * Switching on an account kept out of the summary on top of the default
+         * set has to be an explicit list, and then [archived] ids ride along
+         * with it for the same reason: the archived fund's July is still July.
+         */
+        internal fun toggledAccounts(
+            current: Set<String>,
+            id: String,
+            defaults: Set<String>,
+            archived: Set<String>,
+        ): Set<String> {
+            val effective = current.ifEmpty { defaults } - archived
+            val next = if (id in effective) effective - id else effective + id
+            return when {
+                next.isEmpty() || next == defaults -> emptySet()
+                next.containsAll(defaults) -> next + archived
+                else -> next
+            }
+        }
+
         fun factory(
             repository: MonyxRepository,
             selectedMonth: SelectedMonth,

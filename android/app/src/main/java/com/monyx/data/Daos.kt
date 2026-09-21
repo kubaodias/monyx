@@ -114,6 +114,7 @@ data class AccountBalance(
     val color: String?,
     val balanceMinor: Long,
     val archived: Int = 0,
+    val excludedFromSummary: Int = 0,
 )
 
 /** A transaction joined to the names the list needs, so the UI does no lookups. */
@@ -380,7 +381,7 @@ interface MonyxDao {
                   + COALESCE((SELECT SUM(t.amountMinor) FROM transactions t
                      WHERE t.transferAccountId = a.id AND t.kind = 'transfer'
                        AND t.deleted = 0), 0) AS balanceMinor,
-                  a.archived AS archived
+                  a.archived AS archived, a.excludedFromSummary AS excludedFromSummary
            FROM accounts a WHERE a.deleted = 0 ORDER BY a.archived, a.sortOrder, a.name"""
     )
     fun accountBalances(): Flow<List<AccountBalance>>
@@ -412,7 +413,7 @@ interface MonyxDao {
                   + COALESCE((SELECT SUM(t.amountMinor) FROM transactions t
                      WHERE t.transferAccountId = a.id AND t.kind = 'transfer'
                        AND t.deleted = 0 AND t.occurredOn <= :through), 0) AS balanceMinor,
-                  a.archived AS archived
+                  a.archived AS archived, a.excludedFromSummary AS excludedFromSummary
            FROM accounts a WHERE a.deleted = 0 ORDER BY a.archived, a.sortOrder, a.name"""
     )
     fun accountBalancesThrough(through: String): Flow<List<AccountBalance>>
@@ -425,7 +426,8 @@ interface MonyxDao {
      */
     @Query(
         """SELECT DISTINCT accountId FROM transactions
-           WHERE deleted = 0 AND kind = 'expense' AND substr(occurredOn, 1, 7) = :period"""
+           WHERE deleted = 0 AND kind = 'expense' AND substr(occurredOn, 1, 7) = :period
+             AND accountId NOT IN (SELECT id FROM accounts WHERE excludedFromSummary = 1)"""
     )
     fun spendingAccountIds(period: String): Flow<List<String>>
 
@@ -451,9 +453,10 @@ interface MonyxDao {
     /**
      * The overview's account filter, shared by the three queries below.
      *
-     * `allAccounts = 1` means no filter, and is NOT the same as passing every
-     * id: an archived account's transactions still belong in the month's totals,
-     * even though the account is no longer offered as a chip. Room expands an
+     * `allAccounts = 1` means the default view, and is NOT the same as passing
+     * every id: an archived account's transactions still belong in the month's
+     * totals, even though the account is no longer offered as a chip, and an
+     * account excluded from the summary is left out until it is picked. Room expands an
      * empty :accountIds to `IN ()`, which SQLite accepts and reads as false, so
      * the unfiltered call is safe without a sentinel.
      */
@@ -463,7 +466,8 @@ interface MonyxDao {
              COALESCE(SUM(CASE WHEN kind = 'expense' THEN amountMinor ELSE 0 END), 0) AS expenseMinor
            FROM transactions
            WHERE deleted = 0 AND substr(occurredOn, 1, 7) = :period
-             AND (:allAccounts = 1 OR accountId IN (:accountIds))"""
+             AND ((:allAccounts = 1 AND accountId NOT IN (SELECT id FROM accounts WHERE excludedFromSummary = 1))
+                  OR accountId IN (:accountIds))"""
     )
     fun monthTotals(period: String, allAccounts: Int, accountIds: List<String>): Flow<MonthTotals>
 
@@ -485,7 +489,8 @@ interface MonyxDao {
            LEFT JOIN categories p ON p.id = c.parentId
            WHERE t.deleted = 0 AND t.kind = 'expense'
              AND substr(t.occurredOn, 1, 7) = :period
-             AND (:allAccounts = 1 OR t.accountId IN (:accountIds))
+             AND ((:allAccounts = 1 AND t.accountId NOT IN (SELECT id FROM accounts WHERE excludedFromSummary = 1))
+                  OR t.accountId IN (:accountIds))
            GROUP BY COALESCE(p.id, c.id)
            ORDER BY spentMinor DESC"""
     )
@@ -516,7 +521,8 @@ interface MonyxDao {
            WHERE t.deleted = 0 AND t.kind = 'expense'
              AND substr(t.occurredOn, 1, 7) >= :fromPeriod
              AND substr(t.occurredOn, 1, 7) <= :toPeriod
-             AND (:allAccounts = 1 OR t.accountId IN (:accountIds))
+             AND ((:allAccounts = 1 AND t.accountId NOT IN (SELECT id FROM accounts WHERE excludedFromSummary = 1))
+                  OR t.accountId IN (:accountIds))
            GROUP BY period, COALESCE(p.id, c.id)
            ORDER BY period"""
     )
@@ -542,7 +548,8 @@ interface MonyxDao {
              COALESCE(SUM(CASE WHEN kind = 'expense' THEN amountMinor ELSE 0 END), 0) AS expenseMinor
            FROM transactions
            WHERE deleted = 0 AND occurredOn >= :fromDay AND occurredOn <= :toDay
-             AND (:allAccounts = 1 OR accountId IN (:accountIds))
+             AND ((:allAccounts = 1 AND accountId NOT IN (SELECT id FROM accounts WHERE excludedFromSummary = 1))
+                  OR accountId IN (:accountIds))
            GROUP BY occurredOn
            ORDER BY occurredOn"""
     )
@@ -579,7 +586,7 @@ interface MonyxDao {
                FROM transactions
               WHERE deleted = 0 AND occurredOn >= :fromDay AND occurredOn <= :toDay
                 AND ((:allAccounts = 1 AND accountId IN
-                        (SELECT id FROM accounts WHERE deleted = 0))
+                        (SELECT id FROM accounts WHERE deleted = 0 AND excludedFromSummary = 0))
                      OR accountId IN (:accountIds))
              UNION ALL
              SELECT occurredOn AS day, amountMinor AS deltaMinor
@@ -587,7 +594,7 @@ interface MonyxDao {
               WHERE deleted = 0 AND kind = 'transfer' AND transferAccountId IS NOT NULL
                 AND occurredOn >= :fromDay AND occurredOn <= :toDay
                 AND ((:allAccounts = 1 AND transferAccountId IN
-                        (SELECT id FROM accounts WHERE deleted = 0))
+                        (SELECT id FROM accounts WHERE deleted = 0 AND excludedFromSummary = 0))
                      OR transferAccountId IN (:accountIds))
            )
            GROUP BY day ORDER BY day"""
@@ -613,6 +620,7 @@ interface MonyxDao {
                   COALESCE((SELECT SUM(t.amountMinor) FROM transactions t
                             WHERE t.deleted = 0 AND t.kind = 'expense'
                               AND substr(t.occurredOn, 1, 7) = :period
+                              AND t.accountId NOT IN (SELECT id FROM accounts WHERE excludedFromSummary = 1)
                               AND (t.categoryId = b.categoryId
                                    OR t.categoryId IN (SELECT sc.id FROM categories sc
                                                        WHERE sc.parentId = b.categoryId

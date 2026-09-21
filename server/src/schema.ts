@@ -50,7 +50,7 @@ export const COLUMNS: Record<TableName, readonly string[]> = {
   members: ["id", "household_id", "name", "created_at", "seq", "deleted"],
   accounts: [
     "id", "household_id", "name", "icon", "color",
-    "initial_balance_minor", "sort_order", "archived", "seq", "deleted",
+    "initial_balance_minor", "sort_order", "archived", "excluded_from_summary", "seq", "deleted",
   ],
   categories: [
     "id", "household_id", "parent_id", "name", "icon", "color",
@@ -190,6 +190,10 @@ export function validateChange(raw: unknown): ValidationResult {
       // Absent is legal, and means 0: a client built before archiving existed
       // still pushes accounts, and rejecting those would strand it.
       if (row["archived"] !== undefined && !flag(row["archived"])) return reject("bad_archived");
+      // Same bargain: absent means 0, counted in the summary.
+      if (row["excluded_from_summary"] !== undefined && !flag(row["excluded_from_summary"])) {
+        return reject("bad_excluded_from_summary");
+      }
       break;
     }
     case "categories": {

@@ -46,6 +46,15 @@ data class AccountEntity(
      * closing an account does not un-spend the money that went through it.
      */
     val archived: Int = 0,
+    /**
+     * 1 keeps the account out of the household's summary — a savings account
+     * held somewhere else, which should not be added to what is there to spend.
+     * It is still offered when adding a transaction and still has its own
+     * button on the Overview, which starts switched off; everything computed
+     * over "all accounts" (Overview figures, budget spending and carry-over)
+     * leaves it out until that button is switched on.
+     */
+    val excludedFromSummary: Int = 0,
     val seq: Long = 0,
     val deleted: Int = 0,
     val pending: Int = 0,

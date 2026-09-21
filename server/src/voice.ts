@@ -165,6 +165,8 @@ export interface DigestAccount {
   name: string;
   balance_minor: number;
   archived: boolean;
+  /** Savings held elsewhere: listed, but not in the total or the month. */
+  excluded: boolean;
 }
 
 export interface DigestBudget {
@@ -246,6 +248,7 @@ export async function collectDigest(
     .prepare(
       `SELECT a.name AS name,
               a.archived AS archived,
+              a.excluded_from_summary AS excluded,
               a.initial_balance_minor
                 + COALESCE((SELECT SUM(CASE t.kind
                                          WHEN 'income'  THEN  t.amount_minor
@@ -267,7 +270,7 @@ export async function collectDigest(
        ORDER BY a.archived, a.sort_order, a.name`,
     )
     .bind(hh)
-    .all<{ name: string; archived: number; balance_minor: number }>();
+    .all<{ name: string; archived: number; excluded: number; balance_minor: number }>();
 
   const { results: totals } = await db
     .prepare(
@@ -275,6 +278,7 @@ export async function collectDigest(
        FROM transactions
        WHERE household_id = ? AND deleted = 0
          AND kind IN ('income','expense')
+         AND account_id NOT IN (SELECT id FROM accounts WHERE excluded_from_summary = 1)
          AND occurred_on BETWEEN ? AND ?
        GROUP BY kind`,
     )
@@ -286,6 +290,7 @@ export async function collectDigest(
       `SELECT COALESCE(SUM(amount_minor), 0) AS total
        FROM transactions
        WHERE household_id = ? AND deleted = 0 AND kind = 'expense'
+         AND account_id NOT IN (SELECT id FROM accounts WHERE excluded_from_summary = 1)
          AND occurred_on BETWEEN ? AND ?`,
     )
     .bind(hh, prevFrom, prevTo)
@@ -308,6 +313,7 @@ export async function collectDigest(
        JOIN categories c ON c.id = t.category_id
        LEFT JOIN categories p ON p.id = c.parent_id
        WHERE t.household_id = ? AND t.deleted = 0 AND t.kind = 'expense'
+         AND t.account_id NOT IN (SELECT id FROM accounts WHERE excluded_from_summary = 1)
          AND t.occurred_on BETWEEN ? AND ?
        GROUP BY COALESCE(p.id, c.id)
        ORDER BY spent_minor DESC`,
@@ -357,6 +363,7 @@ export async function collectDigest(
       name: row.name,
       balance_minor: row.balance_minor,
       archived: row.archived === 1,
+      excluded: row.excluded === 1,
     })),
     income_minor: totalOf("income"),
     expense_minor: totalOf("expense"),
@@ -414,14 +421,14 @@ export function renderDigest(data: DigestData): string {
     `<budget currency="PLN"${attr("household", data.household)}${attr("period", data.period)}${attr("today", data.today)}>`,
   );
 
-  const live = data.accounts.filter((a) => !a.archived);
+  const live = data.accounts.filter((a) => !a.archived && !a.excluded);
   const total = live.reduce((sum, a) => sum + a.balance_minor, 0);
   lines.push(`  <accounts total="${amount(total)}">`);
   for (const account of data.accounts) {
     lines.push(
       `    <account${attr("name", account.name)} balance="${amount(account.balance_minor)}"${
         account.archived ? ' archived="true"' : ""
-      }/>`,
+      }${account.excluded ? ' in_summary="false"' : ""}/>`,
     );
   }
   lines.push("  </accounts>");

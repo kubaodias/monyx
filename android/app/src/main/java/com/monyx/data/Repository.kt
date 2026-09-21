@@ -144,7 +144,13 @@ class MonyxRepository(private val dao: MonyxDao) {
         dao.upsertTransactions(listOf(existing.copy(deleted = 1, pending = 1, rejected = 0)))
     }
 
-    suspend fun addAccount(name: String, initialBalanceMinor: Long, icon: String?, color: String?) {
+    suspend fun addAccount(
+        name: String,
+        initialBalanceMinor: Long,
+        icon: String?,
+        color: String?,
+        inSummary: Boolean = true,
+    ) {
         dao.upsertAccounts(
             listOf(
                 AccountEntity(
@@ -153,6 +159,7 @@ class MonyxRepository(private val dao: MonyxDao) {
                     icon = icon,
                     color = color,
                     initialBalanceMinor = initialBalanceMinor,
+                    excludedFromSummary = if (inSummary) 0 else 1,
                     pending = 1,
                 ),
             ),

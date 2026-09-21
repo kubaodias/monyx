@@ -174,6 +174,9 @@
     <string name="settings_add_category">Add a category</string>
     <string name="settings_account_name">Account name</string>
     <string name="settings_account_balance">Current balance</string>
+    <string name="settings_account_in_summary">Include in summary</string>
+    <string name="settings_account_in_summary_hint">Off for savings held elsewhere: you can still add transactions to it, but it is left out of the totals, and its button on the Overview starts switched off.</string>
+    <string name="settings_account_outside_summary">outside summary</string>
     <string name="settings_account_opening">Opening balance: %1$s</string>
     <string name="settings_category_name">Category name</string>
     <string name="settings_category_parent">Parent category</string>
