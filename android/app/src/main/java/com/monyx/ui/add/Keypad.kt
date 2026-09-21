@@ -54,6 +54,12 @@ private enum class Emphasis { Digit, Function }
  * Compose recomposition is not a risk here: a digit tap redrawing a number and a
  * twenty-cell grid is nothing. Do not spend an evening on derivedStateOf.
  */
+/**
+ * One height for the keys wherever they appear — adding, editing, budgets — so
+ * the same thumb finds the same key in the same place on every screen.
+ */
+val KeypadHeight = 212.dp
+
 @Composable
 fun Keypad(
     onKey: (KeyAction) -> Unit,

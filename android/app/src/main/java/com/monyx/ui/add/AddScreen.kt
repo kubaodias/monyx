@@ -261,7 +261,7 @@ fun AddScreen(
             Keypad(
                 onKey = viewModel::onKey,
                 equalsEnabled = state.amount.hasPendingOperation,
-                modifier = Modifier.height(188.dp),
+                modifier = Modifier.height(KeypadHeight),
             )
         }
 
@@ -354,20 +354,19 @@ private fun KindSelector(selected: EntryKind, onSelect: (EntryKind) -> Unit) {
  */
 @Composable
 private fun SaveBar(state: AddUiState, hasMember: Boolean, onSave: () -> Unit) {
+    // Always there, greyed until the entry is complete. It used to appear only
+    // once amount and category were both in — which is mid-typing when the
+    // category goes first — and a 62dp bar arriving under the keypad shoved
+    // every key up one row between the first digit and the second.
     val unfinished = state.amountMinor <= 0 || state.categoryId == null
-    if (unfinished && state.accountId != null && hasMember) return
-
     SaveBar(
-        blocker = when {
-            state.accountId == null -> R.string.add_needs_account
-            state.amountMinor <= 0 -> R.string.add_needs_amount
-            state.categoryId == null -> R.string.add_needs_category
-            else -> null
-        },
+        // A missing account is the one gap with nothing else on screen to show
+        // it, so it is the one the bar still names.
+        blocker = if (state.accountId == null) R.string.add_needs_account else null,
         amountMinor = state.amountMinor,
         // No member id means enrolment has not landed; there is nobody to
         // credit the row to and saving would write an orphan.
-        enabled = hasMember,
+        enabled = hasMember && !unfinished,
         onSave = onSave,
     )
 }

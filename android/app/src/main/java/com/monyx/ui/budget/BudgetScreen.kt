@@ -59,6 +59,7 @@ import com.monyx.R
 import com.monyx.ui.add.AmountDisplay
 import com.monyx.ui.add.AmountInput
 import com.monyx.ui.add.Keypad
+import com.monyx.ui.add.KeypadHeight
 import com.monyx.ui.add.press
 import com.monyx.data.BudgetUsage
 import com.monyx.data.CategoryEntity
@@ -553,7 +554,7 @@ private fun BudgetAmountSheet(
                     touched = true
                 },
                 equalsEnabled = amount.hasPendingOperation,
-                modifier = Modifier.height(188.dp),
+                modifier = Modifier.height(KeypadHeight),
             )
             Row(
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp),

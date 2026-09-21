@@ -66,6 +66,7 @@ import com.monyx.ui.add.CategoryGrid
 import com.monyx.ui.add.ContextChip
 import com.monyx.ui.add.DayPickerDialog
 import com.monyx.ui.add.Keypad
+import com.monyx.ui.add.KeypadHeight
 import com.monyx.ui.add.SaveBar
 import com.monyx.ui.theme.Palette
 import kotlinx.coroutines.launch
@@ -400,16 +401,15 @@ fun EditTransactionSheet(
                 Keypad(
                     onKey = { action -> amount = amount.press(action) },
                     equalsEnabled = amount.hasPendingOperation,
-                    modifier = Modifier.height(188.dp),
+                    modifier = Modifier.height(KeypadHeight),
                 )
             }
 
             SaveBar(
-                blocker = when {
-                    amountMinor <= 0 -> R.string.add_needs_amount
-                    !isTransfer && categoryId == null -> R.string.add_needs_category
-                    else -> null
-                },
+                // Greyed rather than relabelled, as on the add screen: the bar
+                // keeps one wording and one size while the entry is incomplete.
+                blocker = null,
+                enabled = amountMinor > 0 && (isTransfer || categoryId != null),
                 amountMinor = amountMinor,
                 onSave = {
                     val edit = TransactionEdit(
