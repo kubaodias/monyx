@@ -82,7 +82,7 @@ class BudgetViewModel(
                 repository.spendingAccountIds(previous.toString()),
                 repository.accountBalancesThrough(previous.atEndOfMonth().toString()),
             ) { ids, balances ->
-                balances.filter { it.id in ids && it.archived == 0 }
+                balances.filter { it.id in ids }
             }
             combine(
                 repository.monthPlan(p),

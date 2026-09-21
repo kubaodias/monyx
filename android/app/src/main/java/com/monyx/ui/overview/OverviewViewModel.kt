@@ -50,14 +50,11 @@ data class OverviewUiState(
      */
     val carryOverMinor: Long = 0,
     /**
-     * Whatever else moved the position this month: transfers to or from an
-     * account outside the selection (an archived trip fund, Poduszka when only
-     * Portfel is selected), income or spending booked on an archived account,
-     * and anything dated later this month. Zero most months, and not shown then.
-     * It is what makes the statement add up, by definition, rather than by luck.
+     * carry-over + income − expenses, which is [balanceMinor] whenever every
+     * account is counted. Under a filter a transfer across it moves the
+     * balance without being income or spending, and the three lines above no
+     * longer add up to this — accepted until transfers get a line of their own.
      */
-    val otherMinor: Long = 0,
-    /** carry-over + income − expenses + other, which is [balanceMinor]. */
     val netMinor: Long = 0,
     /** The thirty-day window, for the trend face only. See [balanceMinor]. */
     val windowIncomeMinor: Long = 0,
@@ -70,8 +67,10 @@ data class OverviewUiState(
      * it is the household's total, and selecting one account narrows it to that
      * account's own balance.
      *
-     * "Everything" is every OPEN account. An archived one is a closed envelope,
-     * and its leftover is not part of where the household stands.
+     * "Everything" is every account, archived ones included. Leaving an
+     * archived fund out made every transfer into it look like money vanishing
+     * and its spending look free, and the statement needed a catch-all line to
+     * add up. An emptied fund holds nothing, so counting it costs nothing.
      */
     val balanceMinor: Long = 0,
     /**
@@ -283,13 +282,11 @@ class OverviewViewModel(
                 repository.rootExpenseCategories(),
             ) { spend, (accounts, asOf, deltas), daily, (month, opening), allCategories ->
                 val breakdown = padBreakdown(spend, allCategories)
-                // Open accounts only, when nothing is filtered. An archived
-                // account is a closed envelope — Wallet's per-trip funds come
-                // across as these — and what is left in one is not money the
-                // household can reach. Spending on it still counts everywhere
-                // else on this screen; only the POSITION leaves it out.
+                // Every account, archived ones too, when nothing is filtered —
+                // the same accounts income and spending are counted over, so
+                // carry-over + income − expenses lands on the balance.
                 val counted: (AccountBalance) -> Boolean =
-                    { if (accountIds.isEmpty()) it.archived == 0 else it.id in accountIds }
+                    { accountIds.isEmpty() || it.id in accountIds }
                 val balanceMinor = asOf.filter(counted).sumOf { it.balanceMinor }
                 val carryOverMinor = opening.filter(counted).sumOf { it.balanceMinor }
                 val trend = trendSeries(
@@ -312,7 +309,6 @@ class OverviewViewModel(
                     incomeMinor = month.incomeMinor,
                     expenseMinor = month.expenseMinor,
                     carryOverMinor = carryOverMinor,
-                    otherMinor = balanceMinor - carryOverMinor - month.incomeMinor + month.expenseMinor,
                     netMinor = balanceMinor,
                     // The thirty days the chart on the back actually draws —
                     // the drawn window, not the query's, which reaches further
