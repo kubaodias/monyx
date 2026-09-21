@@ -137,9 +137,9 @@ data class TrendSeries(
  * [deltas] is how far the balance moved each day, which is not the same as what
  * was earned and spent: a transfer between two accounts is neither, and it
  * still moves each of them. Null means "use the day's net", which is only
- * right when every account is counted and none is archived — tests use it for
- * brevity. The screen always passes a list, and an EMPTY list means what it
- * says: nothing moved the balance, even on a day an archived fund spent money.
+ * right when every account is counted — tests use it for brevity. The screen
+ * always passes a list, and an EMPTY list means what it says: nothing moved
+ * the balance.
  *
  * [rows] may reach back before [from] — the caller extends it to the 1st of the
  * window's first month — so that a day in the window's leading tail can still

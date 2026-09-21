@@ -124,7 +124,6 @@ fun OverviewScreen(
                 expense = state.expenseMinor,
                 net = state.netMinor,
                 carryOver = state.carryOverMinor,
-                other = state.otherMinor,
                 windowIncome = state.windowIncomeMinor,
                 windowExpense = state.windowExpenseMinor,
                 balance = state.balanceMinor,
@@ -177,7 +176,6 @@ private fun SummaryCard(
     expense: Long,
     net: Long,
     carryOver: Long,
-    other: Long,
     windowIncome: Long,
     windowExpense: Long,
     balance: Long,
@@ -235,7 +233,6 @@ private fun SummaryCard(
                     carryOver = carryOver,
                     income = income,
                     expense = expense,
-                    other = other,
                     net = net,
                     onOpenTrend = { showTrend = true },
                 )
@@ -249,7 +246,6 @@ private fun TotalsFace(
     carryOver: Long,
     income: Long,
     expense: Long,
-    other: Long,
     net: Long,
     onOpenTrend: () -> Unit,
 ) {
@@ -306,13 +302,6 @@ private fun TotalsFace(
             text = "−" + Money.formatWithCurrency(expense),
             tint = MaterialTheme.colorScheme.error,
         )
-        if (other != 0L) {
-            StatementLine(
-                label = stringResource(R.string.overview_other),
-                text = (if (other > 0) "+" else "") + Money.formatWithCurrency(other),
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
     }
 }
 
