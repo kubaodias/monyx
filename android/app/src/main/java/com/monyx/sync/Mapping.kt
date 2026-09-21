@@ -80,6 +80,7 @@ fun AccountEntity.toRow(): JsonObject = buildJsonObject {
     put("initial_balance_minor", JsonPrimitive(initialBalanceMinor))
     put("sort_order", JsonPrimitive(sortOrder))
     put("archived", JsonPrimitive(archived))
+    put("excluded_from_summary", JsonPrimitive(excludedFromSummary))
     put("deleted", JsonPrimitive(deleted))
 }
 
@@ -93,6 +94,8 @@ fun JsonObject.toAccount(): AccountEntity = AccountEntity(
     // A server that predates archiving simply omits it, and unarchived is the
     // right reading of silence.
     archived = int("archived"),
+    // Absent from an older server, and counted is the right reading of silence.
+    excludedFromSummary = int("excluded_from_summary"),
     seq = long("seq"),
     deleted = int("deleted"),
 )

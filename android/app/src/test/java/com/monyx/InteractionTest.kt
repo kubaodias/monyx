@@ -5,6 +5,7 @@ import com.monyx.data.MonyxRepository
 import com.monyx.sync.Rejection
 import com.monyx.sync.SyncEngine
 import com.monyx.ui.budget.PlanState
+import com.monyx.ui.overview.OverviewViewModel
 import com.monyx.ui.overview.PieSlice
 import com.monyx.ui.overview.sliceIdAt
 import com.monyx.ui.theme.Palette
@@ -145,6 +146,35 @@ class InteractionTest {
     fun `picking accounts turns the filter on`() {
         assertEquals(0, MonyxRepository.allAccounts(setOf("a")))
         assertEquals(0, MonyxRepository.allAccounts(setOf("a", "b")))
+    }
+
+    private fun toggle(current: Set<String>, id: String) = OverviewViewModel.toggledAccounts(
+        current = current,
+        id = id,
+        defaults = setOf("portfel", "poduszka"),
+        archived = setOf("wakacje"),
+    )
+
+    @Test
+    fun `an account kept out of the summary is switched on as an extra`() {
+        // Portfel and Poduszka are the default view; PZU is savings held elsewhere.
+        assertEquals(setOf("portfel", "poduszka", "pzu", "wakacje"), toggle(emptySet(), "pzu"))
+    }
+
+    @Test
+    fun `switching the extra off again returns to the default view`() {
+        assertEquals(emptySet<String>(), toggle(setOf("portfel", "poduszka", "pzu", "wakacje"), "pzu"))
+    }
+
+    @Test
+    fun `a default account switched off narrows the view and drops the archived fund`() {
+        assertEquals(setOf("poduszka"), toggle(emptySet(), "portfel"))
+        assertEquals(setOf("poduszka", "pzu"), toggle(setOf("portfel", "poduszka", "pzu", "wakacje"), "portfel"))
+    }
+
+    @Test
+    fun `turning the last one off returns to the default view`() {
+        assertEquals(emptySet<String>(), toggle(setOf("pzu"), "pzu"))
     }
 
     // ---------------------------------------------------- the monthly plan

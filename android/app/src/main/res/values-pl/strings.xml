@@ -173,6 +173,9 @@
     <string name="settings_add_category">Dodaj kategorię</string>
     <string name="settings_account_name">Nazwa konta</string>
     <string name="settings_account_balance">Aktualne saldo</string>
+    <string name="settings_account_in_summary">Uwzględniaj w podsumowaniu</string>
+    <string name="settings_account_in_summary_hint">Wyłącz dla oszczędności trzymanych gdzie indziej: nadal można dodawać do niego transakcje, ale nie wlicza się do sum, a jego przycisk w Przeglądzie jest domyślnie wyłączony.</string>
+    <string name="settings_account_outside_summary">poza podsumowaniem</string>
     <string name="settings_account_opening">Saldo początkowe: %1$s</string>
     <string name="settings_category_name">Nazwa kategorii</string>
     <string name="settings_category_parent">Kategoria nadrzędna</string>

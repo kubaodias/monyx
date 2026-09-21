@@ -2,6 +2,7 @@ package com.monyx.ui.settings
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -25,6 +26,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -37,6 +39,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -56,7 +59,7 @@ import com.monyx.ui.theme.Palette
 @Composable
 fun AccountsSection(
     accounts: List<AccountRow>,
-    onAdd: (name: String, initialBalanceMinor: Long, icon: String?, color: String?) -> Unit,
+    onAdd: (name: String, initialBalanceMinor: Long, icon: String?, color: String?, inSummary: Boolean) -> Unit,
     onUpdate: (AccountEntity) -> Unit,
     onArchive: (AccountEntity, Boolean) -> Unit,
     onDelete: (AccountEntity) -> Unit,
@@ -148,9 +151,10 @@ fun AccountsSection(
             movementsMinor = 0,
             initialIcon = null,
             initialColor = null,
+            initialInSummary = true,
             onDismiss = { showAdd = false },
-            onSave = { name, balanceMinor, icon, color ->
-                onAdd(name, balanceMinor, icon, color)
+            onSave = { name, balanceMinor, icon, color, inSummary ->
+                onAdd(name, balanceMinor, icon, color, inSummary)
                 showAdd = false
             },
         )
@@ -169,14 +173,16 @@ fun AccountsSection(
             movementsMinor = movements,
             initialIcon = entity.icon,
             initialColor = entity.color,
+            initialInSummary = entity.excludedFromSummary == 0,
             onDismiss = { editing = null },
-            onSave = { name, balanceMinor, icon, color ->
+            onSave = { name, balanceMinor, icon, color, inSummary ->
                 onUpdate(
                     entity.copy(
                         name = name,
                         initialBalanceMinor = balanceMinor - movements,
                         icon = icon,
                         color = color,
+                        excludedFromSummary = if (inSummary) 0 else 1,
                     ),
                 )
                 editing = null
@@ -253,7 +259,12 @@ private fun AccountRowItem(
                 },
             )
             Text(
-                Money.formatWithCurrency(row.balanceMinor),
+                if (row.entity.excludedFromSummary == 1) {
+                    Money.formatWithCurrency(row.balanceMinor) + " · " +
+                        stringResource(R.string.settings_account_outside_summary)
+                } else {
+                    Money.formatWithCurrency(row.balanceMinor)
+                },
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -298,13 +309,15 @@ private fun AccountEditDialog(
     movementsMinor: Long,
     initialIcon: String?,
     initialColor: String?,
+    initialInSummary: Boolean,
     onDismiss: () -> Unit,
-    onSave: (name: String, balanceMinor: Long, icon: String?, color: String?) -> Unit,
+    onSave: (name: String, balanceMinor: Long, icon: String?, color: String?, inSummary: Boolean) -> Unit,
 ) {
     var name by remember { mutableStateOf(initialName) }
     var balanceText by remember { mutableStateOf(if (balanceMinor == 0L) "" else Money.format(balanceMinor)) }
     var icon by remember { mutableStateOf(initialIcon) }
     var color by remember { mutableStateOf(initialColor) }
+    var inSummary by remember { mutableStateOf(initialInSummary) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -356,11 +369,34 @@ private fun AccountEditDialog(
                 Text(stringResource(R.string.settings_color), style = MaterialTheme.typography.labelMedium)
                 Spacer(Modifier.height(6.dp))
                 ColorSwatchRow(selected = color, onSelect = { color = it })
+                Spacer(Modifier.height(8.dp))
+                // Savings held somewhere else: still an account you can book
+                // on, just not money to add to what is there to spend.
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .toggleable(value = inSummary, role = Role.Switch, onValueChange = { inSummary = it }),
+                ) {
+                    Column(Modifier.weight(1f)) {
+                        Text(
+                            stringResource(R.string.settings_account_in_summary),
+                            style = MaterialTheme.typography.bodyLarge,
+                        )
+                        Text(
+                            stringResource(R.string.settings_account_in_summary_hint),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Spacer(Modifier.width(12.dp))
+                    Switch(checked = inSummary, onCheckedChange = null)
+                }
             }
         },
         confirmButton = {
             TextButton(
-                onClick = { onSave(name.trim(), Money.parseToMinor(balanceText), icon, color) },
+                onClick = { onSave(name.trim(), Money.parseToMinor(balanceText), icon, color, inSummary) },
                 enabled = name.isNotBlank(),
             ) { Text(stringResource(R.string.settings_save)) }
         },

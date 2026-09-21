@@ -681,9 +681,8 @@ private fun HistoryFace(
 private fun AccountFilter(
     accounts: List<AccountBalance>,
     selected: Set<String>,
-    onToggle: (String, List<String>) -> Unit,
+    onToggle: (String, List<AccountBalance>) -> Unit,
 ) {
-    val allIds = remember(accounts) { accounts.map { it.id } }
     LazyRow(
         horizontalArrangement = Arrangement.spacedBy(10.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -694,11 +693,16 @@ private fun AccountFilter(
                 balanceMinor = account.balanceMinor,
                 icon = Palette.icon(account.icon),
                 color = Palette.colorFor(account.color, account.id),
-                // Empty is the unfiltered query, and the unfiltered query
-                // covers every account — so every button is on. See
+                // Empty is the default query, which covers every account not
+                // kept out of the summary — so those buttons are on. See
                 // OverviewViewModel.selectedAccounts.
-                selected = selected.isEmpty() || account.id in selected,
-                onClick = { onToggle(account.id, allIds) },
+                selected = if (selected.isEmpty()) {
+                    account.excludedFromSummary == 0
+                } else {
+                    account.id in selected
+                },
+                outsideSummary = account.excludedFromSummary == 1,
+                onClick = { onToggle(account.id, accounts) },
             )
         }
     }
@@ -718,6 +722,7 @@ private fun AccountButton(
     icon: ImageVector,
     color: Color,
     selected: Boolean,
+    outsideSummary: Boolean,
     onClick: () -> Unit,
 ) {
     val container = if (selected) {
@@ -756,7 +761,14 @@ private fun AccountButton(
         }
         Spacer(modifier = Modifier.height(2.dp))
         Text(
-            text = Money.formatWithCurrency(balanceMinor),
+            // Kept out of the summary: say so on the button, or an unlit
+            // button that the household never switched off looks like a bug.
+            text = if (outsideSummary) {
+                Money.formatWithCurrency(balanceMinor) + " · " +
+                    stringResource(R.string.settings_account_outside_summary)
+            } else {
+                Money.formatWithCurrency(balanceMinor)
+            },
             style = MaterialTheme.typography.bodyMedium.copy(fontFeatureSettings = "tnum"),
             maxLines = 1,
             color = if (balanceMinor < 0) {

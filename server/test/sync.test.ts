@@ -463,3 +463,29 @@ test("deleting a rule is a tombstone that pulls, leaving its transactions alone"
   const txs = page.changes.filter((c) => c.table === "transactions");
   assert.equal(txs.at(-1)?.row["deleted"], 0, "money already spent does not un-spend");
 });
+
+// ------------------------------------------------- kept out of the summary
+
+test("excluded_from_summary round-trips, and an old client omitting it lands as 0", async () => {
+  const { fake, db } = setup();
+  await push(db, [
+    { table: "accounts", row: { id: "a1", name: "PZU", initial_balance_minor: 0, sort_order: 0, deleted: 0 } },
+  ]);
+  const before = fake.db.prepare("SELECT excluded_from_summary AS x FROM accounts WHERE id='a1'").get() as { x: number };
+  assert.equal(before.x, 0);
+
+  await push(db, [
+    { table: "accounts", row: { id: "a1", name: "PZU", initial_balance_minor: 0, sort_order: 0, excluded_from_summary: 1, deleted: 0 } },
+  ]);
+  const page = await pull(db, 0, 100);
+  const account = page.changes.filter((c) => c.table === "accounts" && c.row["id"] === "a1").at(-1);
+  assert.equal(account?.row["excluded_from_summary"], 1);
+});
+
+test("excluded_from_summary must be a flag", async () => {
+  const { db } = setup();
+  const result = await push(db, [
+    { table: "accounts", row: { id: "a1", name: "PZU", initial_balance_minor: 0, sort_order: 0, excluded_from_summary: "yes", deleted: 0 } },
+  ]);
+  assert.equal(result.rejected[0]?.reason, "bad_excluded_from_summary");
+});

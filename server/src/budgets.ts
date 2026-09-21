@@ -89,6 +89,7 @@ export async function budgetStatuses(
         AND t.deleted = 0
         AND t.kind = 'expense'
         AND substr(t.occurred_on, 1, 7) = ?2
+        AND t.account_id NOT IN (SELECT id FROM accounts WHERE excluded_from_summary = 1)
         AND (
               t.category_id = eff.category_id
            OR t.category_id IN (

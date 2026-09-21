@@ -157,6 +157,7 @@ function normalize(table: TableName, col: string, value: unknown): unknown {
     if (col === "sort_order") return 0;
     if (col === "initial_balance_minor") return 0;
     if (col === "archived") return 0;
+    if (col === "excluded_from_summary") return 0;
     return null;
   }
   return value;
