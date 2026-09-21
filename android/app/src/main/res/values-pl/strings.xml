@@ -53,7 +53,7 @@
     <string name="overview_other">Przelewy i inne</string>
     <string name="overview_balance">Bilans</string>
     <string name="overview_breakdown">Na co idą pieniądze</string>
-    <string name="overview_breakdown_history">Wydatki przez 12 miesięcy</string>
+    <string name="overview_breakdown_history">Ostatnie 12 miesięcy</string>
     <string name="overview_show_history">Pokaż ostatnie 12 miesięcy</string>
     <string name="overview_show_breakdown">Wróć do tego miesiąca</string>
     <string name="overview_history_this_month">Wydatki w tym miesiącu</string>

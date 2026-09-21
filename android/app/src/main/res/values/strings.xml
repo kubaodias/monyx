@@ -52,7 +52,7 @@
     <string name="overview_other">Transfers &amp; other</string>
     <string name="overview_balance">Balance</string>
     <string name="overview_breakdown">Where the money goes</string>
-    <string name="overview_breakdown_history">Spending over 12 months</string>
+    <string name="overview_breakdown_history">Last 12 months</string>
     <string name="overview_show_history">Show the last 12 months</string>
     <string name="overview_show_breakdown">Back to this month</string>
     <string name="overview_history_this_month">Spent this month</string>
