@@ -66,6 +66,7 @@ import com.monyx.DeepLink
 import com.monyx.Destinations
 import com.monyx.MonyxApp
 import com.monyx.R
+import com.monyx.data.Dates
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.foundation.shape.CircleShape
@@ -261,6 +262,12 @@ private fun MainScaffold(
     var txCategoryId by remember { mutableStateOf<String?>(null) }
     var txPeriod by remember { mutableStateOf<String?>(null) }
 
+    // The day the list should be scrolled to, set by a tap on the daily chart.
+    // NOT a filter: the rows either side of that day are the context, and a list
+    // holding one day would answer "what did we spend on the 12th" by hiding
+    // everything that makes the figure worth asking about.
+    var txDay by remember { mutableStateOf<String?>(null) }
+
     // Which tab drilled INTO the transactions list, if any. Tapping a pie slice
     // is a question asked from the overview, so back has to answer it by
     // returning there — not by falling through to the start destination, which
@@ -276,14 +283,16 @@ private fun MainScaffold(
         if (route == Destinations.TRANSACTIONS) {
             txCategoryId = null
             txPeriod = null
+            txDay = null
             txOrigin = null
         }
         navController.switchTab(route)
     }
 
-    fun openTransactions(categoryId: String?, period: String?) {
+    fun openTransactions(categoryId: String?, period: String?, day: String? = null) {
         txCategoryId = categoryId
         txPeriod = period
+        txDay = day
         // Asked of the controller, not read from `route` above. The graph's
         // destination lambdas are remembered from an early composition, so a
         // captured `route` is whatever was current when the graph was built —
@@ -430,6 +439,17 @@ private fun MainScaffold(
                     onOpenTransactions = { categoryId, period ->
                         openTransactions(categoryId, period)
                     },
+                    // The month comes from the DAY, not from the screen: the
+                    // daily chart reaches back over the turn of the month, and a
+                    // tap on the 29th of last month has to take the ledger there
+                    // rather than scroll a month that does not contain it.
+                    onOpenDay = { day ->
+                        openTransactions(
+                            categoryId = null,
+                            period = Dates.periodOfDateString(day),
+                            day = day,
+                        )
+                    },
                 )
             }
             composable(Destinations.TRANSACTIONS) {
@@ -444,11 +464,13 @@ private fun MainScaffold(
                     txOrigin = null
                     txCategoryId = null
                     txPeriod = null
+                    txDay = null
                     origin?.let { navController.switchTab(it) }
                 }
                 TransactionsScreen(
                     filterCategoryId = txCategoryId,
                     filterPeriod = txPeriod,
+                    scrollToDay = txDay,
                     onSyncRequested = { SyncWorker.syncNow(context) },
                 )
             }

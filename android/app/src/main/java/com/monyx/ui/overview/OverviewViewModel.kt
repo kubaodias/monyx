@@ -135,6 +135,12 @@ internal fun padBreakdown(
 private fun emptyHistory(period: String): CategoryHistory =
     categoryHistory(emptyList(), historyWindow(period), period)
 
+/** The same, for the daily face: the days are there, the bars are not yet. */
+private fun emptyDaily(period: String): DailySpend {
+    val window = dailyWindow(period)
+    return dailySpend(emptyList(), window.start, window.endInclusive)
+}
+
 /**
  * Joins the app's [SelectedMonth] against the repository's reactive queries.
  * The month is NOT owned here — it is the same one Transactions and Budget are
@@ -384,6 +390,35 @@ class OverviewViewModel(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5_000),
             initialValue = emptyHistory(period.value),
+        )
+
+    /**
+     * The breakdown card's third face: thirty-one days of spending, one bar each.
+     *
+     * Its own flow, beside [history], and for the same reasons — a different
+     * window from anything in [uiState], and a query that only runs while the
+     * screen is on. It cannot be taken from the trend on the balance card: that
+     * window is thirty days and stretches to reach the 1st of the month, so the
+     * day this chart is named after would sometimes be missing from it.
+     *
+     * The query already follows the account filter and already leaves out
+     * accounts kept out of the summary, so this face counts exactly what the
+     * other two do.
+     */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    val daily: StateFlow<DailySpend> = combine(period, selectedAccounts, ::Pair)
+        .flatMapLatest { (selectedPeriod, accountIds) ->
+            val window = dailyWindow(selectedPeriod)
+            repository.dailyTotals(
+                Dates.iso(window.start),
+                Dates.iso(window.endInclusive),
+                accountIds,
+            ).map { rows -> dailySpend(rows, window.start, window.endInclusive) }
+        }
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5_000),
+            initialValue = emptyDaily(period.value),
         )
 
     fun setPeriod(period: String) {

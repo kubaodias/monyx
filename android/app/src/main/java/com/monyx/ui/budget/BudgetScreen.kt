@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -47,10 +48,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import kotlin.math.roundToInt
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.monyx.MonyxApp
@@ -435,6 +438,10 @@ private fun BudgetRow(
         else -> MaterialTheme.colorScheme.primary
     }
     val over = usage.spentMinor > usage.limitMinor
+    // Only against a real limit. Spending 40 zł where nothing was allowed is
+    // infinitely over, and "4000%" is a number nobody can do anything with —
+    // the line below already says it in words.
+    val percent = if (usage.limitMinor > 0) (pct * 100).roundToInt() else null
     val tint = Palette.colorForChild(usage.color, usage.parentColor, usage.parentId, usage.categoryId)
 
     // Tapping the row asks the question the row provokes — "what did I spend it
@@ -468,20 +475,35 @@ private fun BudgetRow(
             Column(modifier = Modifier.weight(1f)) {
                 Text(usage.name, style = MaterialTheme.typography.titleMedium)
                 Spacer(modifier = Modifier.height(6.dp))
-                LinearProgressIndicator(
-                    progress = { pct.coerceIn(0f, 1f) },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(8.dp)
-                        .clip(RoundedCornerShape(4.dp)),
-                    color = barColor,
-                    trackColor = MaterialTheme.colorScheme.surfaceVariant,
-                )
+                SpendBar(fraction = pct, color = barColor)
                 Spacer(modifier = Modifier.height(6.dp))
-                Text(
-                    text = stringResource(R.string.budget_spent_of, Money.format(usage.spentMinor), Money.format(usage.limitMinor)),
-                    style = MaterialTheme.typography.bodyMedium,
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = stringResource(
+                            R.string.budget_spent_of,
+                            Money.format(usage.spentMinor),
+                            Money.format(usage.limitMinor),
+                        ),
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.weight(1f),
+                    )
+                    // The figure the bar is drawn from, in words, so "how far
+                    // over?" has an answer that does not depend on reading a
+                    // length. Over the limit it is the only place the scale of it
+                    // is stated as a proportion rather than as an amount.
+                    percent?.let {
+                        Text(
+                            text = stringResource(R.string.budget_percent, it),
+                            style = MaterialTheme.typography.bodyMedium.copy(fontFeatureSettings = "tnum"),
+                            fontWeight = if (over) FontWeight.SemiBold else FontWeight.Normal,
+                            color = if (over) {
+                                MaterialTheme.colorScheme.error
+                            } else {
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                            },
+                        )
+                    }
+                }
                 Text(
                     text = if (over) {
                         stringResource(R.string.budget_over, Money.format(usage.spentMinor - usage.limitMinor))
@@ -502,6 +524,54 @@ private fun BudgetRow(
         }
     }
 }
+
+/**
+ * How much of the limit has gone, and — past it — how far past.
+ *
+ * Under the limit the bar is the limit and the fill is the spending, which is
+ * what a progress bar always was. Over it the bar becomes the SPENDING, split
+ * where the limit fell: the pale part is what was allowed, the solid part is the
+ * overspend, and the solid part's length is the size of the problem.
+ *
+ * That split is the whole change. A clamped bar draws 40 zł over a 300 zł limit
+ * and 3 000 zł over it identically — both full, both red — so the one number the
+ * household needed was the one the picture could not show, and the bar stopped
+ * being worth looking at exactly when it mattered most.
+ */
+@Composable
+private fun SpendBar(fraction: Float, color: Color, modifier: Modifier = Modifier) {
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .height(8.dp)
+            .clip(RoundedCornerShape(4.dp))
+            .background(MaterialTheme.colorScheme.surfaceVariant),
+    ) {
+        when {
+            fraction > 1f -> {
+                val limit = limitShare(fraction)
+                Box(Modifier.weight(limit).fillMaxHeight().background(color.copy(alpha = 0.32f)))
+                Box(Modifier.weight(1f - limit).fillMaxHeight().background(color))
+            }
+            fraction > 0f -> {
+                val filled = fraction.coerceAtMost(1f)
+                Box(Modifier.weight(filled).fillMaxHeight().background(color))
+                if (filled < 1f) Spacer(Modifier.weight(1f - filled))
+            }
+        }
+    }
+}
+
+/**
+ * How much of an overspent bar the limit takes up: the reciprocal, since the bar
+ * now measures the spending and the limit is a part of it.
+ *
+ * Bounded at both ends, and not for looks. Compose refuses a weight of zero, so
+ * a category one grosz over its limit — or one twenty times over it — would
+ * crash the screen rather than draw a bar with a sliver on one end. The bounds
+ * mean the reading is approximate at the extremes; the figure beside it is not.
+ */
+internal fun limitShare(fraction: Float): Float = (1f / fraction).coerceIn(0.04f, 0.96f)
 
 /**
  * Typing a budget figure, on the same keys the add screen uses and laid out the
