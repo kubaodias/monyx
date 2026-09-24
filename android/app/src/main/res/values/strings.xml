@@ -63,6 +63,11 @@
     <string name="overview_history_show_one">Show %1$s</string>
     <string name="overview_history_empty">Nothing spent in the last 12 months</string>
     <string name="overview_history_budget">Budget</string>
+    <string name="overview_breakdown_days">Last 31 days</string>
+    <string name="overview_show_days">Show the last 31 days</string>
+    <string name="overview_days_empty">Nothing spent in the last 31 days</string>
+    <string name="overview_days_total">Spent in 31 days</string>
+    <string name="overview_days_hint">Tap a day to see what was bought</string>
     <string name="overview_no_data">No spending this month</string>
     <string name="overview_previous_month">Previous month</string>
     <string name="overview_next_month">Next month</string>
@@ -120,6 +125,7 @@
     <string name="budget_spent_of">%1$s of %2$s</string>
     <string name="budget_left">%1$s left</string>
     <string name="budget_over">%1$s over</string>
+    <string name="budget_percent">%1$d%%</string>
     <string name="budget_add_category">Add a category to the budget</string>
     <string name="budget_save">Save</string>
     <string name="budget_cancel">Cancel</string>

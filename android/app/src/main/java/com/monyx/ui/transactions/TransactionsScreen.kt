@@ -3,6 +3,7 @@ package com.monyx.ui.transactions
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.interaction.DragInteraction
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -17,6 +18,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -89,12 +91,18 @@ import kotlinx.coroutines.launch
  * They are applied reactively rather than through the constructor: this screen
  * keeps its ViewModel across a tab switch, so by the time a jump arrives the
  * ViewModel already exists and a constructor argument would be ignored.
+ *
+ * [scrollToDay] is a day the list should open AT rather than be narrowed to —
+ * see the daily chart on the Overview. It is not a filter and does not belong in
+ * the ViewModel: it is a one-off instruction to a LazyColumn, spent the moment
+ * it is carried out.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TransactionsScreen(
     filterCategoryId: String? = null,
     filterPeriod: String? = null,
+    scrollToDay: String? = null,
     onSyncRequested: () -> Unit = {},
 ) {
     val app = LocalContext.current.applicationContext as MonyxApp
@@ -332,6 +340,30 @@ fun TransactionsScreen(
                 }
             } else {
                 val grouped = remember(transactions) { transactions.groupBy { it.occurredOn }.toList() }
+                val listState = rememberLazyListState()
+                val targetIndex = remember(grouped, scrollToDay) {
+                    if (scrollToDay == null) -1 else grouped.indexOfFirst { it.first == scrollToDay }
+                }
+                // The jump is held rather than fired once. Rows are still
+                // arriving for a frame or two after the tap — the first attempt
+                // landed the day halfway down the screen, because groups above it
+                // appeared after the list had already moved — so the day is
+                // re-taken to the top whenever its position changes.
+                //
+                // Until the list is touched. A drag is the reader taking over,
+                // and after that nothing here moves the list again: being pulled
+                // back to a day you have scrolled away from is the failure this
+                // is written to avoid, and it would otherwise happen on the next
+                // sync that added a row.
+                var released by remember(scrollToDay) { mutableStateOf(false) }
+                LaunchedEffect(listState, scrollToDay) {
+                    listState.interactionSource.interactions.collect { interaction ->
+                        if (interaction is DragInteraction.Start) released = true
+                    }
+                }
+                LaunchedEffect(scrollToDay, targetIndex, released) {
+                    if (targetIndex >= 0 && !released) listState.animateScrollToItem(targetIndex)
+                }
                 PullToRefreshBox(
                     isRefreshing = refreshing,
                     onRefresh = {
@@ -349,6 +381,7 @@ fun TransactionsScreen(
                     modifier = Modifier.fillMaxSize(),
                 ) {
                     LazyColumn(
+                        state = listState,
                         modifier = Modifier.fillMaxSize(),
                         contentPadding = PaddingValues(vertical = 8.dp, horizontal = 0.dp),
                     ) {
@@ -357,6 +390,12 @@ fun TransactionsScreen(
                                 day = day,
                                 items = dayItems,
                                 plannedIds = plannedIds,
+                                // The day that was asked for, marked. Scrolling
+                                // to it is not enough on its own: near the end of
+                                // the list there is nothing left to scroll, so
+                                // the day arrives somewhere down the screen with
+                                // nothing saying which one it was.
+                                highlighted = day == scrollToDay,
                                 // Straight to the editor. What used to open here
                                 // was a sheet whose whole content was two
                                 // buttons, Edit and Delete, and both of them are
@@ -514,6 +553,7 @@ private fun DayGroup(
     day: String,
     items: List<TransactionListItem>,
     plannedIds: Set<String>,
+    highlighted: Boolean = false,
     onRowClick: (TransactionListItem) -> Unit,
 ) {
     // A transfer moves money, it does not spend it — it never enters the total.
@@ -532,6 +572,16 @@ private fun DayGroup(
             // Today and yesterday say so after the date rather than instead of
             // it: the date is what the eye scans down the list by.
             val date = Dates.dayLabel(day)
+            // The heading is otherwise deliberately quiet — it is a separator,
+            // not a reading. The day somebody jumped to is the exception, and it
+            // borrows the emphasis rather than a background tint: a highlighted
+            // band would still be sitting there an hour later looking selected.
+            val headingColor = if (highlighted) {
+                MaterialTheme.colorScheme.onSurface
+            } else {
+                MaterialTheme.colorScheme.onSurfaceVariant
+            }
+            val headingWeight = if (highlighted) FontWeight.Bold else null
             Text(
                 text = when (day) {
                     Dates.today().toString() -> stringResource(R.string.transactions_day_today, date)
@@ -540,12 +590,14 @@ private fun DayGroup(
                     else -> date
                 },
                 style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                fontWeight = headingWeight,
+                color = headingColor,
             )
             Text(
                 text = Money.formatSigned(kotlin.math.abs(totalMinor), totalKind),
                 style = MaterialTheme.typography.labelLarge.copy(fontFeatureSettings = "tnum"),
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                fontWeight = headingWeight,
+                color = headingColor,
             )
         }
         Column(

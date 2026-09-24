@@ -34,6 +34,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.BarChart
+import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.PieChart
 import androidx.compose.material.icons.filled.ShowChart
@@ -79,6 +80,8 @@ import kotlinx.coroutines.launch
 @Composable
 fun OverviewScreen(
     onOpenTransactions: (categoryId: String?, period: String?) -> Unit,
+    /** One day of the ledger, scrolled to. See the daily face of the breakdown. */
+    onOpenDay: (day: String) -> Unit = {},
 ) {
     val app = LocalContext.current.applicationContext as MonyxApp
     val viewModel: OverviewViewModel = viewModel(
@@ -86,6 +89,7 @@ fun OverviewScreen(
     )
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val history by viewModel.history.collectAsStateWithLifecycle()
+    val daily by viewModel.daily.collectAsStateWithLifecycle()
     val hidden by viewModel.hidden.collectAsStateWithLifecycle()
     val budgetHidden by viewModel.budgetHidden.collectAsStateWithLifecycle()
     val showsMonth by viewModel.showsMonth.collectAsStateWithLifecycle()
@@ -135,6 +139,7 @@ fun OverviewScreen(
             BreakdownCard(
                 breakdown = state.breakdown,
                 history = history,
+                daily = daily,
                 hidden = hidden,
                 budgetHidden = budgetHidden,
                 onToggleHidden = viewModel::toggleHidden,
@@ -144,6 +149,10 @@ fun OverviewScreen(
                 // opens that category's transactions for the month on screen,
                 // not for today.
                 onCategoryClick = { categoryId -> onOpenTransactions(categoryId, state.period) },
+                // A day is the same question at a finer grain — "what did we buy
+                // on the 12th?" — and it opens the ledger at that day rather
+                // than filtered to it: the rows either side are the context.
+                onDayClick = onOpenDay,
                 // Tapping a bar moves the whole screen to that month, which is
                 // the same thing the switcher at the top does.
                 onSelectMonth = viewModel::setPeriod,
@@ -445,14 +454,28 @@ private fun SummaryStat(label: String, amountMinor: Long, tint: Color) {
 }
 
 /**
- * Where the money goes this month, and — turned over — where it has been going
- * all year.
+ * The three ways the card can be read, in the order the button walks through
+ * them: this month by category, the year by month, the month by day.
  *
- * One card with two faces rather than a second card below it, because the two
- * answer the same question over different spans, and because the legend is the
- * same list of categories either way: in the pie it says what each cost this
- * month and opens its transactions, in the history it says what each costs in
- * an average month and takes it in and out of the chart.
+ * Pie first because it is the one the screen opens on, and each step after it
+ * zooms out and then back in: categories now, months over a year, days over a
+ * month. Stored by ordinal — see [BreakdownCard] — so the order here is the
+ * order on screen.
+ */
+private enum class BreakdownFace { Pie, Months, Days }
+
+/**
+ * Where the money goes this month, where it has been going all year, and which
+ * days of the month it went on.
+ *
+ * One card with three faces rather than three cards, because they answer the
+ * same question — where does it go — over different spans, and because two of
+ * them share a legend: in the pie it says what each category cost this month and
+ * opens its transactions, in the history it says what each costs in an average
+ * month and takes it in and out of the chart.
+ *
+ * The third has no legend at all. A day is not a category, so there is nothing
+ * to list beside it; the bars ARE the list, and a tap on one opens that day.
  *
  * Which face is showing survives a rotation but not the tab being left, which
  * is the right lifetime for a lens: coming back to the Overview should show the
@@ -462,21 +485,27 @@ private fun SummaryStat(label: String, amountMinor: Long, tint: Color) {
 private fun BreakdownCard(
     breakdown: List<CategorySpend>,
     history: CategoryHistory,
+    daily: DailySpend,
     hidden: Set<String>,
     budgetHidden: Boolean,
     onToggleHidden: (String) -> Unit,
     onToggleBudget: () -> Unit,
     onToggleAllHidden: () -> Unit,
     onCategoryClick: (String) -> Unit,
+    onDayClick: (String) -> Unit,
     onSelectMonth: (String) -> Unit,
     showsMonth: Boolean,
     onSelectAmountMode: (LegendAmount) -> Unit,
 ) {
-    var showHistory by rememberSaveable { mutableStateOf(false) }
-    // Turning a card over is somewhere you went, so Back is the way out of it.
-    // Without this the gesture leaves the Overview entirely and the card is
-    // still showing its back when you come back to the tab.
-    BackHandler(enabled = showHistory) { showHistory = false }
+    // The ordinal rather than the enum: rememberSaveable can only put Bundle
+    // types away, and an Int needs no Saver to explain itself.
+    var faceOrdinal by rememberSaveable { mutableStateOf(0) }
+    val face = BreakdownFace.entries[faceOrdinal]
+    val next = BreakdownFace.entries[(faceOrdinal + 1) % BreakdownFace.entries.size]
+    // Turning a card over is somewhere you went, so Back is the way out of it —
+    // straight back to the pie, not one step round the cycle, because Back means
+    // "undo the detour" and not "keep going the other way".
+    BackHandler(enabled = face != BreakdownFace.Pie) { faceOrdinal = 0 }
     Card(
         shape = RoundedCornerShape(24.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
@@ -486,26 +515,34 @@ private fun BreakdownCard(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     text = stringResource(
-                        if (showHistory) R.string.overview_breakdown_history else R.string.overview_breakdown,
+                        when (face) {
+                            BreakdownFace.Pie -> R.string.overview_breakdown
+                            BreakdownFace.Months -> R.string.overview_breakdown_history
+                            BreakdownFace.Days -> R.string.overview_breakdown_days
+                        },
                     ),
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold,
                     modifier = Modifier.weight(1f),
                 )
-                // The only sign the card has a back, and the same bargain the
-                // balance card makes with its little chart glyph: 24dp in the
+                // The only sign the card has other faces, and the same bargain
+                // the balance card makes with its little chart glyph: 24dp in the
                 // corner, showing what you would get rather than what you have.
                 IconButton(
-                    onClick = { showHistory = !showHistory },
+                    onClick = { faceOrdinal = next.ordinal },
                     modifier = Modifier.size(32.dp),
                 ) {
                     Icon(
-                        imageVector = if (showHistory) Icons.Filled.PieChart else Icons.Filled.BarChart,
+                        imageVector = when (next) {
+                            BreakdownFace.Pie -> Icons.Filled.PieChart
+                            BreakdownFace.Months -> Icons.Filled.BarChart
+                            BreakdownFace.Days -> Icons.Filled.CalendarMonth
+                        },
                         contentDescription = stringResource(
-                            if (showHistory) {
-                                R.string.overview_show_breakdown
-                            } else {
-                                R.string.overview_show_history
+                            when (next) {
+                                BreakdownFace.Pie -> R.string.overview_show_breakdown
+                                BreakdownFace.Months -> R.string.overview_show_history
+                                BreakdownFace.Days -> R.string.overview_show_days
                             },
                         ),
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -514,7 +551,7 @@ private fun BreakdownCard(
                 }
             }
             Spacer(modifier = Modifier.height(16.dp))
-            if (showHistory) {
+            if (face == BreakdownFace.Months) {
                 HistoryFace(
                     history = history,
                     hidden = hidden,
@@ -527,6 +564,8 @@ private fun BreakdownCard(
                     showsMonth = showsMonth,
                     onSelectAmountMode = onSelectAmountMode,
                 )
+            } else if (face == BreakdownFace.Days) {
+                DailyFace(daily = daily, onDayClick = onDayClick)
             } else {
                 val slices = if (!showsMonth) {
                     // Averages come from the twelve-month window, which is the
@@ -564,6 +603,45 @@ private fun BreakdownCard(
             }
         }
     }
+}
+
+/**
+ * The third face: a month of days, and what the whole window came to.
+ *
+ * The total under the chart is the one figure the bars cannot show. Thirty-one
+ * bars say which day was expensive and say nothing about the month; a household
+ * reading this face is usually asking both, and the second question is one line
+ * of text rather than another card.
+ *
+ * No total while nothing has been spent: the chart already says so in words, and
+ * "0,00 zł" under it would be a second answer to a question already answered.
+ */
+@Composable
+private fun DailyFace(daily: DailySpend, onDayClick: (String) -> Unit) {
+    DailySpendChart(daily = daily, onSelectDay = onDayClick)
+    if (daily.isEmpty) return
+    Spacer(modifier = Modifier.height(6.dp))
+    DailySpendAxis(daily)
+    Spacer(modifier = Modifier.height(14.dp))
+    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Text(
+            text = stringResource(R.string.overview_days_total),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.weight(1f),
+        )
+        Text(
+            text = Money.formatWithCurrency(daily.totalMinor),
+            style = MaterialTheme.typography.bodyMedium.copy(fontFeatureSettings = "tnum"),
+            fontWeight = FontWeight.SemiBold,
+        )
+    }
+    Spacer(modifier = Modifier.height(4.dp))
+    Text(
+        text = stringResource(R.string.overview_days_hint),
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
 }
 
 /**
