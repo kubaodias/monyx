@@ -181,8 +181,9 @@
     <string name="settings_account_name">Account name</string>
     <string name="settings_account_balance">Current balance</string>
     <string name="settings_account_in_summary">Include in summary</string>
-    <string name="settings_account_in_summary_hint">Off means the money is not the household\'s to spend: its balance and everything spent from it leave every total, budget and chart. Transactions can still be added to it, and its button on the Overview starts switched off.</string>
-    <string name="settings_account_outside_summary">outside summary</string>
+    <string name="settings_account_in_summary_hint">Off: its balance and its spending stay out of every total, budget and chart. You can still book transactions on it.</string>
+    <string name="settings_account_outside_summary">outside the summary</string>
+    <string name="settings_account_transactions">Show transactions</string>
     <string name="settings_outside_summary_accounts">Outside the summary (%1$d)</string>
     <string name="settings_archived_accounts_count">Archived (%1$d)</string>
     <string name="settings_expand">Show</string>

@@ -117,6 +117,16 @@ data class AccountBalance(
     val excludedFromSummary: Int = 0,
 )
 
+/**
+ * The last day anything was booked on an account.
+ *
+ * Only used to aim a ledger: opening an archived account's transactions in the
+ * month you happen to be looking at shows an empty list, because an account is
+ * archived when it is finished with. Both ends of a transfer count as activity —
+ * money arriving is something happening to the account that received it.
+ */
+data class AccountActivity(val id: String, val lastOn: String)
+
 /** A transaction joined to the names the list needs, so the UI does no lookups. */
 data class TransactionListItem(
     val id: String,
@@ -385,6 +395,18 @@ interface MonyxDao {
            FROM accounts a WHERE a.deleted = 0 ORDER BY a.archived, a.sortOrder, a.name"""
     )
     fun accountBalances(): Flow<List<AccountBalance>>
+
+    /** See [AccountActivity]. Accounts with nothing on them are simply absent. */
+    @Query(
+        """SELECT id, MAX(occurredOn) AS lastOn FROM (
+               SELECT accountId AS id, occurredOn FROM transactions
+                WHERE deleted = 0 AND accountId IS NOT NULL
+               UNION ALL
+               SELECT transferAccountId AS id, occurredOn FROM transactions
+                WHERE deleted = 0 AND kind = 'transfer' AND transferAccountId IS NOT NULL
+           ) GROUP BY id"""
+    )
+    fun accountActivity(): Flow<List<AccountActivity>>
 
     /**
      * The same balances, as they stood at the end of [through].

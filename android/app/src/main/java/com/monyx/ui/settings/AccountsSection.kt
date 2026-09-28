@@ -2,7 +2,9 @@ package com.monyx.ui.settings
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.toggleable
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -16,12 +18,14 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ReceiptLong
 import androidx.compose.material.icons.filled.AccountBalanceWallet
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Archive
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.RemoveCircleOutline
 import androidx.compose.material.icons.filled.Unarchive
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
@@ -66,6 +70,7 @@ fun AccountsSection(
     onArchive: (AccountEntity, Boolean) -> Unit,
     onDelete: (AccountEntity) -> Unit,
     onReorder: (List<AccountEntity>) -> Unit,
+    onOpenTransactions: (accountId: String, period: String?) -> Unit,
 ) {
     var showAdd by remember { mutableStateOf(false) }
     var editing by remember { mutableStateOf<AccountRow?>(null) }
@@ -111,7 +116,7 @@ fun AccountsSection(
                     row = row,
                     dragging = dragging,
                     muted = false,
-                    showOutsideLabel = false,
+                    onOpenTransactions = onOpenTransactions,
                     onEdit = { editing = row },
                     onArchive = { archiving = row.entity },
                     onRestore = null,
@@ -127,9 +132,7 @@ fun AccountsSection(
                     row = row,
                     dragging = false,
                     muted = true,
-                    // The header already says it; repeating it on every row
-                    // would be the same word twice in two lines.
-                    showOutsideLabel = false,
+                    onOpenTransactions = onOpenTransactions,
                     onEdit = { editing = row },
                     onArchive = { archiving = row.entity },
                     onRestore = null,
@@ -152,10 +155,7 @@ fun AccountsSection(
                         row = row,
                         dragging = false,
                         muted = true,
-                        // Here it is worth saying: this group is about being
-                        // finished, which on its own says nothing about whether
-                        // the money counted.
-                        showOutsideLabel = row.entity.excludedFromSummary == 1,
+                        onOpenTransactions = onOpenTransactions,
                         onEdit = { editing = row },
                         onArchive = null,
                         // Restoring is not destructive and is the whole reason the
@@ -301,13 +301,16 @@ private fun GroupHeader(
  * @param muted drawn quieter, for an account outside the summary or finished
  *   with. The group it sits under says which; the dimming says "not one of the
  *   ones above" at a glance, without the eye having to read a heading again.
+ * @param onOpenTransactions the ledger, filtered to this account and aimed at
+ *   the month it was last used. For an archived account this row is the ONLY way
+ *   in — the filter on the Transactions tab no longer offers it.
  */
 @Composable
 private fun AccountRowItem(
     row: AccountRow,
     dragging: Boolean,
     muted: Boolean,
-    showOutsideLabel: Boolean,
+    onOpenTransactions: (accountId: String, period: String?) -> Unit,
     onEdit: () -> Unit,
     onArchive: (() -> Unit)?,
     onRestore: (() -> Unit)?,
@@ -341,24 +344,44 @@ private fun AccountRowItem(
         }
         Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    row.entity.name,
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = if (muted) {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    } else {
+                        MaterialTheme.colorScheme.onSurface
+                    },
+                )
+                // The same mark the chip on the Overview carries, so the two
+                // screens say it the same way. On every account it is true of,
+                // group heading or not: a row that has to be read together with
+                // a heading four rows up is a row that does not say what it is.
+                if (row.entity.excludedFromSummary == 1) {
+                    Spacer(Modifier.width(6.dp))
+                    Icon(
+                        imageVector = Icons.Filled.RemoveCircleOutline,
+                        contentDescription = stringResource(R.string.settings_account_outside_summary),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(15.dp),
+                    )
+                }
+            }
             Text(
-                row.entity.name,
-                style = MaterialTheme.typography.bodyLarge,
-                color = if (muted) {
-                    MaterialTheme.colorScheme.onSurfaceVariant
-                } else {
-                    MaterialTheme.colorScheme.onSurface
-                },
-            )
-            Text(
-                if (showOutsideLabel) {
-                    Money.formatWithCurrency(row.balanceMinor) + " · " +
-                        stringResource(R.string.settings_account_outside_summary)
-                } else {
-                    Money.formatWithCurrency(row.balanceMinor)
-                },
+                Money.formatWithCurrency(row.balanceMinor),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        IconButton(
+            onClick = { onOpenTransactions(row.entity.id, row.lastActivityOn?.take(7)) },
+            // Nothing has ever been booked on it, so there is no ledger to open.
+            enabled = row.lastActivityOn != null,
+        ) {
+            Icon(
+                Icons.AutoMirrored.Filled.ReceiptLong,
+                contentDescription = stringResource(R.string.settings_account_transactions),
             )
         }
         onArchive?.let {
@@ -415,7 +438,11 @@ private fun AccountEditDialog(
         onDismissRequest = onDismiss,
         title = { Text(title) },
         text = {
-            Column {
+            // Scrollable, because this dialog is eight controls tall and the
+            // last of them is a switch with an explanation under it: on a short
+            // screen, or with the font scaled up, AlertDialog simply cuts the
+            // bottom off rather than letting it move.
+            Column(Modifier.verticalScroll(rememberScrollState())) {
                 OutlinedTextField(
                     value = name,
                     onValueChange = { name = it },
