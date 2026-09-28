@@ -86,8 +86,12 @@ data class OverviewUiState(
     val breakdown: List<CategorySpend> = emptyList(),
     /** Everything still open, for the selector at the top. */
     val accounts: List<AccountBalance> = emptyList(),
-    /** Archived accounts: no button, but part of every view that includes all
-     *  the default ones. See [toggledAccounts]. */
+    /** Archived accounts that still COUNT: no button, but part of every view
+     *  that includes all the default ones. See [toggledAccounts].
+     *
+     *  An archived account kept out of the summary is deliberately not here.
+     *  It has no button either, so riding along with these would put money in
+     *  the figures that nothing on screen could take back out. */
     val archivedIds: Set<String> = emptySet(),
     /** Empty means every account. Never a list of all ids — see the repository. */
     val selectedAccountIds: Set<String> = emptySet(),
@@ -331,7 +335,10 @@ class OverviewViewModel(
                     // An archived account is not offered as a chip, but its
                     // transactions are still in every unfiltered figure above.
                     accounts = accounts.filter { it.archived == 0 },
-                    archivedIds = accounts.filter { it.archived == 1 }.map { it.id }.toSet(),
+                    archivedIds = accounts
+                        .filter { it.archived == 1 && it.excludedFromSummary == 0 }
+                        .map { it.id }
+                        .toSet(),
                     selectedAccountIds = accountIds,
                     trend = trend,
                 )
