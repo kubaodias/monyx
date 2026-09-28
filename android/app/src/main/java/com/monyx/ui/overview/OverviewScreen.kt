@@ -49,7 +49,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
@@ -761,29 +765,59 @@ private fun AccountFilter(
     selected: Set<String>,
     onToggle: (String, List<AccountBalance>) -> Unit,
 ) {
+    // Counted first, then the ones outside the summary — a stable sort, so
+    // within each group the household's own order survives. The strip answers
+    // "which accounts are these numbers about", and an account that is never
+    // part of that answer has no business sitting in the middle of it looking
+    // like one somebody switched off by accident.
+    val counted = accounts.filter { it.excludedFromSummary == 0 }
+    val outside = accounts.filter { it.excludedFromSummary == 1 }
     LazyRow(
         horizontalArrangement = Arrangement.spacedBy(10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        items(accounts, key = { it.id }) { account ->
-            AccountButton(
-                name = account.name,
-                balanceMinor = account.balanceMinor,
-                icon = Palette.icon(account.icon),
-                color = Palette.colorFor(account.color, account.id),
-                // Empty is the default query, which covers every account not
-                // kept out of the summary — so those buttons are on. See
-                // OverviewViewModel.selectedAccounts.
-                selected = if (selected.isEmpty()) {
-                    account.excludedFromSummary == 0
-                } else {
-                    account.id in selected
-                },
-                outsideSummary = account.excludedFromSummary == 1,
-                onClick = { onToggle(account.id, accounts) },
-            )
+        items(counted, key = { it.id }) { account ->
+            AccountChip(account, selected, accounts, onToggle)
+        }
+        if (counted.isNotEmpty() && outside.isNotEmpty()) {
+            item(key = "outside-divider") {
+                Box(
+                    modifier = Modifier
+                        .width(1.dp)
+                        .height(44.dp)
+                        .background(MaterialTheme.colorScheme.outlineVariant),
+                )
+            }
+        }
+        items(outside, key = { it.id }) { account ->
+            AccountChip(account, selected, accounts, onToggle)
         }
     }
+}
+
+@Composable
+private fun AccountChip(
+    account: AccountBalance,
+    selected: Set<String>,
+    all: List<AccountBalance>,
+    onToggle: (String, List<AccountBalance>) -> Unit,
+) {
+    AccountButton(
+        name = account.name,
+        balanceMinor = account.balanceMinor,
+        icon = Palette.icon(account.icon),
+        color = Palette.colorFor(account.color, account.id),
+        // Empty is the default query, which covers every account not
+        // kept out of the summary — so those buttons are on. See
+        // OverviewViewModel.selectedAccounts.
+        selected = if (selected.isEmpty()) {
+            account.excludedFromSummary == 0
+        } else {
+            account.id in selected
+        },
+        outsideSummary = account.excludedFromSummary == 1,
+        onClick = { onToggle(account.id, all) },
+    )
 }
 
 /**
@@ -808,14 +842,39 @@ private fun AccountButton(
     } else {
         MaterialTheme.colorScheme.surface
     }
+    val shape = RoundedCornerShape(18.dp)
+    // Outside the summary and not switched on: a dashed outline, which is the
+    // one border nothing else in the app uses, so it reads as a different KIND
+    // of button rather than the same button in a different state. Switched on it
+    // takes the ordinary solid ring — it is contributing to the figures now, and
+    // the chip should stop apologising for itself.
+    val quiet = outsideSummary && !selected
+    val outline = MaterialTheme.colorScheme.outlineVariant
     Column(
         modifier = Modifier
-            .clip(RoundedCornerShape(18.dp))
+            .clip(shape)
             .background(container)
-            .border(
-                width = if (selected) 2.dp else 1.dp,
-                color = if (selected) color else MaterialTheme.colorScheme.outlineVariant,
-                shape = RoundedCornerShape(18.dp),
+            .then(
+                if (quiet) {
+                    Modifier.drawBehind {
+                        drawRoundRect(
+                            color = outline,
+                            cornerRadius = CornerRadius(18.dp.toPx()),
+                            style = Stroke(
+                                width = 1.dp.toPx(),
+                                pathEffect = PathEffect.dashPathEffect(
+                                    floatArrayOf(5.dp.toPx(), 4.dp.toPx()),
+                                ),
+                            ),
+                        )
+                    }
+                } else {
+                    Modifier.border(
+                        width = if (selected) 2.dp else 1.dp,
+                        color = if (selected) color else outline,
+                        shape = shape,
+                    )
+                },
             )
             .selectable(selected = selected, onClick = onClick)
             .padding(horizontal = 14.dp, vertical = 10.dp),
@@ -824,7 +883,7 @@ private fun AccountButton(
             Icon(
                 imageVector = icon,
                 contentDescription = null,
-                tint = color,
+                tint = if (quiet) color.copy(alpha = 0.45f) else color,
                 modifier = Modifier.size(18.dp),
             )
             Spacer(modifier = Modifier.width(8.dp))
@@ -834,19 +893,16 @@ private fun AccountButton(
                 fontWeight = FontWeight.SemiBold,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
-                color = MaterialTheme.colorScheme.onSurface,
+                color = if (quiet) {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                } else {
+                    MaterialTheme.colorScheme.onSurface
+                },
             )
         }
         Spacer(modifier = Modifier.height(2.dp))
         Text(
-            // Kept out of the summary: say so on the button, or an unlit
-            // button that the household never switched off looks like a bug.
-            text = if (outsideSummary) {
-                Money.formatWithCurrency(balanceMinor) + " · " +
-                    stringResource(R.string.settings_account_outside_summary)
-            } else {
-                Money.formatWithCurrency(balanceMinor)
-            },
+            text = Money.formatWithCurrency(balanceMinor),
             style = MaterialTheme.typography.bodyMedium.copy(fontFeatureSettings = "tnum"),
             maxLines = 1,
             color = if (balanceMinor < 0) {
@@ -855,6 +911,17 @@ private fun AccountButton(
                 MaterialTheme.colorScheme.onSurfaceVariant
             },
         )
+        // Its own line, not a suffix after the balance: as a suffix it read as
+        // part of the figure, and an unlit button nobody switched off looks
+        // like a bug unless the button itself says why.
+        if (outsideSummary) {
+            Text(
+                text = stringResource(R.string.settings_account_outside_summary),
+                style = MaterialTheme.typography.labelSmall,
+                maxLines = 1,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
     }
 }
 

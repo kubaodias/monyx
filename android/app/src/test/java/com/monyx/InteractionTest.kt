@@ -177,6 +177,24 @@ class InteractionTest {
         assertEquals(emptySet<String>(), toggle(setOf("pzu"), "pzu"))
     }
 
+    @Test
+    fun `an archived account kept out of the summary never rides along`() {
+        // A trip account can be both: finished AND paid for from outside the
+        // household. It has no button — archived accounts get none — so if it
+        // rode along with the counted archived fund, switching PZU on would put
+        // its spending into the figures with nothing on screen able to take it
+        // back out. Only accounts that COUNT are passed as `archived`, so the
+        // set below is what the view model hands over.
+        val switchedOn = OverviewViewModel.toggledAccounts(
+            current = emptySet(),
+            id = "pzu",
+            defaults = setOf("portfel", "poduszka"),
+            archived = setOf("wakacje"),
+        )
+        assertEquals(setOf("portfel", "poduszka", "pzu", "wakacje"), switchedOn)
+        assertEquals("a trip nobody in the house paid for must stay out", false, "tatry" in switchedOn)
+    }
+
     // ---------------------------------------------------- the monthly plan
 
     private fun plan(planned: Long, assigned: Long, spent: Long = 0) =

@@ -20,6 +20,8 @@ import androidx.compose.material.icons.filled.AccountBalanceWallet
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Archive
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Unarchive
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
@@ -70,7 +72,16 @@ fun AccountsSection(
     var deleting by remember { mutableStateOf<AccountEntity?>(null) }
     var archiving by remember { mutableStateOf<AccountEntity?>(null) }
 
-    val (archived, open) = accounts.partition { it.entity.archived == 1 }
+    var archivedExpanded by remember { mutableStateOf(false) }
+
+    // Three groups, and their order carries the meaning: what the household
+    // spends from, then money that is not theirs to spend, then what is
+    // finished with. An account that is both excluded and archived belongs in
+    // the archive — that is where you look for a trip that is over, whoever
+    // paid for it — and keeps the "outside summary" mark on its own row.
+    val archived = accounts.filter { it.entity.archived == 1 }
+    val outside = accounts.filter { it.entity.archived == 0 && it.entity.excludedFromSummary == 1 }
+    val open = accounts.filter { it.entity.archived == 0 && it.entity.excludedFromSummary == 0 }
 
     SectionCard(
         title = stringResource(R.string.settings_accounts),
@@ -99,6 +110,26 @@ fun AccountsSection(
                 AccountRowItem(
                     row = row,
                     dragging = dragging,
+                    muted = false,
+                    showOutsideLabel = false,
+                    onEdit = { editing = row },
+                    onArchive = { archiving = row.entity },
+                    onRestore = null,
+                    onDelete = { deleting = row.entity },
+                )
+            }
+        }
+        if (outside.isNotEmpty()) {
+            Spacer(Modifier.height(12.dp))
+            GroupHeader(stringResource(R.string.settings_outside_summary_accounts, outside.size))
+            outside.forEach { row ->
+                AccountRowItem(
+                    row = row,
+                    dragging = false,
+                    muted = true,
+                    // The header already says it; repeating it on every row
+                    // would be the same word twice in two lines.
+                    showOutsideLabel = false,
                     onEdit = { editing = row },
                     onArchive = { archiving = row.entity },
                     onRestore = null,
@@ -108,22 +139,31 @@ fun AccountsSection(
         }
         if (archived.isNotEmpty()) {
             Spacer(Modifier.height(12.dp))
-            Text(
-                stringResource(R.string.settings_archived_accounts),
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            // Folded by default: an archive earns its place by being undoable,
+            // not by being in the way of the accounts in use.
+            GroupHeader(
+                text = stringResource(R.string.settings_archived_accounts_count, archived.size),
+                expanded = archivedExpanded,
+                onToggle = { archivedExpanded = !archivedExpanded },
             )
-            archived.forEach { row ->
-                AccountRowItem(
-                    row = row,
-                    dragging = false,
-                    onEdit = { editing = row },
-                    onArchive = null,
-                    // Restoring is not destructive and is the whole reason the
-                    // row is still here, so it needs no confirmation.
-                    onRestore = { onArchive(row.entity, false) },
-                    onDelete = { deleting = row.entity },
-                )
+            if (archivedExpanded) {
+                archived.forEach { row ->
+                    AccountRowItem(
+                        row = row,
+                        dragging = false,
+                        muted = true,
+                        // Here it is worth saying: this group is about being
+                        // finished, which on its own says nothing about whether
+                        // the money counted.
+                        showOutsideLabel = row.entity.excludedFromSummary == 1,
+                        onEdit = { editing = row },
+                        onArchive = null,
+                        // Restoring is not destructive and is the whole reason the
+                        // row is still here, so it needs no confirmation.
+                        onRestore = { onArchive(row.entity, false) },
+                        onDelete = { deleting = row.entity },
+                    )
+                }
             }
         }
     }
@@ -205,22 +245,74 @@ fun AccountsSection(
 }
 
 /**
+ * The label above a group of accounts, with the count in it.
+ *
+ * Given [onToggle] it folds, and the whole line is the target rather than the
+ * chevron alone — a 16 dp icon is not a button on a phone held one-handed.
+ */
+@Composable
+private fun GroupHeader(
+    text: String,
+    expanded: Boolean = true,
+    onToggle: (() -> Unit)? = null,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .then(
+                if (onToggle == null) {
+                    Modifier
+                } else {
+                    Modifier.clickable(
+                        onClickLabel = stringResource(
+                            if (expanded) R.string.settings_collapse else R.string.settings_expand,
+                        ),
+                        onClick = onToggle,
+                    )
+                },
+            )
+            .padding(vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = text,
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.weight(1f),
+        )
+        if (onToggle != null) {
+            Icon(
+                imageVector = if (expanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(20.dp),
+            )
+        }
+    }
+}
+
+/**
  * One account, tappable.
  *
  * The row opens the editor; there is no pencil, the same bargain the category
  * list makes. Archive and delete keep their buttons — one is not what editing
  * means and the other is destructive.
+ *
+ * @param muted drawn quieter, for an account outside the summary or finished
+ *   with. The group it sits under says which; the dimming says "not one of the
+ *   ones above" at a glance, without the eye having to read a heading again.
  */
 @Composable
 private fun AccountRowItem(
     row: AccountRow,
     dragging: Boolean,
+    muted: Boolean,
+    showOutsideLabel: Boolean,
     onEdit: () -> Unit,
     onArchive: (() -> Unit)?,
     onRestore: (() -> Unit)?,
     onDelete: () -> Unit,
 ) {
-    val archived = row.entity.archived == 1
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -240,7 +332,7 @@ private fun AccountRowItem(
                 .size(40.dp)
                 .background(
                     Palette.colorFor(row.entity.color, row.entity.id)
-                        .copy(alpha = if (archived) 0.35f else 1f),
+                        .copy(alpha = if (muted) 0.35f else 1f),
                     CircleShape,
                 ),
             contentAlignment = Alignment.Center,
@@ -252,14 +344,14 @@ private fun AccountRowItem(
             Text(
                 row.entity.name,
                 style = MaterialTheme.typography.bodyLarge,
-                color = if (archived) {
+                color = if (muted) {
                     MaterialTheme.colorScheme.onSurfaceVariant
                 } else {
                     MaterialTheme.colorScheme.onSurface
                 },
             )
             Text(
-                if (row.entity.excludedFromSummary == 1) {
+                if (showOutsideLabel) {
                     Money.formatWithCurrency(row.balanceMinor) + " · " +
                         stringResource(R.string.settings_account_outside_summary)
                 } else {
