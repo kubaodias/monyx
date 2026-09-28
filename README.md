@@ -14,16 +14,18 @@
 
 <table>
   <tr>
-    <td align="center" width="16%"><img src="docs/screenshots/overview.png" alt="The month's income, spending and the difference between them, with account filters and a category breakdown" width="100%"></td>
-    <td align="center" width="16%"><img src="docs/screenshots/trends.png" alt="Twelve months of spending as stacked bars by category, the budget as a red line over them, and a switch between a normal month and the selected one" width="100%"></td>
-    <td align="center" width="16%"><img src="docs/screenshots/add.png" alt="Adding an expense on the built-in keypad" width="100%"></td>
-    <td align="center" width="16%"><img src="docs/screenshots/history.png" alt="Transaction history with search, and filters by account, category and subcategory" width="100%"></td>
-    <td align="center" width="16%"><img src="docs/screenshots/budget.png" alt="Monthly plan and per-category budgets" width="100%"></td>
-    <td align="center" width="16%"><img src="docs/screenshots/settings.png" alt="Accounts and categories in settings" width="100%"></td>
+    <td align="center" width="14%"><img src="docs/screenshots/overview.png" alt="The month's income, spending and the difference between them, with account filters and a category breakdown" width="100%"></td>
+    <td align="center" width="14%"><img src="docs/screenshots/trends.png" alt="Twelve months of spending as stacked bars by category, the budget as a red line over them, and a switch between a normal month and the selected one" width="100%"></td>
+    <td align="center" width="14%"><img src="docs/screenshots/days.png" alt="One bar per day for the last thirty-one days, with the costliest day labelled, tappable to open that day in the ledger" width="100%"></td>
+    <td align="center" width="14%"><img src="docs/screenshots/add.png" alt="Adding an expense on the built-in keypad" width="100%"></td>
+    <td align="center" width="14%"><img src="docs/screenshots/history.png" alt="Transaction history with search, and filters by account, category and subcategory" width="100%"></td>
+    <td align="center" width="14%"><img src="docs/screenshots/budget.png" alt="Monthly plan and per-category budgets, with a bar that shows how far past a limit the spending went" width="100%"></td>
+    <td align="center" width="14%"><img src="docs/screenshots/settings.png" alt="Accounts grouped by whether they count towards the summary, and categories, in settings" width="100%"></td>
   </tr>
   <tr>
     <td align="center"><b>Summary</b><br>the launch screen</td>
     <td align="center"><b>12 months</b><br>the same card, turned over</td>
+    <td align="center"><b>31 days</b><br>and once more, day by day</td>
     <td align="center"><b>Add</b><br>keypad and calculator</td>
     <td align="center"><b>History</b><br>search and filter</td>
     <td align="center"><b>Budget</b><br>plan and limits</td>
