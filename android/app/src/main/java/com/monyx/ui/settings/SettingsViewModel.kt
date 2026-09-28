@@ -24,8 +24,17 @@ import kotlinx.coroutines.withContext
  * One row in the accounts list: the entity editing needs (name, opening
  * balance, icon, colour) plus the running balance from accountBalances(),
  * which the entity alone does not carry.
+ *
+ * @param lastActivityOn the day the account last saw anything, or null if it has
+ *   never been used. The ledger shortcut on the row aims at the month this falls
+ *   in, so a finished account opens where its transactions are rather than on
+ *   whatever month the app happens to be showing.
  */
-data class AccountRow(val entity: AccountEntity, val balanceMinor: Long)
+data class AccountRow(
+    val entity: AccountEntity,
+    val balanceMinor: Long,
+    val lastActivityOn: String? = null,
+)
 
 /**
  * Nesting is exactly one level deep: a root category plus its direct
@@ -53,10 +62,19 @@ class SettingsViewModel(private val app: MonyxApp) : ViewModel() {
     private val session = app.session
 
     val accountRows: Flow<List<AccountRow>> =
-        combine(repository.accounts(), repository.accountBalances()) { entities, balances ->
+        combine(
+            repository.accounts(),
+            repository.accountBalances(),
+            repository.accountActivity(),
+        ) { entities, balances, activity ->
             val balanceById = balances.associateBy { it.id }
+            val lastOnById = activity.associate { it.id to it.lastOn }
             entities.map { entity ->
-                AccountRow(entity, balanceById[entity.id]?.balanceMinor ?: entity.initialBalanceMinor)
+                AccountRow(
+                    entity = entity,
+                    balanceMinor = balanceById[entity.id]?.balanceMinor ?: entity.initialBalanceMinor,
+                    lastActivityOn = lastOnById[entity.id],
+                )
             }
         }
 

@@ -35,6 +35,7 @@ class TransactionsViewModel(
     private val appContext: Context,
     private val selectedMonth: SelectedMonth,
     initialCategoryId: String? = null,
+    initialAccountId: String? = null,
 ) : ViewModel() {
 
     private val _query = MutableStateFlow("")
@@ -43,7 +44,7 @@ class TransactionsViewModel(
     private val _categoryId = MutableStateFlow(initialCategoryId)
     val categoryId: StateFlow<String?> = _categoryId.asStateFlow()
 
-    private val _accountId = MutableStateFlow<String?>(null)
+    private val _accountId = MutableStateFlow(initialAccountId)
     val accountId: StateFlow<String?> = _accountId.asStateFlow()
 
     /**
@@ -198,6 +199,25 @@ class TransactionsViewModel(
         _accountId.value = id
     }
 
+    companion object {
+        /**
+         * The accounts the filter offers: the open ones, plus whichever is
+         * already selected.
+         *
+         * An archived account is finished with, and listing every account the
+         * household has ever opened is how this dropdown grew to be useless. The
+         * way to ask about one is its row in Settings, which arrives here with
+         * the filter already applied — and that is why the selected account is
+         * kept whatever its state. Drop it and the chip would name an account
+         * missing from its own list, which Compose renders as a filter nobody
+         * can clear.
+         */
+        internal fun filterableAccounts(
+            accounts: List<AccountEntity>,
+            selectedId: String?,
+        ): List<AccountEntity> = accounts.filter { it.archived == 0 || it.id == selectedId }
+    }
+
     fun setIncludePlanned(on: Boolean) {
         _includePlanned.value = on
     }
@@ -213,13 +233,17 @@ class TransactionsViewModel(
      * in from a budget row or a pie slice cannot pass its filter through the
      * constructor — by then the ViewModel already exists.
      *
+     * The account filter arrives the same way, from the accounts list in
+     * Settings — the only route to an archived account's rows.
+     *
      * A null period leaves the month ALONE. It used to snap back to the present
      * one, which was defensible while every tab held its own month and was a
      * bug the moment they started sharing: tapping the tab after choosing March
      * on the overview would have thrown March away on arrival.
      */
-    fun applyFilter(categoryId: String?, period: String?) {
+    fun applyFilter(categoryId: String?, accountId: String?, period: String?) {
         _categoryId.value = categoryId
+        _accountId.value = accountId
         selectedMonth.set(period)
     }
 

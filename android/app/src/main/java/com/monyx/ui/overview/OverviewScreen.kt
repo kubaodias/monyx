@@ -37,6 +37,7 @@ import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.PieChart
+import androidx.compose.material.icons.filled.RemoveCircleOutline
 import androidx.compose.material.icons.filled.ShowChart
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -779,16 +780,6 @@ private fun AccountFilter(
         items(counted, key = { it.id }) { account ->
             AccountChip(account, selected, accounts, onToggle)
         }
-        if (counted.isNotEmpty() && outside.isNotEmpty()) {
-            item(key = "outside-divider") {
-                Box(
-                    modifier = Modifier
-                        .width(1.dp)
-                        .height(44.dp)
-                        .background(MaterialTheme.colorScheme.outlineVariant),
-                )
-            }
-        }
         items(outside, key = { it.id }) { account ->
             AccountChip(account, selected, accounts, onToggle)
         }
@@ -899,6 +890,20 @@ private fun AccountButton(
                     MaterialTheme.colorScheme.onSurface
                 },
             )
+            // A mark rather than the words "outside the summary", which took a
+            // third line and made the widest chip on the strip out of the
+            // account that matters least. Minus-in-a-circle for "left out of
+            // the count" — and the words are still one tap away, on the switch
+            // in Settings that put the account here.
+            if (outsideSummary) {
+                Spacer(modifier = Modifier.width(6.dp))
+                Icon(
+                    imageVector = Icons.Filled.RemoveCircleOutline,
+                    contentDescription = stringResource(R.string.settings_account_outside_summary),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(14.dp),
+                )
+            }
         }
         Spacer(modifier = Modifier.height(2.dp))
         Text(
@@ -911,17 +916,6 @@ private fun AccountButton(
                 MaterialTheme.colorScheme.onSurfaceVariant
             },
         )
-        // Its own line, not a suffix after the balance: as a suffix it read as
-        // part of the figure, and an unlit button nobody switched off looks
-        // like a bug unless the button itself says why.
-        if (outsideSummary) {
-            Text(
-                text = stringResource(R.string.settings_account_outside_summary),
-                style = MaterialTheme.typography.labelSmall,
-                maxLines = 1,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
     }
 }
 

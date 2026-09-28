@@ -21,6 +21,9 @@ class MonyxRepository(private val dao: MonyxDao) {
     fun members() = dao.members()
     fun accountBalances() = dao.accountBalances()
 
+    /** The last day each account saw anything, for aiming a ledger at it. */
+    fun accountActivity() = dao.accountActivity()
+
     /** Balances as they stood at the end of [through] (an ISO local date). */
     fun accountBalancesThrough(through: String) = dao.accountBalancesThrough(through)
     fun spendingAccountIds(period: String) = dao.spendingAccountIds(period)

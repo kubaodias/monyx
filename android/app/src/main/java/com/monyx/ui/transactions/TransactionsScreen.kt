@@ -101,7 +101,9 @@ import kotlinx.coroutines.launch
 @Composable
 fun TransactionsScreen(
     filterCategoryId: String? = null,
+    filterAccountId: String? = null,
     filterPeriod: String? = null,
+    filterRevision: Int = 0,
     scrollToDay: String? = null,
     onSyncRequested: () -> Unit = {},
 ) {
@@ -109,13 +111,19 @@ fun TransactionsScreen(
     val viewModel: TransactionsViewModel = viewModel(
         factory = viewModelFactory {
             initializer {
-                TransactionsViewModel(app.repository, app.applicationContext, app.selectedMonth, filterCategoryId)
+                TransactionsViewModel(
+                    repository = app.repository,
+                    appContext = app.applicationContext,
+                    selectedMonth = app.selectedMonth,
+                    initialCategoryId = filterCategoryId,
+                    initialAccountId = filterAccountId,
+                )
             }
         },
     )
 
-    LaunchedEffect(filterCategoryId, filterPeriod) {
-        viewModel.applyFilter(filterCategoryId, filterPeriod)
+    LaunchedEffect(filterCategoryId, filterAccountId, filterPeriod, filterRevision) {
+        viewModel.applyFilter(filterCategoryId, filterAccountId, filterPeriod)
     }
 
     val query by viewModel.query.collectAsStateWithLifecycle()
@@ -193,8 +201,12 @@ fun TransactionsScreen(
                 // Account first, then category. It reads as narrowing: which
                 // money, then what it went on — and it is the order the edit
                 // dialog puts the same two choices in.
+                // Archived accounts are deliberately absent — see
+                // TransactionsViewModel.filterableAccounts for why.
                 AccountFilterChip(
-                    accounts = accounts,
+                    accounts = remember(accounts, accountId) {
+                        TransactionsViewModel.filterableAccounts(accounts, accountId)
+                    },
                     selectedId = accountId,
                     onSelect = viewModel::setAccountFilter,
                 )

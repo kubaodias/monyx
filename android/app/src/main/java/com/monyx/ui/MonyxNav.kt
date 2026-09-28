@@ -33,6 +33,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -262,6 +263,17 @@ private fun MainScaffold(
     var txCategoryId by remember { mutableStateOf<String?>(null) }
     var txPeriod by remember { mutableStateOf<String?>(null) }
 
+    // Set only from the accounts list in Settings, which is the one place an
+    // archived account can be asked about — the filter on the tab itself stopped
+    // offering them, on purpose.
+    var txAccountId by remember { mutableStateOf<String?>(null) }
+
+    // Bumped by every jump in, and a key on the screen's LaunchedEffect. Without
+    // it, asking for the SAME filter twice is not a change and does nothing:
+    // open an account's ledger, clear the chip by hand to compare, tap the same
+    // account in Settings again — and the list would stay cleared.
+    var txRevision by remember { mutableIntStateOf(0) }
+
     // The day the list should be scrolled to, set by a tap on the daily chart.
     // NOT a filter: the rows either side of that day are the context, and a list
     // holding one day would answer "what did we spend on the 12th" by hiding
@@ -283,16 +295,24 @@ private fun MainScaffold(
         if (route == Destinations.TRANSACTIONS) {
             txCategoryId = null
             txPeriod = null
+            txAccountId = null
             txDay = null
             txOrigin = null
         }
         navController.switchTab(route)
     }
 
-    fun openTransactions(categoryId: String?, period: String?, day: String? = null) {
+    fun openTransactions(
+        categoryId: String?,
+        period: String?,
+        day: String? = null,
+        accountId: String? = null,
+    ) {
         txCategoryId = categoryId
         txPeriod = period
+        txAccountId = accountId
         txDay = day
+        txRevision += 1
         // Asked of the controller, not read from `route` above. The graph's
         // destination lambdas are remembered from an early composition, so a
         // captured `route` is whatever was current when the graph was built —
@@ -464,11 +484,14 @@ private fun MainScaffold(
                     txOrigin = null
                     txCategoryId = null
                     txPeriod = null
+                    txAccountId = null
                     txDay = null
                     origin?.let { navController.switchTab(it) }
                 }
                 TransactionsScreen(
                     filterCategoryId = txCategoryId,
+                    filterAccountId = txAccountId,
+                    filterRevision = txRevision,
                     filterPeriod = txPeriod,
                     scrollToDay = txDay,
                     onSyncRequested = { SyncWorker.syncNow(context) },
@@ -483,7 +506,16 @@ private fun MainScaffold(
                     },
                 )
             }
-            composable(Destinations.SETTINGS) { SettingsScreen() }
+            composable(Destinations.SETTINGS) {
+                SettingsScreen(
+                    // The month goes with it: an account is archived because it
+                    // is finished, so its ledger opens where its rows are rather
+                    // than on a month it saw nothing in.
+                    onOpenAccountTransactions = { accountId, period ->
+                        openTransactions(categoryId = null, period = period, accountId = accountId)
+                    },
+                )
+            }
         }
     }
 

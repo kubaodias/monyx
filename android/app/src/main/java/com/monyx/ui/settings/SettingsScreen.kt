@@ -123,10 +123,14 @@ private enum class SettingsTab(val labelRes: Int) {
  * and sync status, plus the three items that make the design operable: the
  * count of rejected rows, last_backup_at from the server, and re-upload
  * everything. They are split across [SettingsTab].
+ *
+ * @param onOpenAccountTransactions jumps to the ledger filtered to one account.
+ *   This screen is the only way to reach an archived account's transactions, so
+ *   the route out of it is not optional dressing.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SettingsScreen() {
+fun SettingsScreen(onOpenAccountTransactions: (accountId: String, period: String?) -> Unit = { _, _ -> }) {
     val context = LocalContext.current
     val app = context.applicationContext as MonyxApp
     val viewModel: SettingsViewModel = viewModel(factory = SettingsViewModel.factory(app))
@@ -230,6 +234,7 @@ fun SettingsScreen() {
                             onArchive = viewModel::setAccountArchived,
                             onDelete = viewModel::deleteAccount,
                             onReorder = viewModel::reorderAccounts,
+                            onOpenTransactions = onOpenAccountTransactions,
                         )
                     }
                     item {

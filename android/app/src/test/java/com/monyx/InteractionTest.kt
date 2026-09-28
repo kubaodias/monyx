@@ -1,6 +1,7 @@
 package com.monyx
 
 import androidx.compose.ui.graphics.Color
+import com.monyx.data.AccountEntity
 import com.monyx.data.MonyxRepository
 import com.monyx.sync.Rejection
 import com.monyx.sync.SyncEngine
@@ -9,6 +10,7 @@ import com.monyx.ui.overview.OverviewViewModel
 import com.monyx.ui.overview.PieSlice
 import com.monyx.ui.overview.sliceIdAt
 import com.monyx.ui.theme.Palette
+import com.monyx.ui.transactions.TransactionsViewModel
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNull
@@ -193,6 +195,41 @@ class InteractionTest {
         )
         assertEquals(setOf("portfel", "poduszka", "pzu", "wakacje"), switchedOn)
         assertEquals("a trip nobody in the house paid for must stay out", false, "tatry" in switchedOn)
+    }
+
+    // ------------------------------------------- what the ledger can filter by
+
+    private val ledgerAccounts = listOf(
+        AccountEntity(id = "portfel", name = "Portfel"),
+        AccountEntity(id = "pzu", name = "PZU", excludedFromSummary = 1),
+        AccountEntity(id = "tatry", name = "Tatry 2026", archived = 1, excludedFromSummary = 1),
+    )
+
+    @Test
+    fun `the ledger does not offer an archived account`() {
+        assertEquals(
+            listOf("portfel", "pzu"),
+            TransactionsViewModel.filterableAccounts(ledgerAccounts, null).map { it.id },
+        )
+    }
+
+    @Test
+    fun `an account outside the summary is still offered`() {
+        // Excluded is about whose money it is, archived about whether it is
+        // finished with. Only the second one takes an account off this list.
+        val offered = TransactionsViewModel.filterableAccounts(ledgerAccounts, null)
+        assertEquals("savings held elsewhere are still a ledger you can read", true, offered.any { it.id == "pzu" })
+    }
+
+    @Test
+    fun `an archived account arriving from settings stays in the list`() {
+        // Settings is the only route to it, and it lands with the filter already
+        // set. Leave it out and the chip names an account its own dropdown does
+        // not contain — a filter with no way back to "all".
+        assertEquals(
+            listOf("portfel", "pzu", "tatry"),
+            TransactionsViewModel.filterableAccounts(ledgerAccounts, "tatry").map { it.id },
+        )
     }
 
     // ---------------------------------------------------- the monthly plan
