@@ -242,7 +242,17 @@ class OverviewViewModel(
      * the screen. Every account button is simply drawn selected while this is
      * empty. See [toggleAccount] for what a tap does then.
      */
-    private val selectedAccounts: StateFlow<Set<String>> = chartPreferences.selectedAccounts
+    private val selectedAccounts: StateFlow<Set<String>> = combine(
+        chartPreferences.selectedAccounts,
+        repository.accounts(),
+    ) { stored, accounts ->
+        // Only ids an account still answers to. A remembered selection outlives
+        // the account it names — delete that account and the stored id filters
+        // every figure on the screen down to 0,00 zł while no button on the
+        // strip looks selected, so there is nothing on screen to tap to undo it.
+        // Dropping it leaves an empty set, which already means every account.
+        stored.intersect(accounts.mapTo(HashSet()) { it.id })
+    }
         // Eagerly, not WhileSubscribed: this is the filter every figure on the
         // screen is computed under, and a value that resets to "all accounts"
         // while nothing is collecting would be read back as a deliberate choice

@@ -58,6 +58,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
@@ -134,14 +135,20 @@ fun TransactionsScreen(
     val totals by viewModel.filteredTotals.collectAsStateWithLifecycle()
     val accounts by viewModel.accounts.collectAsStateWithLifecycle()
     val transactions by viewModel.transactions.collectAsStateWithLifecycle()
+    val usualAccountId by viewModel.usualAccountId.collectAsStateWithLifecycle()
     // What a row is compared against before it is marked as coming from
-    // somewhere else. Normally the keypad's starting account — the household's
-    // first open one, in their own order, which is the row AddViewModel picks
-    // the same way. Under an account filter it is that account instead, so the
-    // mark disappears: every row matches, the chip overhead already names it,
-    // and a pill on all of them would be the same word forty times down a list.
-    val defaultAccountId = remember(accounts, accountId) {
-        accountId ?: accounts.firstOrNull { it.archived == 0 }?.id
+    // somewhere else. Normally the account most of the ledger is on. Under an
+    // account filter it is that account instead, so the mark disappears: every
+    // row matches, the chip overhead already names it, and a pill on all of them
+    // would be the same word forty times down a list.
+    val defaultAccountId = remember(usualAccountId, accountId) {
+        accountId ?: usualAccountId
+    }
+    // Each account's own colour, for the pill on a row from elsewhere. Resolved
+    // once for the list rather than per row: Palette hashes when an account has
+    // never been given a colour, and a long month is hundreds of rows.
+    val accountColors = remember(accounts) {
+        accounts.associate { it.id to Palette.colorFor(it.color, it.id) }
     }
     val accountActivity by viewModel.accountActivity.collectAsStateWithLifecycle()
     // Pinned to a finished account, which only Settings can do. The filter then
@@ -444,6 +451,7 @@ fun TransactionsScreen(
                                 items = dayItems,
                                 plannedIds = plannedIds,
                                 defaultAccountId = defaultAccountId,
+                                accountColors = accountColors,
                                 // The day that was asked for, marked. Scrolling
                                 // to it is not enough on its own: near the end of
                                 // the list there is nothing left to scroll, so
@@ -616,6 +624,7 @@ private fun DayGroup(
     items: List<TransactionListItem>,
     plannedIds: Set<String>,
     defaultAccountId: String?,
+    accountColors: Map<String, Color>,
     highlighted: Boolean = false,
     onRowClick: (TransactionListItem) -> Unit,
 ) {
@@ -680,6 +689,7 @@ private fun DayGroup(
                             item = item,
                             planned = item.id in plannedIds,
                             defaultAccountId = defaultAccountId,
+                            accountColor = item.accountId?.let { accountColors[it] },
                             onClick = { onRowClick(item) },
                         )
                         if (index != items.lastIndex) {
@@ -700,11 +710,13 @@ private fun TransactionRow(
     item: TransactionListItem,
     planned: Boolean = false,
     /**
-     * The account the keypad starts on — the household's first one. Rows on any
-     * other account say so; rows on this one do not, or the mark would be on
-     * nearly every row and would mark nothing.
+     * The account most of the ledger is on. Rows on any other account say so;
+     * rows on this one do not, or the mark would be on nearly every row and
+     * would mark nothing.
      */
     defaultAccountId: String? = null,
+    /** This row's account's own colour, for the pill. Never resolved here. */
+    accountColor: Color? = null,
     onClick: () -> Unit,
 ) {
     val isTransfer = item.kind == "transfer"
@@ -799,14 +811,23 @@ private fun TransactionRow(
             if (elsewhere || !item.note.isNullOrBlank()) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     if (elsewhere) {
+                        // In the account's own colour, the way the icon left of
+                        // the row carries the category's: the pill then says
+                        // WHICH other account at a glance, and a month with two
+                        // of them in it stops being a column of identical grey
+                        // tags you have to read one at a time. Tinted background,
+                        // saturated text — the same recipe as the category
+                        // circle, for the same reason: a solid fill this small
+                        // would shout louder than the amount.
+                        val tint = accountColor ?: MaterialTheme.colorScheme.onSurfaceVariant
                         Text(
                             text = item.accountName.orEmpty(),
                             style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            color = tint,
                             maxLines = 1,
                             modifier = Modifier
                                 .clip(RoundedCornerShape(6.dp))
-                                .background(MaterialTheme.colorScheme.surfaceVariant)
+                                .background(tint.copy(alpha = 0.15f))
                                 .padding(horizontal = 6.dp, vertical = 1.dp),
                         )
                         if (!item.note.isNullOrBlank()) Spacer(Modifier.width(6.dp))

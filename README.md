@@ -16,10 +16,10 @@
   <tr>
     <td align="center" width="14%"><img src="docs/screenshots/overview.png" alt="The month's income, spending and the difference between them, with account filters and a category breakdown" width="100%"></td>
     <td align="center" width="14%"><img src="docs/screenshots/trends.png" alt="Twelve months of spending as stacked bars by category, the budget as a red line over them, and a switch between a normal month and the selected one" width="100%"></td>
-    <td align="center" width="14%"><img src="docs/screenshots/days.png" alt="One bar per day for the last thirty-one days, with the costliest day labelled, tappable to open that day in the ledger" width="100%"></td>
+    <td align="center" width="14%"><img src="docs/screenshots/days.png" alt="One bar per day for the last thirty-one days, each stacked in its categories' colours, with the same category list underneath and a tap opening that day" width="100%"></td>
     <td align="center" width="14%"><img src="docs/screenshots/add.png" alt="Adding an expense on the built-in keypad" width="100%"></td>
-    <td align="center" width="14%"><img src="docs/screenshots/history.png" alt="Transaction history with search, and filters by account, category and subcategory" width="100%"></td>
-    <td align="center" width="14%"><img src="docs/screenshots/budget.png" alt="Monthly plan and per-category budgets, with a bar that shows how far past a limit the spending went" width="100%"></td>
+    <td align="center" width="14%"><img src="docs/screenshots/history.png" alt="Transaction history with search, filters by account, category and subcategory, and rows from an unusual account marked with that account's name in its own colour" width="100%"></td>
+    <td align="center" width="14%"><img src="docs/screenshots/budget.png" alt="Monthly plan and per-category budgets, with a bar that shows how far past a limit the spending went, and a limit that applies to the month being edited" width="100%"></td>
     <td align="center" width="14%"><img src="docs/screenshots/settings.png" alt="Accounts grouped by whether they count towards the summary, and categories, in settings" width="100%"></td>
   </tr>
   <tr>
@@ -40,10 +40,12 @@ with the new row on screen.
 - **Summary** — what the chosen month earned, spent, and the difference between
   them, filtered by account. Tapping it turns the card over to show the last
   thirty days as a line and what is actually in the accounts, which is a
-  position rather than a month. The breakdown card has two faces as well: this
-  month as a pie, or the last twelve months as stacked bars by category, with
-  the budget drawn over them as a red line so a month that went over is one you
-  can see. Tapping a bar moves the whole screen to that month. The legend gives
+  position rather than a month. The breakdown card has three faces: this month as
+  a pie, the last twelve months as stacked bars by category with the budget drawn
+  over them as a red line so a month that went over is one you can see, or the
+  last thirty-one days a day at a time. Tapping a bar moves the whole screen to
+  that month; tapping a day opens what was bought on it, and the ledger for that
+  day is one more tap from there. The legend gives
   each category's monthly average — over the months the ledger actually covers —
   or that one month's spending, whichever the card is set to — one switch, shared
   by both faces and remembered, and the legend re-sorts itself to match. The eye at the end of a row hides
@@ -52,13 +54,15 @@ with the new row on screen.
 - **Add** — a keypad that is also a calculator, a note, any date including the
   future, and *Make it repeat* to turn the row being typed into a repeating rule.
 - **History** — the month, searchable, filtered by account, category and then
-  subcategory; pick a category and the rows are totalled above them, so "how much
+  subcategory, with any row that is not on the account the household mostly uses
+  carrying that account's name in its own colour; pick a category and the rows are totalled above them, so "how much
   went on coffee" is a figure rather than an addition. Pulled down to sync. Today and
   yesterday are labelled as such, and *Planned* shows
   what the repeating rules are about to write.
-- **Budget** — what there is to spend this month, limits on main categories that
-  carry forward until changed, and a warning before a limit is passed rather than
-  after. A limit of zero is a limit: it means nothing may go here, which is not
+- **Budget** — what there is to spend this month, limits on main categories, and
+  a warning before a limit is passed rather than after. A limit applies to the
+  month you set it in and carries forward from there; changing it later changes
+  that month alone, unless you tick the box that carries the new figure on. A limit of zero is a limit: it means nothing may go here, which is not
   the same as having set none.
 - **Settings** — accounts, categories (two levels, dragged into order), repeating
   rules, language, backup health, the update check and what every release

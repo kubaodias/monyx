@@ -66,7 +66,6 @@
     <string name="overview_breakdown_days">Last 31 days</string>
     <string name="overview_show_days">Show the last 31 days</string>
     <string name="overview_days_empty">Nothing spent in the last 31 days</string>
-    <string name="overview_days_total">Spent in 31 days</string>
     <string name="overview_days_hint">Tap a day to see what was bought</string>
     <string name="overview_no_data">No spending this month</string>
     <string name="overview_previous_month">Previous month</string>

@@ -615,13 +615,12 @@ private fun BreakdownCard(
 /**
  * The third face: a month of days, and what the whole window came to.
  *
- * The total under the chart is the one figure the bars cannot show. Thirty-one
- * bars say which day was expensive and say nothing about the month; a household
- * reading this face is usually asking both, and the second question is one line
- * of text rather than another card.
- *
- * No total while nothing has been spent: the chart already says so in words, and
- * "0,00 zł" under it would be a second answer to a question already answered.
+ * The window's total is stated once, at the foot of the legend, where every other
+ * face on this card states its own. It used to be stated twice — a labelled row
+ * of its own between the chart and the legend, and then the legend's closing line
+ * a few rows further down saying the identical figure. Two answers to one
+ * question read as two questions, and the eye stops to check whether the numbers
+ * agree. So the row is gone and the legend keeps it.
  */
 @Composable
 private fun DailyFace(daily: DailySpend, onDayClick: (String) -> Unit) {
@@ -639,20 +638,6 @@ private fun DailyFace(daily: DailySpend, onDayClick: (String) -> Unit) {
     Spacer(modifier = Modifier.height(6.dp))
     DailySpendAxis(daily)
     Spacer(modifier = Modifier.height(14.dp))
-    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        Text(
-            text = stringResource(R.string.overview_days_total),
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.weight(1f),
-        )
-        Text(
-            text = Money.formatWithCurrency(daily.totalMinor),
-            style = MaterialTheme.typography.bodyMedium.copy(fontFeatureSettings = "tnum"),
-            fontWeight = FontWeight.SemiBold,
-        )
-    }
-    Spacer(modifier = Modifier.height(4.dp))
     Text(
         text = stringResource(R.string.overview_days_hint),
         style = MaterialTheme.typography.bodySmall,
