@@ -572,7 +572,13 @@ private fun BreakdownCard(
                     onSelectAmountMode = onSelectAmountMode,
                 )
             } else if (face == BreakdownFace.Days) {
-                DailyFace(daily = daily, onDayClick = onDayClick)
+                DailyFace(
+                    daily = daily,
+                    hidden = hidden,
+                    onToggle = onToggleHidden,
+                    onToggleAll = onToggleAllHidden,
+                    onDayClick = onDayClick,
+                )
             } else {
                 val slices = if (!showsMonth) {
                     // Averages come from the twelve-month window, which is the
@@ -623,14 +629,33 @@ private fun BreakdownCard(
  * agree. So the row is gone and the legend keeps it.
  */
 @Composable
-private fun DailyFace(daily: DailySpend, onDayClick: (String) -> Unit) {
+private fun DailyFace(
+    daily: DailySpend,
+    /**
+     * The same set the twelve-month face hides by, deliberately shared.
+     *
+     * Both faces are the same card asking about the same categories, so taking
+     * Dom off one and finding it back on the other would make "hidden" a
+     * property of the face rather than of the category — and the household
+     * would have to hide it twice to get one answer.
+     */
+    hidden: Set<String>,
+    onToggle: (String) -> Unit,
+    onToggleAll: () -> Unit,
+    onDayClick: (String) -> Unit,
+) {
     // Which bar was tapped. A day, not a route: the tap asks "what was that
     // day", and the ledger is one more tap away inside the answer. Kept as a
     // date string so it survives a rotation without a Saver.
     var openDay by rememberSaveable { mutableStateOf<String?>(null) }
 
+    // What the chart and the day sheet are about: the window with the hidden
+    // categories taken out, so the axis rescales and the totals add up to the
+    // rows still listed.
+    val shown = remember(daily, hidden) { daily.excluding(hidden) }
+
     DailySpendChart(
-        daily = daily,
+        daily = shown,
         onSelectDay = { openDay = it },
         selected = openDay,
     )
@@ -644,31 +669,33 @@ private fun DailyFace(daily: DailySpend, onDayClick: (String) -> Unit) {
         color = MaterialTheme.colorScheme.onSurfaceVariant,
     )
 
-    // The same legend the pie has, over these thirty-one days. The bars are
-    // drawn in these colours, and until this was here they were drawn in
-    // colours nothing on the card named.
+    // The same legend the twelve-month face has, over these thirty-one days —
+    // eyes and all, hiding by the same set. Built from the UNFILTERED window,
+    // so a category hidden by accident still has a row to bring it back.
     if (daily.categories.isNotEmpty()) {
         Spacer(modifier = Modifier.height(16.dp))
-        SliceLegend(
-            slices = daily.categories.map { part ->
-                PieSlice(
-                    id = part.categoryId,
-                    label = part.name,
-                    amountMinor = part.minorAmount,
-                    color = Palette.colorFor(part.color, part.categoryId),
-                )
+        CategoryHistoryLegend(
+            // Hidden sinks to the bottom, the rest biggest first — the same
+            // order the other face uses, for the same reason.
+            categories = remember(daily, hidden) {
+                daily.categories
+                    .sortedWith(
+                        compareBy<SpendPart> { it.categoryId in hidden }
+                            .thenByDescending { it.minorAmount },
+                    )
+                    .map { LegendEntry(it.categoryId, it.name, it.color) }
             },
-            total = daily.totalMinor,
-            // Inert. On the pie a legend row opens that category's month; here
-            // the rows describe a window that is not a month, and a tap that
-            // filtered the ledger to "the last 31 days" would be answering a
-            // question with a different one.
-            onSliceClick = {},
+            hidden = hidden,
+            amounts = remember(daily) {
+                daily.categories.associate { it.categoryId to it.minorAmount }
+            },
+            onToggle = onToggle,
+            onToggleAll = onToggleAll,
         )
     }
 
     openDay?.let { date ->
-        daily.day(LocalDate.parse(date))?.let { day ->
+        shown.day(LocalDate.parse(date))?.let { day ->
             DaySheet(
                 day = day,
                 onDismiss = { openDay = null },
@@ -813,7 +840,8 @@ private fun HistoryFace(
     CategoryHistoryLegend(
         // Ranked by the figure on show, so switching the column re-sorts the
         // list with it — the order is part of the answer, not decoration.
-        categories = legendOrder(history.categories, hidden) { amounts[it.id] ?: 0L },
+        categories = legendOrder(history.categories, hidden) { amounts[it.id] ?: 0L }
+            .map { LegendEntry(it.id, it.name, it.color) },
         hidden = hidden,
         amounts = amounts,
         onToggle = onToggle,

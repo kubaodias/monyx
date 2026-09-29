@@ -14,6 +14,7 @@ import com.monyx.ui.overview.legendAmounts
 import com.monyx.ui.overview.legendOrder
 import com.monyx.ui.overview.monthIndexAt
 import com.monyx.ui.overview.padBreakdown
+import com.monyx.ui.overview.LegendEntry
 import com.monyx.ui.overview.visibleTotal
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -741,7 +742,9 @@ class UntouchedCategoriesTest {
  */
 class LegendTotalTest {
 
-    private fun category(id: String) = HistoryCategory(id, id, null, 0L, 0L)
+    // The legend only ever needed the id, the name and the colour; it now says
+    // so in its signature. See LegendEntry.
+    private fun category(id: String) = LegendEntry(id, id, null)
 
     @Test
     fun `the total is what the visible rows add up to`() {
