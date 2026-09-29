@@ -1,6 +1,32 @@
 package com.monyx.data
 
 /**
+ * Which group an account sits in, wherever accounts are listed.
+ *
+ * Settings and the account strip both draw these as three blocks: the accounts
+ * that count, then the ones held outside the summary, then the finished ones.
+ * The table does not — `sortOrder, name` interleaves all three — so anything
+ * that lists accounts and does NOT group them contradicts the list the
+ * household set up.
+ */
+private fun listGroup(account: AccountEntity): Int = when {
+    account.archived == 1 -> 2
+    account.excludedFromSummary == 1 -> 1
+    else -> 0
+}
+
+/**
+ * The accounts in the order the household actually sees them.
+ *
+ * Grouped as above, and inside a group left exactly as the DAO returned them —
+ * the sort is stable, so `sortOrder, name` still decides. Anything that offers
+ * a list of accounts to pick from should go through here, or it offers a
+ * different order from the one Settings shows and the one a person dragged.
+ */
+fun accountsInListOrder(accounts: List<AccountEntity>): List<AccountEntity> =
+    accounts.sortedBy(::listGroup)
+
+/**
  * The household's default account: the first one on the list.
  *
  * Two screens need to agree on this. The keypad starts a new transaction on it,
@@ -29,11 +55,11 @@ package com.monyx.data
  * @param accounts ordered as the DAO returns them: `sortOrder, name`.
  */
 fun defaultAccount(accounts: List<AccountEntity>): AccountEntity? =
-    accounts.firstOrNull { it.archived == 0 && it.excludedFromSummary == 0 }
-    // Every open account is held outside the summary — unusual, but a household
-    // that has said so about all of them still has to be able to add a
-    // transaction. First open one, rather than nothing at all.
-        ?: accounts.firstOrNull { it.archived == 0 }
+    // Literally the first open row of the list, once the list is in the order
+    // the household sees. Where every open account is held outside the summary
+    // — unusual, but they still have to be able to add a transaction — that
+    // group is simply next, and its first row wins.
+    accountsInListOrder(accounts).firstOrNull { it.archived == 0 }
 
 /** [defaultAccount]'s id, for the callers that only compare. */
 fun defaultAccountId(accounts: List<AccountEntity>): String? = defaultAccount(accounts)?.id

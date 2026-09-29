@@ -77,6 +77,7 @@ import com.monyx.R
 import com.monyx.data.AccountEntity
 import com.monyx.data.CategoryEntity
 import com.monyx.data.Dates
+import com.monyx.data.accountsInListOrder
 import com.monyx.data.defaultAccountId
 import com.monyx.data.Money
 import com.monyx.data.TransactionEntity
@@ -224,6 +225,10 @@ fun TransactionsScreen(
                     .padding(horizontal = 16.dp)
                     .padding(bottom = 8.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
+                // The archived-account note beside these chips is two lines of
+                // small type against a row of 32dp chips; left to align at the
+                // top it sat visibly high of the thing it is labelling.
+                verticalAlignment = Alignment.CenterVertically,
             ) {
                 // Account first, then category. It reads as narrowing: which
                 // money, then what it went on — and it is the order the edit
@@ -239,12 +244,17 @@ fun TransactionsScreen(
                         // How far back the account goes, because the list under
                         // it shows one month and cannot say that by itself.
                         span?.let {
+                            val from = Dates.shortMonthLabel(Dates.periodOfDateString(it.firstOn))
+                            val to = Dates.shortMonthLabel(Dates.periodOfDateString(it.lastOn))
                             Text(
-                                text = stringResource(
-                                    R.string.transactions_account_span,
-                                    Dates.shortMonthLabel(Dates.periodOfDateString(it.firstOn)),
-                                    Dates.shortMonthLabel(Dates.periodOfDateString(it.lastOn)),
-                                ),
+                                // An account that only ever saw one month says
+                                // that month once. "wrz 2026 – wrz 2026" is a
+                                // range with nothing in it, and reads as a bug.
+                                text = if (from == to) {
+                                    from
+                                } else {
+                                    stringResource(R.string.transactions_account_span, from, to)
+                                },
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
@@ -254,8 +264,14 @@ fun TransactionsScreen(
                 // Archived accounts are deliberately absent — see
                 // TransactionsViewModel.filterableAccounts for why.
                 AccountFilterChip(
+                    // In the household's own order, grouped the way Settings
+                    // groups it. Straight from the table this menu put an
+                    // account held outside the summary above the one everything
+                    // is spent from, because the table interleaves the groups.
                     accounts = remember(accounts, accountId) {
-                        TransactionsViewModel.filterableAccounts(accounts, accountId)
+                        accountsInListOrder(
+                            TransactionsViewModel.filterableAccounts(accounts, accountId),
+                        )
                     },
                     selectedId = accountId,
                     enabled = pinnedArchived == null,
