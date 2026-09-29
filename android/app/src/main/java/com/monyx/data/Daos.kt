@@ -838,7 +838,13 @@ interface MonyxDao {
            WHERE t.deleted = 0
              AND (:query = '' OR t.note LIKE '%' || :query || '%' OR c.name LIKE '%' || :query || '%')
              AND (:categoryId IS NULL OR t.categoryId = :categoryId OR c.parentId = :categoryId)
-             AND (:accountId  IS NULL OR t.accountId  = :accountId)
+             -- Money arriving counts as this account's too. A transfer stores
+             -- the SOURCE in accountId, so matching only that hid every
+             -- incoming transfer from the account it landed in: a holiday
+             -- account showed the spending and never the saving up, and its
+             -- rows could not add up to the balance shown above them.
+             AND (:accountId  IS NULL OR t.accountId  = :accountId
+                  OR (t.kind = 'transfer' AND t.transferAccountId = :accountId))
              AND (:period = '' OR substr(t.occurredOn, 1, 7) = :period)
            ORDER BY t.occurredAt DESC, t.id DESC"""
     )

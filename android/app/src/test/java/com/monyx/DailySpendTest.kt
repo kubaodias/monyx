@@ -4,9 +4,11 @@ import com.monyx.data.DailyCategorySpend
 import com.monyx.ui.budget.limitShare
 import com.monyx.ui.overview.DAILY_DAYS
 import com.monyx.ui.overview.dailySpend
+import com.monyx.ui.overview.SpendPart
 import com.monyx.ui.overview.dailyWindow
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.time.LocalDate
@@ -157,5 +159,75 @@ class DailySpendTest {
         assertTrue(limitShare(50f) >= 0.04f)
         assertTrue(1f - limitShare(50f) > 0f)
         assertTrue(1f - limitShare(1.0001f) > 0f)
+    }
+}
+
+/**
+ * Hiding a category has to change the chart, not just the legend.
+ *
+ * Every figure the face shows — the tallest bar the axis is scaled to, the
+ * window total, a day's total in the sheet — is derived from the days, so this
+ * is the one place that has to drop the parts for all of them to follow.
+ */
+class DailySpendHidingTest {
+
+    private fun row(day: String, categoryId: String, minor: Long) =
+        DailyCategorySpend(day = day, categoryId = categoryId, name = categoryId, color = null, spentMinor = minor)
+
+    private fun window() = dailySpend(
+        rows = listOf(
+            row("2026-09-01", "food", 10_000),
+            row("2026-09-01", "fuel", 40_000),
+            row("2026-09-02", "food", 20_000),
+        ),
+        from = LocalDate.parse("2026-09-01"),
+        to = LocalDate.parse("2026-09-02"),
+    )
+
+    @Test
+    fun `hiding a category drops it from every day it appears on`() {
+        val shown = window().excluding(setOf("fuel"))
+        assertEquals(listOf("food"), shown.days[0].parts.map { it.categoryId })
+        assertEquals(10_000L, shown.days[0].expenseMinor)
+    }
+
+    /** The axis is scaled to this, so the bars have to grow back into the space. */
+    @Test
+    fun `the tallest bar is recomputed, not merely redrawn`() {
+        val full = window()
+        assertEquals(50_000L, full.maxMinor)
+        // Day one was the tall one only because of the fuel; without it day two is.
+        assertEquals(20_000L, full.excluding(setOf("fuel")).maxMinor)
+    }
+
+    @Test
+    fun `the window total counts only what is left`() {
+        assertEquals(70_000L, window().totalMinor)
+        assertEquals(30_000L, window().excluding(setOf("fuel")).totalMinor)
+    }
+
+    @Test
+    fun `the day the sheet opens agrees with the bar above it`() {
+        val shown = window().excluding(setOf("fuel"))
+        assertEquals(10_000L, shown.day(LocalDate.parse("2026-09-01"))?.expenseMinor)
+    }
+
+    @Test
+    fun `hiding everything empties the face rather than leaving zero-height bars`() {
+        val shown = window().excluding(setOf("food", "fuel"))
+        assertTrue(shown.isEmpty)
+        assertEquals(emptyList<SpendPart>(), shown.categories)
+    }
+
+    /** Quiet days survive: the run of days is the chart's x-axis, not its data. */
+    @Test
+    fun `the days themselves are all still there`() {
+        assertEquals(2, window().excluding(setOf("food", "fuel")).days.size)
+    }
+
+    @Test
+    fun `hiding nothing returns the very same window`() {
+        val full = window()
+        assertSame(full, full.excluding(emptySet()))
     }
 }

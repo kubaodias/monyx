@@ -274,15 +274,35 @@ fun CategoryHistoryChart(
  * Show all / Hide all sits in the header, because isolating one category out of
  * eight is otherwise seven taps.
  */
+/**
+ * The least a legend row needs: who it is, and what colour it is drawn in.
+ *
+ * Its own type so the same legend can serve both faces of the card. The
+ * twelve-month face has months and averages behind each row and the
+ * thirty-one-day face has neither; making the daily face fake a
+ * [HistoryCategory] would mean inventing an "average per month" for a window
+ * that is not months, and that invented figure would be one refactor away from
+ * being printed.
+ */
+data class LegendEntry(val id: String, val name: String, val color: String?)
+
 @Composable
 fun CategoryHistoryLegend(
-    categories: List<HistoryCategory>,
+    categories: List<LegendEntry>,
     hidden: Set<String>,
     /** What to print per category — see [legendAmounts]. */
     amounts: Map<String, Long>,
     onToggle: (String) -> Unit,
     onToggleAll: () -> Unit,
-    onOpen: (String) -> Unit,
+    /**
+     * Opens the category, or null where there is nothing to open.
+     *
+     * Null on the daily face: its rows describe thirty-one days, and a tap that
+     * filtered the ledger to "the last 31 days" would be answering the question
+     * with a different one. A null also takes the ripple away, so the row does
+     * not advertise a tap that does nothing.
+     */
+    onOpen: ((String) -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     Column(modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -325,7 +345,13 @@ fun CategoryHistoryLegend(
                     modifier = Modifier
                         .weight(1f)
                         .clip(MaterialTheme.shapes.small)
-                        .clickable { onOpen(category.id) }
+                        .then(
+                            if (onOpen == null) {
+                                Modifier
+                            } else {
+                                Modifier.clickable { onOpen(category.id) }
+                            },
+                        )
                         // Dimmed and sunk to the bottom of the list, never
                         // removed — see legendOrder. The cost is that the row
                         // under the finger moves when the eye is tapped, so
@@ -391,7 +417,7 @@ fun CategoryHistoryLegend(
  * rule the bars and the budget line already follow.
  */
 internal fun visibleTotal(
-    categories: List<HistoryCategory>,
+    categories: List<LegendEntry>,
     hidden: Set<String>,
     amounts: Map<String, Long>,
 ): Long = categories.filterNot { it.id in hidden }.sumOf { amounts[it.id] ?: 0L }

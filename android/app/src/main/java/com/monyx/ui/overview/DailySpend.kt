@@ -75,6 +75,33 @@ data class DailySpend(
 
     /** The day [date] falls on, or null when it is outside the window. */
     fun day(date: LocalDate): DaySpend? = days.firstOrNull { it.date == date }
+
+    /**
+     * The same window with [hidden] categories taken out of it.
+     *
+     * Taken out, not greyed out: every figure this type derives — the tallest
+     * bar, the window's total, each day's total — is computed from [days], so
+     * dropping the parts here makes the chart rescale to what is left and the
+     * total add up to the rows still on screen. A legend that can hide a
+     * category from a chart whose axis does not move is a legend that only
+     * pretends to filter.
+     *
+     * The legend itself is built from the UNFILTERED window, or a category
+     * hidden by accident would vanish along with the eye that brings it back.
+     */
+    fun excluding(hidden: Set<String>): DailySpend {
+        if (hidden.isEmpty()) return this
+        return DailySpend(
+            days.map { day ->
+                val parts = day.parts.filterNot { it.categoryId in hidden }
+                DaySpend(
+                    date = day.date,
+                    expenseMinor = parts.sumOf { it.minorAmount },
+                    parts = parts,
+                )
+            },
+        )
+    }
 }
 
 /**
