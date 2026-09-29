@@ -252,8 +252,22 @@ class SettingsViewModel(private val app: MonyxApp) : ViewModel() {
         SyncWorker.enqueue(app)
     }
 
+    /**
+     * The button in Settings, which must actually sync.
+     *
+     * [SyncWorker.syncNow] exists for exactly this and was not being called:
+     * this went through [SyncWorker.enqueue], which debounces by fifteen
+     * seconds and enqueues under ExistingWorkPolicy.KEEP.
+     *
+     * KEEP is what made it a dead control rather than a slow one. A sync that
+     * fails returns Result.retry(), so the unique work "sync" stays in the
+     * queue backing off — and KEEP drops every later request under that name.
+     * Once syncing started failing, the one button a household has for "try
+     * again" did nothing at all, for days, without a word. REPLACE cancels the
+     * backed-off attempt and runs now, which is what the tap meant.
+     */
     fun syncNow() {
-        SyncWorker.enqueue(app)
+        SyncWorker.syncNow(app)
     }
 
     /**
