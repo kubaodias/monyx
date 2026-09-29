@@ -26,6 +26,20 @@ class Session(private val context: Context) {
     private val memberKey = stringPreferencesKey("member_id")
     private val fcmKey = stringPreferencesKey("fcm_token")
 
+    /**
+     * Why the last sync failed, if it did.
+     *
+     * In DataStore rather than in the sync_state row, which is where it
+     * belongs by rights: the database is built with
+     * fallbackToDestructiveMigration, so adding a column to carry this would
+     * wipe every phone's local data on upgrade — to ship a diagnostic. A
+     * preference costs nothing and survives.
+     *
+     * Cleared on the next success, so a stale message can never be read as a
+     * current fault.
+     */
+    private val syncErrorKey = stringPreferencesKey("last_sync_error")
+
     val tokenFlow: Flow<String?> = context.sessionStore.data.map { it[tokenKey] }
     val memberIdFlow: Flow<String?> = context.sessionStore.data.map { it[memberKey] }
 
@@ -41,6 +55,15 @@ class Session(private val context: Context) {
             it[tokenKey] = token
             it[householdKey] = householdId
             it[memberKey] = memberId
+        }
+    }
+
+    val syncErrorFlow: Flow<String?> = context.sessionStore.data.map { it[syncErrorKey] }
+
+    /** [message] null after a sync that worked, which clears the last failure. */
+    suspend fun recordSyncError(message: String?) {
+        context.sessionStore.edit {
+            if (message == null) it.remove(syncErrorKey) else it[syncErrorKey] = message
         }
     }
 

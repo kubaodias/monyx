@@ -142,6 +142,7 @@ fun SettingsScreen(onOpenAccountTransactions: (accountId: String, period: String
     val recurringRules by viewModel.recurringRules.collectAsStateWithLifecycle(initialValue = emptyList())
     val syncState by viewModel.syncState.collectAsStateWithLifecycle(initialValue = null)
     val rejectedCount by viewModel.rejectedCount.collectAsStateWithLifecycle(initialValue = 0)
+    val syncError by viewModel.syncError.collectAsStateWithLifecycle(initialValue = null)
     val inviteState by viewModel.inviteState.collectAsStateWithLifecycle()
     val reuploadRequested by viewModel.reuploadRequested.collectAsStateWithLifecycle()
     // Which of the household's members is holding THIS phone. Null until
@@ -279,6 +280,7 @@ fun SettingsScreen(onOpenAccountTransactions: (accountId: String, period: String
                         SyncSection(
                             lastSyncAt = syncState?.lastSyncAt ?: 0,
                             rejectedCount = rejectedCount,
+                            syncError = syncError,
                             onSyncNow = viewModel::syncNow,
                         )
                     }
@@ -455,7 +457,13 @@ private fun InviteSection(
 }
 
 @Composable
-private fun SyncSection(lastSyncAt: Long, rejectedCount: Int, onSyncNow: () -> Unit) {
+private fun SyncSection(
+    lastSyncAt: Long,
+    rejectedCount: Int,
+    /** The last failure, or null when the last attempt worked. */
+    syncError: String?,
+    onSyncNow: () -> Unit,
+) {
     SectionCard(title = stringResource(R.string.settings_sync), icon = Icons.Filled.Sync) {
         Text(
             if (lastSyncAt > 0) {
@@ -469,6 +477,18 @@ private fun SyncSection(lastSyncAt: Long, rejectedCount: Int, onSyncNow: () -> U
             Text(
                 stringResource(R.string.settings_rejected_rows, rejectedCount),
                 style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.error,
+            )
+        }
+        // Verbatim, not a friendly paraphrase. Nobody reads this unless the
+        // date above it has stopped moving, and by then the only useful thing
+        // is the exception's own name — which is the difference between a
+        // timeout, a parse failure and a constraint violation.
+        syncError?.let { error ->
+            Spacer(Modifier.height(4.dp))
+            Text(
+                stringResource(R.string.settings_sync_error, error),
+                style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.error,
             )
         }

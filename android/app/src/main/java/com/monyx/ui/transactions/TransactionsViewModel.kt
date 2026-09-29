@@ -20,6 +20,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -77,6 +78,21 @@ class TransactionsViewModel(
     val accountActivity: StateFlow<Map<String, AccountActivity>> = repository.accountActivity()
         .map { rows -> rows.associateBy { it.id } }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyMap())
+
+    /**
+     * Everything ever spent from the account the filter is pinned to.
+     *
+     * Only asked when a filter is set. The ledger shows one month, so a holiday
+     * that ran across July and August had no figure anywhere saying what the
+     * whole thing cost — which is the question somebody opens a finished
+     * account to ask.
+     */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    val accountSpend: StateFlow<Long> = accountId
+        .flatMapLatest { id ->
+            if (id == null) flowOf(0L) else repository.accountSpend(id)
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0L)
 
     /**
      * Whether the list also shows what the repeating rules are going to write.
