@@ -160,6 +160,7 @@
     <string name="settings_last_sync">Ostatnia synchronizacja: %1$s</string>
     <string name="settings_never_synced">Jeszcze nie synchronizowano</string>
     <string name="settings_rejected_rows">Odrzucone wiersze: %1$d</string>
+    <string name="settings_sync_error">Ostatni błąd: %1$s</string>
     <string name="settings_reupload">Wyślij wszystko ponownie</string>
     <string name="settings_reupload_description">Użyj po odtworzeniu serwera z kopii zapasowej</string>
     <string name="settings_reupload_done">Zaplanowano ponowne wysłanie</string>
@@ -330,6 +331,7 @@
     </plurals>
     <string name="transactions_account_archived">Konto archiwalne</string>
     <string name="transactions_account_span">%1$s – %2$s</string>
+    <string name="transactions_account_spent">Wydano łącznie: %1$s</string>
     <string name="budget_apply_forward">Zastosuj też do kolejnych miesięcy</string>
     <string name="overview_day_open">Zobacz transakcje</string>
 </resources>

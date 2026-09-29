@@ -426,6 +426,24 @@ interface MonyxDao {
     fun accountActivity(): Flow<List<AccountActivity>>
 
     /**
+     * Everything ever spent FROM one account, whatever month it happened in.
+     *
+     * Expenses only. Money transferred in is how the account was funded, not
+     * something it bought — and for a holiday account the funding is the bigger
+     * number, so counting it would answer "how much passed through here" when
+     * the question is "what did this cost us".
+     *
+     * Not filtered by period on purpose: the ledger shows one month at a time,
+     * so a holiday spanning July and August had no figure anywhere that stated
+     * what the whole thing came to.
+     */
+    @Query(
+        """SELECT COALESCE(SUM(amountMinor), 0) FROM transactions
+           WHERE accountId = :accountId AND kind = 'expense' AND deleted = 0"""
+    )
+    fun accountSpend(accountId: String): Flow<Long>
+
+    /**
      * The same balances, as they stood at the end of [through].
      *
      * An account's position is a running total, so asking about a past month

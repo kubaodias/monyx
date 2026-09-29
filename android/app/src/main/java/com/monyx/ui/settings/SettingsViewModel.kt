@@ -100,6 +100,9 @@ class SettingsViewModel(private val app: MonyxApp) : ViewModel() {
     val syncState = repository.syncStateFlow()
     val rejectedCount = repository.rejectedCount()
 
+    /** Why the last sync failed, or null. See [Session.recordSyncError]. */
+    val syncError: Flow<String?> = session.syncErrorFlow
+
     private val _inviteState = MutableStateFlow<InviteUiState>(InviteUiState.Idle)
     val inviteState: StateFlow<InviteUiState> = _inviteState.asStateFlow()
 

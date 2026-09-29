@@ -34,7 +34,17 @@ class SyncWorker(
 
         // WorkManager handles retry with backoff; we do not write our own.
         val outcome = SyncEngine(db, session).sync()
-        if (outcome.isFailure) return Result.retry()
+        if (outcome.isFailure) {
+            // A silent retry loop is indistinguishable from a working sync: the
+            // failure is swallowed here, the timestamp in Settings simply stops
+            // advancing, and the household is left to notice that by itself. It
+            // took a day of reading server logs to establish that one phone was
+            // pushing fine and failing every pull — which the phone knew all
+            // along and had no way to say.
+            session.recordSyncError(describe(outcome.exceptionOrNull()))
+            return Result.retry()
+        }
+        session.recordSyncError(null)
 
         // AFTER the pull, so a tombstone for an occurrence someone else deleted
         // has already landed and is never briefly rewritten and re-pushed.
@@ -47,6 +57,20 @@ class SyncWorker(
         if (written > 0) SyncEngine(db, session).sync()
 
         return Result.success()
+    }
+
+    /**
+     * The shortest thing that still identifies the fault.
+     *
+     * The class name matters as much as the text — a SocketTimeoutException, a
+     * SerializationException and an SQLiteConstraintException are three
+     * different bugs, and several of them carry no message at all.
+     */
+    private fun describe(error: Throwable?): String {
+        val name = error?.let { it::class.java.simpleName } ?: "unknown"
+        val message = error?.message?.trim().orEmpty()
+        val cause = error?.cause?.let { " <- ${it::class.java.simpleName}: ${it.message.orEmpty()}" }.orEmpty()
+        return (if (message.isEmpty()) name else "$name: $message") .plus(cause).take(300)
     }
 
     companion object {

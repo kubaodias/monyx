@@ -161,6 +161,7 @@
     <string name="settings_last_sync">Last sync: %1$s</string>
     <string name="settings_never_synced">Not synced yet</string>
     <string name="settings_rejected_rows">Rejected rows: %1$d</string>
+    <string name="settings_sync_error">Last error: %1$s</string>
     <string name="settings_reupload">Re-upload everything</string>
     <string name="settings_reupload_description">Use this after restoring the server from a backup</string>
     <string name="settings_reupload_done">Re-upload scheduled</string>
@@ -331,6 +332,7 @@
     </plurals>
     <string name="transactions_account_archived">Archived account</string>
     <string name="transactions_account_span">%1$s – %2$s</string>
+    <string name="transactions_account_spent">Spent in total: %1$s</string>
     <string name="budget_apply_forward">Apply to the months after this one too</string>
     <string name="overview_day_open">See the transactions</string>
 </resources>
