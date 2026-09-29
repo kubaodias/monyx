@@ -8,7 +8,7 @@ import assert from "node:assert/strict";
 import { FakeDb, expense, seedHousehold } from "./fake-db.ts";
 import { forHousehold } from "../src/db.ts";
 import { push } from "../src/sync.ts";
-import { budgetStatuses, claimAlerts, undeliveredAlerts, stamp } from "../src/budgets.ts";
+import { alertPeriodsFor, budgetStatuses, claimAlerts, undeliveredAlerts, stamp } from "../src/budgets.ts";
 
 const NOW = 1_756_000_000_000;
 
@@ -207,4 +207,29 @@ test("percentages floor rather than round, so 79.9% does not fire an 80% alert",
   await push(db, [expense("t1", 79_999, "cat1")]);
   assert.equal((await budgetStatuses(db, "2026-08"))[0]?.pct, 79);
   assert.deepEqual(await claimAlerts(db, "2026-08", NOW), []);
+});
+
+/**
+ * The bound that keeps a bulk push inside the client's read timeout.
+ * See alertPeriodsFor — a re-upload used to sweep every month it touched.
+ */
+test("a push only ever sweeps the month being lived", () => {
+  assert.deepEqual(alertPeriodsFor(["2026-09-03", "2026-09-29"], "2026-09"), ["2026-09"]);
+});
+
+test("a push of pure history sweeps nothing at all", () => {
+  const wholeYear = [
+    "2025-10-04", "2025-11-19", "2025-12-02", "2026-01-15", "2026-02-12",
+    "2026-03-31", "2026-04-15", "2026-05-13", "2026-06-09", "2026-07-30", "2026-08-10",
+  ];
+  assert.deepEqual(alertPeriodsFor(wholeYear, "2026-09"), []);
+});
+
+test("one row in this month is enough, and it is still one sweep", () => {
+  const mixed = ["2025-10-04", "2026-03-31", "2026-09-28", "2026-09-29", "2026-08-10"];
+  assert.deepEqual(alertPeriodsFor(mixed, "2026-09"), ["2026-09"]);
+});
+
+test("an empty push sweeps nothing", () => {
+  assert.deepEqual(alertPeriodsFor([], "2026-09"), []);
 });

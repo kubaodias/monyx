@@ -128,6 +128,32 @@ export async function budgetStatuses(
  *
  * Returns only what this caller owns and must deliver.
  */
+/**
+ * Which periods a push should sweep for budget alerts: this month, or none.
+ *
+ * Bounded on purpose, and the bound is the whole point. Sweeping every period a
+ * push touched is fine for a handful of same-day expenses and ruinous for a
+ * bulk one: a re-upload sends the household's whole history, so a single chunk
+ * spans a dozen months or more, and each one costs a status query plus up to a
+ * DELETE per budgeted category per threshold — sequential, and inside the
+ * request. Hundreds of round trips before the response is written is a
+ * guaranteed client timeout, and a timeout AFTER the batch has committed is the
+ * worst shape available: the server keeps the rows, the phone never learns they
+ * were accepted, and it re-pushes the same chunk forever while its pull never
+ * gets a turn.
+ *
+ * Nothing worth having is lost. An alert exists to be read seconds after the
+ * expense that crossed the line; one for March, raised in September because
+ * somebody re-uploaded, is not a warning about anything. The daily sweep picks
+ * up whatever this skips.
+ */
+export function alertPeriodsFor(
+  occurredOns: readonly string[],
+  thisPeriod: string,
+): string[] {
+  return occurredOns.some((on) => on.slice(0, 7) === thisPeriod) ? [thisPeriod] : [];
+}
+
 export async function claimAlerts(
   db: HouseholdDb,
   period: string,

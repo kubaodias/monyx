@@ -7,6 +7,7 @@
 import { env } from "@telnyx/edge-runtime";
 import { authenticate, createInvite, enroll, touchDevice } from "./auth.ts";
 import {
+  alertPeriodsFor,
   claimAlerts,
   stamp,
   sweepPeriod,
@@ -143,12 +144,27 @@ async function handlePush(req: Request, session: SessionLike, nowMs: number): Pr
   // The threshold check runs inline right after the batch commits — not in an
   // actor. The alert lands seconds after the expense that crossed the
   // line, which is the only moment it is worth anything.
-  const periods = new Set<string>();
-  for (const row of result.acceptedTransactions) {
-    const on = row["occurred_on"];
-    if (typeof on === "string") periods.add(periodOf(on));
-  }
-  for (const period of periods) {
+  // The month being lived, and only that one.
+  //
+  // This used to sweep every period the pushed rows touched, which is fine for
+  // an ordinary push of a few same-day expenses and ruinous for a bulk one. A
+  // re-upload sends the household's whole history, so a single 200-row chunk
+  // spans a dozen months or more; claimAlerts costs a status query per period
+  // plus up to one DELETE per budgeted category per threshold, all sequential
+  // and all inside the request. That ran to hundreds of round trips before the
+  // response was written, the phone gave up at its 30 s read timeout, and the
+  // batch had already committed — so the server kept the rows, the client never
+  // learned they were accepted, and it re-pushed the same chunk forever while
+  // its pull never got a turn. One phone sat three days behind that way.
+  //
+  // Nothing is lost by the bound. An alert exists to be seen seconds after the
+  // expense that crossed the line; one for March, raised in September while
+  // re-uploading, is not a warning about anything. The daily sweep still covers
+  // what this skips.
+  const occurredOns = result.acceptedTransactions
+    .map((row) => row["occurred_on"])
+    .filter((on): on is string => typeof on === "string");
+  for (const period of alertPeriodsFor(occurredOns, currentPeriod(nowMs))) {
     const alerts = await claimAlerts(db, period, nowMs);
     await deliverAlerts(db, alerts, nowMs);
   }
