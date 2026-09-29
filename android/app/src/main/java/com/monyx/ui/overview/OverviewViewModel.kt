@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.monyx.data.AccountBalance
+import com.monyx.data.AccountEntity
 import com.monyx.data.CategoryRef
 import com.monyx.data.CategorySpend
 import com.monyx.data.Dates
@@ -246,12 +247,30 @@ class OverviewViewModel(
         chartPreferences.selectedAccounts,
         repository.accounts(),
     ) { stored, accounts ->
-        // Only ids an account still answers to. A remembered selection outlives
-        // the account it names — delete that account and the stored id filters
-        // every figure on the screen down to 0,00 zł while no button on the
-        // strip looks selected, so there is nothing on screen to tap to undo it.
-        // Dropping it leaves an empty set, which already means every account.
-        stored.intersect(accounts.mapTo(HashSet()) { it.id })
+        // Only ids the strip can still answer for.
+        //
+        // A remembered selection outlives what it names. Two ways, both of
+        // which end with money in the figures that nothing on screen can take
+        // back out:
+        //
+        //  - the account is gone. The stored id then matches nothing and
+        //    filters every figure down to 0,00 zł while no button looks
+        //    selected.
+        //  - the account is archived AND kept out of the summary. It has no
+        //    button, and it is not one of the archived ids that ride along with
+        //    the default set either — but it can already BE in the set, because
+        //    it rode along back when it still counted, and that set was
+        //    persisted. Switching the account out of the summary afterwards
+        //    does not remove an id that is already stored, and no tap can:
+        //    toggleAccount only collapses to "all" when the selection equals
+        //    the defaults exactly, which it never will with an extra id in it.
+        //    One household had a finished holiday account moving its carry-over
+        //    by 17 900 zł this way, with nothing on screen admitting it existed.
+        //
+        // Dropping either leaves an empty set, which already means every
+        // account — and the empty set is the only honest reading of a selection
+        // whose remaining members are all invisible.
+        visibleSelection(stored, accounts)
     }
         // Eagerly, not WhileSubscribed: this is the filter every figure on the
         // screen is computed under, and a value that resets to "all accounts"
@@ -488,6 +507,29 @@ class OverviewViewModel(
          * set has to be an explicit list, and then [archived] ids ride along
          * with it for the same reason: the archived fund's July is still July.
          */
+        /**
+         * The stored selection, minus every id the strip cannot answer for.
+         *
+         * See the call site for why this is not paranoia. Empty is the right
+         * landing place for both cases it drops: it already means every
+         * account, and a selection whose remaining members are all invisible
+         * cannot honestly mean anything narrower.
+         *
+         * An archived account that still counts is deliberately kept — it has
+         * no button either, but it rides along with the default set by design,
+         * and dropping it here would take an archived fund's July back out of
+         * July.
+         */
+        internal fun visibleSelection(
+            stored: Set<String>,
+            accounts: List<AccountEntity>,
+        ): Set<String> {
+            val keep = accounts
+                .filter { it.archived == 0 || it.excludedFromSummary == 0 }
+                .mapTo(HashSet()) { it.id }
+            return stored.intersect(keep)
+        }
+
         internal fun toggledAccounts(
             current: Set<String>,
             id: String,

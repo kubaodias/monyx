@@ -349,3 +349,70 @@ class InteractionTest {
         assertEquals(Palette.colors.size, Palette.colors.map { it.first }.toSet().size)
     }
 }
+
+/**
+ * Which stored ids the account strip is still allowed to act on.
+ *
+ * The remembered selection outlives what it names, and an id nothing on screen
+ * can reach is money in the figures with no way to take it back out.
+ */
+class VisibleSelectionTest {
+
+    private fun account(id: String, archived: Int = 0, outside: Int = 0) =
+        AccountEntity(
+            id = id,
+            name = id,
+            archived = archived,
+            excludedFromSummary = outside,
+        )
+
+    private val accounts = listOf(
+        account("portfel"),
+        account("oszczednosci", outside = 1),
+        account("wakacje", archived = 1, outside = 1),
+        account("stary-fundusz", archived = 1),
+    )
+
+    /**
+     * The bug this was written for. An archived account that still counted rode
+     * along with the default set, that set was persisted, and switching the
+     * account out of the summary afterwards could not remove the stored id —
+     * no tap could either. It moved one household's carry-over by 17 900 zł
+     * while having no button on the screen at all.
+     */
+    @Test
+    fun `an archived account kept out of the summary is dropped`() {
+        val stored = setOf("portfel", "wakacje")
+        assertEquals(setOf("portfel"), OverviewViewModel.visibleSelection(stored, accounts))
+    }
+
+    /** It has no button either, but it rides along by design. */
+    @Test
+    fun `an archived account that still counts is kept`() {
+        val stored = setOf("portfel", "stary-fundusz")
+        assertEquals(stored, OverviewViewModel.visibleSelection(stored, accounts))
+    }
+
+    /** Outside the summary but open: it has a button, so it stays. */
+    @Test
+    fun `an open account outside the summary is kept`() {
+        val stored = setOf("portfel", "oszczednosci")
+        assertEquals(stored, OverviewViewModel.visibleSelection(stored, accounts))
+    }
+
+    @Test
+    fun `an id no account answers to is dropped`() {
+        assertEquals(setOf("portfel"), OverviewViewModel.visibleSelection(setOf("portfel", "gone"), accounts))
+    }
+
+    /** Nothing left that can be seen means all accounts, not no accounts. */
+    @Test
+    fun `a selection of nothing but invisible ids collapses to empty`() {
+        assertEquals(emptySet<String>(), OverviewViewModel.visibleSelection(setOf("wakacje", "gone"), accounts))
+    }
+
+    @Test
+    fun `the default empty selection is left alone`() {
+        assertEquals(emptySet<String>(), OverviewViewModel.visibleSelection(emptySet(), accounts))
+    }
+}
