@@ -307,6 +307,29 @@ object Dates {
         return LocalDate.parse("$period-01").format(formatter)
     }
 
+    private var shortMonthLocale: Locale? = null
+    private var cachedShortMonth: DateTimeFormatter? = null
+
+    /**
+     * "sie 2025" — the month where a full name would not fit.
+     *
+     * The year is in it on purpose. An account's span can cross one, and
+     * "sie – wrz" for August 2025 to September 2026 is a thirteen-month history
+     * printed as though it were six weeks.
+     */
+    fun shortMonthLabel(period: String): String {
+        val formatter = synchronized(this) {
+            val locale = Locale.getDefault()
+            cachedShortMonth?.takeIf { shortMonthLocale == locale } ?: run {
+                DateTimeFormatter.ofPattern("LLL yyyy", locale).also {
+                    shortMonthLocale = locale
+                    cachedShortMonth = it
+                }
+            }
+        }
+        return LocalDate.parse("$period-01").format(formatter)
+    }
+
     fun shiftPeriod(period: String, months: Long): String =
         LocalDate.parse("$period-01").plusMonths(months).format(PERIOD)
 

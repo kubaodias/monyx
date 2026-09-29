@@ -3,6 +3,7 @@ package com.monyx.ui.transactions
 import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.monyx.data.AccountActivity
 import com.monyx.data.AccountEntity
 import com.monyx.data.CategoryEntity
 import com.monyx.data.Dates
@@ -64,6 +65,18 @@ class TransactionsViewModel(
 
     val accounts: StateFlow<List<AccountEntity>> = repository.accounts()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    /**
+     * First and last day on each account, keyed by id.
+     *
+     * Only read for the account the filter is pinned to, and only to say how far
+     * back it goes: arriving on an archived account's ledger from Settings, the
+     * one thing the screen cannot otherwise answer is "is this all of it, or am
+     * I looking at one month of three years".
+     */
+    val accountActivity: StateFlow<Map<String, AccountActivity>> = repository.accountActivity()
+        .map { rows -> rows.associateBy { it.id } }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyMap())
 
     /**
      * Whether the list also shows what the repeating rules are going to write.

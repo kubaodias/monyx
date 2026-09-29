@@ -1,13 +1,12 @@
 package com.monyx
 
-import com.monyx.data.DailyTotals
+import com.monyx.data.DailyCategorySpend
 import com.monyx.ui.budget.limitShare
 import com.monyx.ui.overview.DAILY_DAYS
 import com.monyx.ui.overview.dailySpend
 import com.monyx.ui.overview.dailyWindow
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
-import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.time.LocalDate
@@ -22,6 +21,16 @@ import java.time.LocalDate
 class DailySpendTest {
 
     private val today = LocalDate.of(2026, 9, 24)
+
+    /** One category's spending on one day, the shape the query returns. */
+    private fun row(day: String, minor: Long, category: String = "jedzenie") =
+        DailyCategorySpend(
+            day = day,
+            categoryId = category,
+            name = category.replaceFirstChar { it.uppercase() },
+            color = null,
+            spentMinor = minor,
+        )
 
     @Test
     fun `window is thirty-one days ending today in the current month`() {
@@ -50,41 +59,77 @@ class DailySpendTest {
 
     @Test
     fun `quiet days are zeros rather than missing`() {
-        val rows = listOf(DailyTotals(day = "2026-09-23", incomeMinor = 900000, expenseMinor = 4500))
-        val daily = dailySpend(rows, LocalDate.of(2026, 9, 22), LocalDate.of(2026, 9, 24))
+        val daily = dailySpend(
+            listOf(row("2026-09-23", 4500)),
+            LocalDate.of(2026, 9, 22),
+            LocalDate.of(2026, 9, 24),
+        )
         assertEquals(listOf(0L, 4500L, 0L), daily.days.map { it.expenseMinor })
         // Income is not on this chart at all — a 9 000 zł salary would dwarf
-        // every bar the household came here to compare.
+        // every bar the household came here to compare, which is why the query
+        // behind it only ever asks about expenses.
         assertEquals(4500L, daily.totalMinor)
     }
 
     @Test
-    fun `the busiest day is the tallest bar`() {
-        val rows = listOf(
-            DailyTotals("2026-09-22", 0, 3000),
-            DailyTotals("2026-09-23", 0, 51230),
-            DailyTotals("2026-09-24", 0, 12000),
+    fun `a day is the sum of its categories, biggest first`() {
+        val daily = dailySpend(
+            listOf(
+                row("2026-09-23", 3000, "transport"),
+                row("2026-09-23", 51230, "jedzenie"),
+                row("2026-09-23", 12000, "dom"),
+            ),
+            LocalDate.of(2026, 9, 23),
+            LocalDate.of(2026, 9, 23),
         )
-        val daily = dailySpend(rows, LocalDate.of(2026, 9, 22), LocalDate.of(2026, 9, 24))
-        assertEquals(1, daily.busiestIndex)
-        assertEquals(51230L, daily.maxMinor)
-        assertEquals(66230L, daily.totalMinor)
+        val day = daily.days.single()
+        assertEquals(66230L, day.expenseMinor)
+        // Sorted so the bar stacks its biggest block on the baseline; the
+        // smallest is on top, which is where the rounded cap goes.
+        assertEquals(listOf("jedzenie", "dom", "transport"), day.parts.map { it.categoryId })
+        // The tallest BAR, which is a day's total and not its largest category:
+        // the y axis is scaled to whole days.
+        assertEquals(66230L, daily.maxMinor)
         assertFalse(daily.isEmpty)
     }
 
     @Test
-    fun `a tie goes to the later day and an empty window has no busiest day`() {
-        val tied = dailySpend(
-            listOf(DailyTotals("2026-09-22", 0, 5000), DailyTotals("2026-09-24", 0, 5000)),
+    fun `the legend is the window's categories, biggest first`() {
+        val daily = dailySpend(
+            listOf(
+                row("2026-09-22", 3000, "transport"),
+                row("2026-09-23", 4000, "jedzenie"),
+                row("2026-09-24", 9000, "transport"),
+            ),
             LocalDate.of(2026, 9, 22),
             LocalDate.of(2026, 9, 24),
         )
-        assertEquals(2, tied.busiestIndex)
+        // Transport is two days added together, and that is what puts it first:
+        // the legend is about the window, not about any one bar in it.
+        assertEquals(listOf("transport", "jedzenie"), daily.categories.map { it.categoryId })
+        assertEquals(listOf(12000L, 4000L), daily.categories.map { it.minorAmount })
+        assertEquals(16000L, daily.totalMinor)
+    }
 
+    @Test
+    fun `an empty window has nothing to name`() {
         val quiet = dailySpend(emptyList(), LocalDate.of(2026, 9, 22), LocalDate.of(2026, 9, 24))
-        assertNull(quiet.busiestIndex)
         assertTrue(quiet.isEmpty)
         assertEquals(0L, quiet.totalMinor)
+        assertTrue(quiet.categories.isEmpty())
+    }
+
+    @Test
+    fun `a day can be looked up by date, and only inside the window`() {
+        val daily = dailySpend(
+            listOf(row("2026-09-23", 4500)),
+            LocalDate.of(2026, 9, 22),
+            LocalDate.of(2026, 9, 24),
+        )
+        // What the sheet opens on: the tap carries a date, not an index.
+        assertEquals(4500L, daily.day(LocalDate.of(2026, 9, 23))?.expenseMinor)
+        assertEquals(0L, daily.day(LocalDate.of(2026, 9, 22))?.expenseMinor)
+        assertEquals(null, daily.day(LocalDate.of(2026, 9, 25)))
     }
 
     @Test

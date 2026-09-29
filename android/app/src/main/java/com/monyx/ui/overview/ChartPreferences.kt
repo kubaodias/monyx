@@ -35,6 +35,7 @@ class ChartPreferences(private val context: Context) {
     private val key = stringSetPreferencesKey("history_hidden_categories")
     private val budgetKey = booleanPreferencesKey("history_budget_hidden")
     private val showsMonthKey = booleanPreferencesKey("breakdown_shows_month")
+    private val accountsKey = stringSetPreferencesKey("overview_selected_accounts")
 
     val hidden: Flow<Set<String>> = context.chartStore.data.map { it[key] ?: emptySet() }
 
@@ -64,6 +65,23 @@ class ChartPreferences(private val context: Context) {
      */
     suspend fun setShowsMonth(value: Boolean) {
         context.chartStore.edit { it[showsMonthKey] = value }
+    }
+
+    /**
+     * Which account buttons are lit on the Overview. Empty is the default view —
+     * see OverviewViewModel.selectedAccounts, where that meaning is defined.
+     *
+     * Remembered for the same reason the hidden categories are: somebody who
+     * looks at one account's month looks at it again the next time they open
+     * the app, and being handed back the unfiltered view every launch is the
+     * app forgetting what it was told thirty seconds ago.
+     *
+     * Local, unsynced, and ids that no longer exist simply never match.
+     */
+    val selectedAccounts: Flow<Set<String>> = context.chartStore.data.map { it[accountsKey] ?: emptySet() }
+
+    suspend fun setSelectedAccounts(ids: Set<String>) {
+        context.chartStore.edit { it[accountsKey] = ids }
     }
 
     suspend fun toggle(id: String) {

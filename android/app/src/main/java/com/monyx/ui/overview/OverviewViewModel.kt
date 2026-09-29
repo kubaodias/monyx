@@ -242,7 +242,12 @@ class OverviewViewModel(
      * the screen. Every account button is simply drawn selected while this is
      * empty. See [toggleAccount] for what a tap does then.
      */
-    private val selectedAccounts = MutableStateFlow<Set<String>>(emptySet())
+    private val selectedAccounts: StateFlow<Set<String>> = chartPreferences.selectedAccounts
+        // Eagerly, not WhileSubscribed: this is the filter every figure on the
+        // screen is computed under, and a value that resets to "all accounts"
+        // while nothing is collecting would be read back as a deliberate choice
+        // the moment the tab returns.
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptySet())
 
     @OptIn(ExperimentalCoroutinesApi::class)
     val uiState: StateFlow<OverviewUiState> = combine(period, selectedAccounts, ::Pair)
@@ -416,7 +421,7 @@ class OverviewViewModel(
     val daily: StateFlow<DailySpend> = combine(period, selectedAccounts, ::Pair)
         .flatMapLatest { (selectedPeriod, accountIds) ->
             val window = dailyWindow(selectedPeriod)
-            repository.dailyTotals(
+            repository.spendByCategoryPerDay(
                 Dates.iso(window.start),
                 Dates.iso(window.endInclusive),
                 accountIds,
@@ -444,12 +449,16 @@ class OverviewViewModel(
      * See [toggledAccounts] for the rules.
      */
     fun toggleAccount(id: String, buttons: List<AccountBalance>) {
-        selectedAccounts.value = toggledAccounts(
+        val next = toggledAccounts(
             current = selectedAccounts.value,
             id = id,
             defaults = buttons.filter { it.excludedFromSummary == 0 }.map { it.id }.toSet(),
             archived = uiState.value.archivedIds,
         )
+        // Written, not held: the strip is where somebody says which money they
+        // are looking at, and it outlives the visit. The flow above reads it
+        // back, so there is one copy of the answer and not two.
+        viewModelScope.launch { chartPreferences.setSelectedAccounts(next) }
     }
 
     companion object {

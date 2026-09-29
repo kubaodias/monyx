@@ -62,6 +62,33 @@ data class PlanState(
     val overAssigned: Boolean get() = (leftToAssignMinor ?: 0) < 0
 }
 
+/**
+ * How a limit is doing, for the colour the row is drawn in.
+ *
+ * Three bands and not four: the point of the band is the ALARM, and an alarm
+ * that goes off for four złoty over 1 650 is an alarm the eye learns to skip.
+ * [Close] therefore covers both "nearly there" and "over by a rounding error",
+ * which keeps the escalation monotone — nothing may look calmer than the state
+ * before it, so a hair over the limit can never come out gentler than 95%.
+ */
+enum class BudgetBand { Under, Close, Over }
+
+/** Over the limit by at least this much of it before the row turns red. */
+private const val OVER_MARGIN = 0.01
+
+/**
+ * The band [spentMinor] falls in against [limitMinor].
+ *
+ * A limit of nothing is a real limit — "do not spend here" — so any spending
+ * against it is over, with no margin to be within: one per cent of zero is zero.
+ */
+fun overBudgetBand(spentMinor: Long, limitMinor: Long): BudgetBand = when {
+    limitMinor <= 0L -> if (spentMinor > 0L) BudgetBand.Over else BudgetBand.Under
+    spentMinor > limitMinor + (limitMinor * OVER_MARGIN) -> BudgetBand.Over
+    spentMinor >= limitMinor * 0.8 -> BudgetBand.Close
+    else -> BudgetBand.Under
+}
+
 class BudgetViewModel(
     private val repository: MonyxRepository,
     private val selectedMonth: SelectedMonth,
@@ -144,9 +171,12 @@ class BudgetViewModel(
     /** What to prefill the plan field with when the month has none yet. */
     suspend fun suggestedPlanMinor(): Long = repository.suggestedPlanMinor(_period.value)
 
-    /** Sets or changes the limit for the currently selected period. */
-    suspend fun setBudget(categoryId: String, limitMinor: Long) {
-        repository.setBudget(categoryId, _period.value, limitMinor)
+    /**
+     * Sets or changes the limit for the currently selected period — and only
+     * that one, unless [alsoFutureMonths]. See [com.monyx.data.BudgetEdit].
+     */
+    suspend fun setBudget(categoryId: String, limitMinor: Long, alsoFutureMonths: Boolean = false) {
+        repository.setBudget(categoryId, _period.value, limitMinor, alsoFutureMonths)
     }
 
     /** Tombstones the limit for the currently selected period; carry-forward

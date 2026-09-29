@@ -33,6 +33,22 @@ data class CategorySpend(
  * with the month it happened in, so a category is one series across the window
  * rather than twelve separate answers.
  */
+/**
+ * One category's spending on one day, for the 31-day chart's stacked bars.
+ *
+ * The same rollup the pie and the twelve-month chart do — a subcategory counts
+ * inside its parent — so a day's bar is made of the same colours as the legend
+ * under it, and the legend is the same list of categories the other two faces
+ * show. Days with nothing on them are simply absent; the chart fills its gaps.
+ */
+data class DailyCategorySpend(
+    val day: String,
+    val categoryId: String,
+    val name: String,
+    val color: String?,
+    val spentMinor: Long,
+)
+
 data class MonthlyCategorySpend(
     val period: String,
     val categoryId: String,
@@ -125,7 +141,7 @@ data class AccountBalance(
  * archived when it is finished with. Both ends of a transfer count as activity —
  * money arriving is something happening to the account that received it.
  */
-data class AccountActivity(val id: String, val lastOn: String)
+data class AccountActivity(val id: String, val firstOn: String, val lastOn: String)
 
 /** A transaction joined to the names the list needs, so the UI does no lookups. */
 data class TransactionListItem(
@@ -398,7 +414,7 @@ interface MonyxDao {
 
     /** See [AccountActivity]. Accounts with nothing on them are simply absent. */
     @Query(
-        """SELECT id, MAX(occurredOn) AS lastOn FROM (
+        """SELECT id, MIN(occurredOn) AS firstOn, MAX(occurredOn) AS lastOn FROM (
                SELECT accountId AS id, occurredOn FROM transactions
                 WHERE deleted = 0 AND accountId IS NOT NULL
                UNION ALL
@@ -517,6 +533,36 @@ interface MonyxDao {
            ORDER BY spentMinor DESC"""
     )
     fun spendByCategory(period: String, allAccounts: Int, accountIds: List<String>): Flow<List<CategorySpend>>
+
+    /**
+     * The breakdown day by day across a date range, both ends inclusive.
+     *
+     * One query for the window, for the same reason the monthly one gives: the
+     * chart is a shape, and thirty-one separately arriving flows redraw it
+     * thirty-one times.
+     */
+    @Query(
+        """SELECT t.occurredOn               AS day,
+                  COALESCE(p.id, c.id)        AS categoryId,
+                  COALESCE(p.name, c.name)    AS name,
+                  COALESCE(p.color, c.color)  AS color,
+                  SUM(t.amountMinor)          AS spentMinor
+           FROM transactions t
+           JOIN categories c ON c.id = t.categoryId
+           LEFT JOIN categories p ON p.id = c.parentId
+           WHERE t.deleted = 0 AND t.kind = 'expense'
+             AND t.occurredOn >= :fromDay AND t.occurredOn <= :toDay
+             AND ((:allAccounts = 1 AND t.accountId NOT IN (SELECT id FROM accounts WHERE excludedFromSummary = 1))
+                  OR t.accountId IN (:accountIds))
+           GROUP BY t.occurredOn, COALESCE(p.id, c.id)
+           ORDER BY t.occurredOn"""
+    )
+    fun spendByCategoryPerDay(
+        fromDay: String,
+        toDay: String,
+        allAccounts: Int,
+        accountIds: List<String>,
+    ): Flow<List<DailyCategorySpend>>
 
     /**
      * The same breakdown, month by month across a range of periods.
@@ -709,6 +755,28 @@ interface MonyxDao {
     )
     suspend fun effectiveBudget(categoryId: String, period: String): BudgetEntity?
 
+    /**
+     * Whatever this category has at exactly this month, tombstone included.
+     *
+     * Deliberately not filtered on deleted: a tombstone is a decision too —
+     * "no limit from here" — and an edit to the month before it must not
+     * quietly write over either kind.
+     */
+    @Query(
+        """SELECT * FROM budgets
+           WHERE categoryId = :categoryId AND period = :period
+           ORDER BY pending DESC, seq DESC, id DESC LIMIT 1"""
+    )
+    suspend fun budgetAt(categoryId: String, period: String): BudgetEntity?
+
+    /** Live limits after [period], for an edit that carries forward. */
+    @Query(
+        """SELECT * FROM budgets
+           WHERE categoryId = :categoryId AND period > :period AND deleted = 0
+           ORDER BY period"""
+    )
+    suspend fun budgetsAfter(categoryId: String, period: String): List<BudgetEntity>
+
     @Query("SELECT * FROM budgets WHERE categoryId = :categoryId AND period = :period")
     suspend fun budgetForPeriod(categoryId: String, period: String): BudgetEntity?
 
@@ -732,11 +800,19 @@ interface MonyxDao {
     )
     suspend fun previousPlannedMinor(period: String): Long?
 
-    /** Income actually recorded in a month — the fallback suggestion. */
+    /**
+     * Income actually recorded in a month — the fallback suggestion.
+     *
+     * Accounts kept out of the summary are left out, like everywhere else. A
+     * policy paying out 7 500 zł into an account the household cannot spend
+     * from would otherwise propose a month's plan two thirds larger than the
+     * money that actually arrived.
+     */
     @Query(
         """SELECT COALESCE(SUM(amountMinor), 0) FROM transactions
            WHERE deleted = 0 AND kind = 'income'
-             AND substr(occurredOn, 1, 7) = :period"""
+             AND substr(occurredOn, 1, 7) = :period
+             AND accountId NOT IN (SELECT id FROM accounts WHERE excludedFromSummary = 1)"""
     )
     suspend fun incomeMinorIn(period: String): Long
 

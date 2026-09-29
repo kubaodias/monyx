@@ -134,6 +134,23 @@ fun TransactionsScreen(
     val totals by viewModel.filteredTotals.collectAsStateWithLifecycle()
     val accounts by viewModel.accounts.collectAsStateWithLifecycle()
     val transactions by viewModel.transactions.collectAsStateWithLifecycle()
+    // What a row is compared against before it is marked as coming from
+    // somewhere else. Normally the keypad's starting account — the household's
+    // first open one, in their own order, which is the row AddViewModel picks
+    // the same way. Under an account filter it is that account instead, so the
+    // mark disappears: every row matches, the chip overhead already names it,
+    // and a pill on all of them would be the same word forty times down a list.
+    val defaultAccountId = remember(accounts, accountId) {
+        accountId ?: accounts.firstOrNull { it.archived == 0 }?.id
+    }
+    val accountActivity by viewModel.accountActivity.collectAsStateWithLifecycle()
+    // Pinned to a finished account, which only Settings can do. The filter then
+    // stops being a filter: there is one account to look at, it is named in the
+    // chip, and offering to swap it for another would undo the only reason this
+    // screen was opened.
+    val pinnedArchived = remember(accounts, accountId) {
+        accounts.firstOrNull { it.id == accountId && it.archived == 1 }
+    }
     val includePlanned by viewModel.includePlanned.collectAsStateWithLifecycle()
     val plannedAvailable by viewModel.plannedAvailable.collectAsStateWithLifecycle()
     val plannedIds by viewModel.plannedIds.collectAsStateWithLifecycle()
@@ -201,6 +218,29 @@ fun TransactionsScreen(
                 // Account first, then category. It reads as narrowing: which
                 // money, then what it went on — and it is the order the edit
                 // dialog puts the same two choices in.
+                pinnedArchived?.let { account ->
+                    val span = accountActivity[account.id]
+                    Column(modifier = Modifier.padding(end = 8.dp)) {
+                        Text(
+                            text = stringResource(R.string.transactions_account_archived),
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        // How far back the account goes, because the list under
+                        // it shows one month and cannot say that by itself.
+                        span?.let {
+                            Text(
+                                text = stringResource(
+                                    R.string.transactions_account_span,
+                                    Dates.shortMonthLabel(Dates.periodOfDateString(it.firstOn)),
+                                    Dates.shortMonthLabel(Dates.periodOfDateString(it.lastOn)),
+                                ),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+                }
                 // Archived accounts are deliberately absent — see
                 // TransactionsViewModel.filterableAccounts for why.
                 AccountFilterChip(
@@ -208,6 +248,7 @@ fun TransactionsScreen(
                         TransactionsViewModel.filterableAccounts(accounts, accountId)
                     },
                     selectedId = accountId,
+                    enabled = pinnedArchived == null,
                     onSelect = viewModel::setAccountFilter,
                 )
                 // The chosen category may be a child, in which case this chip
@@ -402,6 +443,7 @@ fun TransactionsScreen(
                                 day = day,
                                 items = dayItems,
                                 plannedIds = plannedIds,
+                                defaultAccountId = defaultAccountId,
                                 // The day that was asked for, marked. Scrolling
                                 // to it is not enough on its own: near the end of
                                 // the list there is nothing left to scroll, so
@@ -533,6 +575,7 @@ private fun SubcategoryFilterChip(
 private fun AccountFilterChip(
     accounts: List<AccountEntity>,
     selectedId: String?,
+    enabled: Boolean = true,
     onSelect: (String?) -> Unit,
 ) {
     var expanded by remember { mutableStateOf(false) }
@@ -541,9 +584,16 @@ private fun AccountFilterChip(
     Box {
         FilterChip(
             selected = selectedId != null,
+            enabled = enabled,
             onClick = { expanded = true },
             label = { Text(label) },
-            trailingIcon = { Icon(Icons.Filled.ArrowDropDown, contentDescription = null) },
+            // No arrow when there is nothing to open: a disabled control that
+            // still advertises a menu reads as a control that is broken.
+            trailingIcon = if (enabled) {
+                { Icon(Icons.Filled.ArrowDropDown, contentDescription = null) }
+            } else {
+                null
+            },
         )
         DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
             DropdownMenuItem(
@@ -565,6 +615,7 @@ private fun DayGroup(
     day: String,
     items: List<TransactionListItem>,
     plannedIds: Set<String>,
+    defaultAccountId: String?,
     highlighted: Boolean = false,
     onRowClick: (TransactionListItem) -> Unit,
 ) {
@@ -628,6 +679,7 @@ private fun DayGroup(
                         TransactionRow(
                             item = item,
                             planned = item.id in plannedIds,
+                            defaultAccountId = defaultAccountId,
                             onClick = { onRowClick(item) },
                         )
                         if (index != items.lastIndex) {
@@ -647,6 +699,12 @@ private fun DayGroup(
 private fun TransactionRow(
     item: TransactionListItem,
     planned: Boolean = false,
+    /**
+     * The account the keypad starts on — the household's first one. Rows on any
+     * other account say so; rows on this one do not, or the mark would be on
+     * nearly every row and would mark nothing.
+     */
+    defaultAccountId: String? = null,
     onClick: () -> Unit,
 ) {
     val isTransfer = item.kind == "transfer"
@@ -731,14 +789,38 @@ private fun TransactionRow(
                     )
                 }
             }
-            if (!item.note.isNullOrBlank()) {
-                Text(
-                    text = item.note,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
+            // Which account it came out of, when it was not the usual one. A
+            // transfer is exempt: its title line already names both ends, and
+            // repeating one of them underneath says nothing new.
+            val elsewhere = !isTransfer &&
+                defaultAccountId != null &&
+                item.accountId != null &&
+                item.accountId != defaultAccountId
+            if (elsewhere || !item.note.isNullOrBlank()) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    if (elsewhere) {
+                        Text(
+                            text = item.accountName.orEmpty(),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(6.dp))
+                                .background(MaterialTheme.colorScheme.surfaceVariant)
+                                .padding(horizontal = 6.dp, vertical = 1.dp),
+                        )
+                        if (!item.note.isNullOrBlank()) Spacer(Modifier.width(6.dp))
+                    }
+                    if (!item.note.isNullOrBlank()) {
+                        Text(
+                            text = item.note,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                }
             }
             if (item.rejected == 1) {
                 Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 2.dp)) {

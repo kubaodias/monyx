@@ -28,6 +28,7 @@ import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.RemoveCircleOutline
 import androidx.compose.material.icons.filled.Unarchive
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -401,6 +402,22 @@ private fun AccountRowItem(
 }
 
 /**
+ * A hairline between two parts of the account dialog.
+ *
+ * The dialog asks four unrelated things — what it is called and what is in it,
+ * what it looks like, what colour, and whether it counts — and as one unbroken
+ * column of controls the eye could not tell where one question ended and the
+ * next began. Thin and faint: it is punctuation, not a border.
+ */
+@Composable
+private fun SectionRule() {
+    HorizontalDivider(
+        modifier = Modifier.padding(top = 16.dp, bottom = 12.dp),
+        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f),
+    )
+}
+
+/**
  * The balance field is the balance the account has NOW, not the one it opened
  * with.
  *
@@ -480,15 +497,15 @@ private fun AccountEditDialog(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
-                Spacer(Modifier.height(12.dp))
+                SectionRule()
                 Text(stringResource(R.string.settings_icon), style = MaterialTheme.typography.labelMedium)
                 Spacer(Modifier.height(6.dp))
                 IconSwatchRow(selected = icon, onSelect = { icon = it })
-                Spacer(Modifier.height(12.dp))
+                SectionRule()
                 Text(stringResource(R.string.settings_color), style = MaterialTheme.typography.labelMedium)
                 Spacer(Modifier.height(6.dp))
                 ColorSwatchRow(selected = color, onSelect = { color = it })
-                Spacer(Modifier.height(8.dp))
+                SectionRule()
                 // Savings held somewhere else: still an account you can book
                 // on, just not money to add to what is there to spend.
                 Row(

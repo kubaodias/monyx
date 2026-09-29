@@ -25,6 +25,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
@@ -76,6 +77,7 @@ import com.monyx.ui.MonthSwitcher
 import com.monyx.ui.theme.Palette
 import com.monyx.ui.transactions.EditTransactionSheet
 import kotlinx.coroutines.launch
+import java.time.LocalDate
 
 /**
  * The Overview screen (Przegląd): month totals, the spending breakdown, account
@@ -623,7 +625,16 @@ private fun BreakdownCard(
  */
 @Composable
 private fun DailyFace(daily: DailySpend, onDayClick: (String) -> Unit) {
-    DailySpendChart(daily = daily, onSelectDay = onDayClick)
+    // Which bar was tapped. A day, not a route: the tap asks "what was that
+    // day", and the ledger is one more tap away inside the answer. Kept as a
+    // date string so it survives a rotation without a Saver.
+    var openDay by rememberSaveable { mutableStateOf<String?>(null) }
+
+    DailySpendChart(
+        daily = daily,
+        onSelectDay = { openDay = it },
+        selected = openDay,
+    )
     if (daily.isEmpty) return
     Spacer(modifier = Modifier.height(6.dp))
     DailySpendAxis(daily)
@@ -646,6 +657,93 @@ private fun DailyFace(daily: DailySpend, onDayClick: (String) -> Unit) {
         text = stringResource(R.string.overview_days_hint),
         style = MaterialTheme.typography.bodySmall,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+
+    // The same legend the pie has, over these thirty-one days. The bars are
+    // drawn in these colours, and until this was here they were drawn in
+    // colours nothing on the card named.
+    if (daily.categories.isNotEmpty()) {
+        Spacer(modifier = Modifier.height(16.dp))
+        SliceLegend(
+            slices = daily.categories.map { part ->
+                PieSlice(
+                    id = part.categoryId,
+                    label = part.name,
+                    amountMinor = part.minorAmount,
+                    color = Palette.colorFor(part.color, part.categoryId),
+                )
+            },
+            total = daily.totalMinor,
+            // Inert. On the pie a legend row opens that category's month; here
+            // the rows describe a window that is not a month, and a tap that
+            // filtered the ledger to "the last 31 days" would be answering a
+            // question with a different one.
+            onSliceClick = {},
+        )
+    }
+
+    openDay?.let { date ->
+        daily.day(LocalDate.parse(date))?.let { day ->
+            DaySheet(
+                day = day,
+                onDismiss = { openDay = null },
+                onOpenLedger = {
+                    openDay = null
+                    onDayClick(date)
+                },
+            )
+        }
+    }
+}
+
+/**
+ * One day, opened from a bar: what it cost and what on.
+ *
+ * It exists because the tap used to leave the screen. "Which day was that and
+ * what was it" is answerable right here, on the card that provoked the
+ * question, and the ledger — a different screen, with the month switcher and the
+ * search on it — is for when the answer is not enough. So the jump is a button
+ * inside the answer rather than the answer itself.
+ */
+@Composable
+private fun DaySheet(
+    day: DaySpend,
+    onDismiss: () -> Unit,
+    onOpenLedger: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(Dates.fullDayLabel(day.date.toString())) },
+        text = {
+            Column {
+                Text(
+                    text = Money.formatWithCurrency(day.expenseMinor),
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+                SliceLegend(
+                    slices = day.parts.map { part ->
+                        PieSlice(
+                            id = part.categoryId,
+                            label = part.name,
+                            amountMinor = part.minorAmount,
+                            color = Palette.colorFor(part.color, part.categoryId),
+                        )
+                    },
+                    total = day.expenseMinor,
+                    onSliceClick = {},
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onOpenLedger) {
+                Text(stringResource(R.string.overview_day_open))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.common_close)) }
+        },
     )
 }
 
