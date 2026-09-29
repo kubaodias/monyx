@@ -286,10 +286,13 @@ internal fun CategoryGrid(
                     // below it is the open question — fading it would be the
                     // screen dimming the very thing it is asking about.
                     dimmed = selectedId != openRootId && category.id != selectedId,
-                    // Tapping the lit one goes back to the parent. Optional has
-                    // to be undoable or it is a second required step with a
-                    // softer label.
-                    onClick = { onSelect(if (category.id == selectedId) openRootId else category.id) },
+                    // Tapping the chosen one again keeps it chosen. It used to
+                    // drop back to the parent, so a second tap — a stutter, or
+                    // checking the amount and tapping again — silently undid
+                    // the choice, and the save button went dead for a reason
+                    // nothing on screen gave. Undoing a subcategory is still
+                    // one tap: the parent is right above it, still lit.
+                    onClick = { onSelect(category.id) },
                 )
             }
         }

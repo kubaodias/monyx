@@ -1,6 +1,7 @@
 package com.monyx
 
 import com.monyx.data.AccountEntity
+import com.monyx.data.accountsInListOrder
 import com.monyx.data.defaultAccount
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -125,5 +126,38 @@ class DefaultAccountTest {
             account("Alfa", sortOrder = 1),
         )
         assertEquals("acc-Portfel", defaultAccount(accounts)?.id)
+    }
+
+    /**
+     * The order every list of accounts should offer, and the reason the default
+     * is simply its first open row.
+     */
+    @Test
+    fun `list order groups the way Settings groups`() {
+        val accounts = ordered(
+            account("Oszczędności", sortOrder = 0, outside = 1),
+            account("Portfel", sortOrder = 0),
+            account("Poduszka", sortOrder = 1),
+            account("Tatry 2026", sortOrder = 2, archived = 1),
+            account("PZU", sortOrder = 3),
+        )
+        assertEquals(
+            listOf("Portfel", "Poduszka", "PZU", "Oszczędności", "Tatry 2026"),
+            accountsInListOrder(accounts).map { it.name },
+        )
+    }
+
+    /** Inside a group the household's own dragged order is left alone. */
+    @Test
+    fun `list order keeps sortOrder within a group`() {
+        val accounts = ordered(
+            account("Zeta", sortOrder = 0),
+            account("Alfa", sortOrder = 1),
+            account("Beta", sortOrder = 2),
+        )
+        assertEquals(
+            listOf("Zeta", "Alfa", "Beta"),
+            accountsInListOrder(accounts).map { it.name },
+        )
     }
 }
