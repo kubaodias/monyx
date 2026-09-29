@@ -372,6 +372,7 @@ interface MonyxDao {
     @Query("SELECT * FROM accounts WHERE deleted = 0 AND archived = 0 ORDER BY sortOrder, name")
     fun activeAccounts(): Flow<List<AccountEntity>>
 
+
     /**
      * Oldest first. Who joined the household when is a fact about the household;
      * alphabetical order was a fact about nothing, and it reshuffled the list

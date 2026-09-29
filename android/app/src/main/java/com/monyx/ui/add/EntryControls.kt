@@ -1,8 +1,10 @@
 package com.monyx.ui.add
 
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -39,9 +41,11 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -261,6 +265,9 @@ internal fun CategoryGrid(
                 // itself is one of those children. A ring rather than a fill:
                 // it is not the answer, it is where the answer came from.
                 open = category.id == openRootId && category.id != selectedId,
+                // Faded once the choice is made, unless this IS the choice or
+                // the family it came from. See [CategoryCell].
+                dimmed = openRootId != null && category.id != openRootId,
                 onClick = { onSelect(category.id) },
             )
         }
@@ -274,6 +281,11 @@ internal fun CategoryGrid(
                     color = colorOf(category),
                     selected = category.id == selectedId,
                     open = false,
+                    // A subcategory only fades once one of its siblings has been
+                    // picked. Until then the parent is the choice and the row
+                    // below it is the open question — fading it would be the
+                    // screen dimming the very thing it is asking about.
+                    dimmed = selectedId != openRootId && category.id != selectedId,
                     // Tapping the lit one goes back to the parent. Optional has
                     // to be undoable or it is a second required step with a
                     // softer label.
@@ -321,15 +333,43 @@ private fun CategoryCell(
     color: Color,
     selected: Boolean,
     open: Boolean,
+    /**
+     * Something else has been chosen, so this one steps back.
+     *
+     * The grid is four columns of saturated circles and the chosen one has to
+     * win against all of them at once; a ring on one cell is a small mark on a
+     * loud page. Fading the rest is the other half of the same sentence, and it
+     * leaves them perfectly legible — this is a step back, not a disabling, and
+     * every one of them is still one tap away.
+     */
+    dimmed: Boolean = false,
     onClick: () -> Unit,
 ) {
+    // Not quite half: at 0.5 the unchosen names on a light background start to
+    // read as greyed-out rather than as quiet, and nothing here is unavailable.
+    val fade by animateFloatAsState(if (dimmed) 0.45f else 1f, label = "categoryFade")
     // fillMaxWidth, or the cell is only as wide as its widest child and sits at
     // the start of the grid slot: "Dom" made a narrow column with the icon
     // centred over three letters, "Zakupy spożywcze" made a column the full
     // width of the slot, and the icons in one row stopped lining up.
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
+        modifier = Modifier
+            .fillMaxWidth()
+            .alpha(fade)
+            // No ripple. The clickable covers the whole cell — 56dp of circle
+            // and two lines of label — so the default indication was a grey
+            // rectangle around a round icon, announcing the shape of the touch
+            // target rather than the thing being chosen. The answer arrives
+            // instantly anyway: the circle fills, the ring appears and every
+            // other cell fades. Bounding the ripple to the circle instead would
+            // mean moving the clickable onto it and losing the label as a
+            // target, which is the half of the cell a thumb actually lands on.
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                onClick = onClick,
+            ),
     ) {
         // The ring sits OUTSIDE the circle, with daylight between the two.
         // Drawn on the circle's own edge it was invisible on the one cell that

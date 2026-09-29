@@ -67,7 +67,6 @@
     <string name="overview_breakdown_days">Ostatnie 31 dni</string>
     <string name="overview_show_days">Pokaż ostatnie 31 dni</string>
     <string name="overview_days_empty">Brak wydatków w ostatnich 31 dniach</string>
-    <string name="overview_days_total">Wydatki w 31 dniach</string>
     <string name="overview_days_hint">Dotknij dzień, aby zobaczyć wydatki</string>
     <string name="overview_no_data">Brak wydatków w tym miesiącu</string>
     <string name="overview_previous_month">Poprzedni miesiąc</string>
