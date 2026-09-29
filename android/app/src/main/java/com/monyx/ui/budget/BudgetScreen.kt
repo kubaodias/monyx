@@ -25,6 +25,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Checkbox
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ModalBottomSheet
@@ -51,6 +53,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import kotlin.math.roundToInt
@@ -226,9 +229,9 @@ fun BudgetScreen(
         EditBudgetLimitDialog(
             target = target,
             onDismiss = { editTarget = null },
-            onSave = { minor ->
+            onSave = { minor, alsoFuture ->
                 scope.launch {
-                    viewModel.setBudget(target.categoryId, minor)
+                    viewModel.setBudget(target.categoryId, minor, alsoFuture)
                     SyncWorker.enqueue(context)
                 }
                 editTarget = null
@@ -432,12 +435,20 @@ private fun BudgetRow(
         usage.spentMinor > 0 -> 1f
         else -> 0f
     }
+    val over = usage.spentMinor > usage.limitMinor
+    // Over by less than one per cent is over by a rounding error: a 1 650 zł
+    // limit missed by four złoty is not the same event as one missed by four
+    // hundred, and painting both of them red taught the eye to ignore red.
+    //
+    // It lands in the SAME amber as 80–100%, not in grey. Grey would read as
+    // calmer than 95% and the escalation has to stay monotone — an overshoot
+    // cannot look like better news than nearly getting there.
+    val seriouslyOver = overBudgetBand(usage.spentMinor, usage.limitMinor) == BudgetBand.Over
     val barColor = when {
-        pct >= 1f -> MaterialTheme.colorScheme.error
+        seriouslyOver -> MaterialTheme.colorScheme.error
         pct >= 0.8f -> MaterialTheme.colorScheme.tertiary
         else -> MaterialTheme.colorScheme.primary
     }
-    val over = usage.spentMinor > usage.limitMinor
     // Only against a real limit. Spending 40 zł where nothing was allowed is
     // infinitely over, and "4000%" is a number nobody can do anything with —
     // the line below already says it in words.
@@ -495,8 +506,8 @@ private fun BudgetRow(
                         Text(
                             text = stringResource(R.string.budget_percent, it),
                             style = MaterialTheme.typography.bodyMedium.copy(fontFeatureSettings = "tnum"),
-                            fontWeight = if (over) FontWeight.SemiBold else FontWeight.Normal,
-                            color = if (over) {
+                            fontWeight = if (seriouslyOver) FontWeight.SemiBold else FontWeight.Normal,
+                            color = if (seriouslyOver) {
                                 MaterialTheme.colorScheme.error
                             } else {
                                 MaterialTheme.colorScheme.onSurfaceVariant
@@ -511,7 +522,14 @@ private fun BudgetRow(
                         stringResource(R.string.budget_left, Money.format(usage.limitMinor - usage.spentMinor))
                     },
                     style = MaterialTheme.typography.bodySmall,
-                    color = if (over) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
+                    // The words still say "over by 4,20 zł" — that is a fact.
+                    // Only the alarm colour is reserved for an overshoot worth
+                    // acting on.
+                    color = if (seriouslyOver) {
+                        MaterialTheme.colorScheme.error
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    },
                 )
             }
 
@@ -698,17 +716,22 @@ private fun EditPlanDialog(
 private fun EditBudgetLimitDialog(
     target: EditTarget,
     onDismiss: () -> Unit,
-    onSave: (Long) -> Unit,
+    onSave: (Long, Boolean) -> Unit,
     onClear: () -> Unit,
 ) {
     val hasExisting = target.limitMinor != null
+    // Off every time the sheet opens. Carrying a limit into every month to come
+    // is the bigger claim of the two, and a box that remembered being ticked
+    // would make the bigger claim on behalf of somebody who only came to fix
+    // one month.
+    var alsoFuture by remember(target.categoryId) { mutableStateOf(false) }
     val tint = Palette.colorFor(target.color, target.categoryId)
 
     BudgetAmountSheet(
         initialMinor = target.limitMinor ?: 0L,
         label = stringResource(if (hasExisting) R.string.budget_edit_limit else R.string.budget_set_limit),
         onDismiss = onDismiss,
-        onSave = onSave,
+        onSave = { minor -> onSave(minor, alsoFuture) },
         // The same circle the budget row shows, so the sheet plainly belongs
         // to the row that opened it.
         header = {
@@ -726,12 +749,28 @@ private fun EditBudgetLimitDialog(
                 Text(target.name, style = MaterialTheme.typography.titleLarge)
             }
         },
+        // It used to say, in small grey text, that the limit would also apply in
+        // later months. That was true and it was not a choice — which is the
+        // wrong shape for something this consequential. It is a choice now, and
+        // the unticked box is the promise that only this month changes.
         footnote = {
-            Text(
-                text = stringResource(R.string.budget_carries_forward),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .toggleable(
+                        value = alsoFuture,
+                        role = Role.Checkbox,
+                        onValueChange = { alsoFuture = it },
+                    ),
+            ) {
+                Checkbox(checked = alsoFuture, onCheckedChange = null)
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    text = stringResource(R.string.budget_apply_forward),
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+            }
         },
         // Zero is a limit like any other, so "shows 0" cannot mean "nothing
         // typed": a new limit is savable once a key has been pressed, an existing

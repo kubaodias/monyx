@@ -330,4 +330,8 @@
         <item quantity="one">%1$d transaction</item>
         <item quantity="other">%1$d transactions</item>
     </plurals>
+    <string name="transactions_account_archived">Archived account</string>
+    <string name="transactions_account_span">%1$s – %2$s</string>
+    <string name="budget_apply_forward">Apply to the months after this one too</string>
+    <string name="overview_day_open">See the transactions</string>
 </resources>

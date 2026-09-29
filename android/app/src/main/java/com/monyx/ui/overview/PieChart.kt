@@ -136,56 +136,77 @@ fun PieChart(
 
         betweenChartAndLegend()
 
-        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            slices.forEach { slice ->
-                val percent = (slice.amountMinor * 100 / total).toInt()
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
+        SliceLegend(
+            slices = slices,
+            total = total,
+            onSliceClick = { id ->
+                focused = id
+                onSliceClick(id)
+            },
+        )
+    }
+}
+
+/**
+ * The rows under a chart: a colour, a name, what it cost and its share.
+ *
+ * Its own composable because two faces of the breakdown card need it and they
+ * are not the same chart. The pie's legend explains a donut; the 31-day face
+ * has no donut and needs the identical list, because a wall of coloured bars
+ * with nothing naming the colours is a picture rather than an answer.
+ */
+@Composable
+fun SliceLegend(
+    slices: List<PieSlice>,
+    total: Long,
+    onSliceClick: (String) -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        slices.forEach { slice ->
+            val percent = if (total > 0) (slice.amountMinor * 100 / total).toInt() else 0
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { onSliceClick(slice.id) },
+            ) {
+                Box(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable {
-                            focused = slice.id
-                            onSliceClick(slice.id)
-                        },
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(10.dp)
-                            .clip(CircleShape)
-                            .background(slice.color),
-                    )
-                    Spacer(modifier = Modifier.width(10.dp))
-                    Text(
-                        text = slice.label,
-                        style = MaterialTheme.typography.bodyMedium,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.weight(1f),
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = Money.format(slice.amountMinor),
-                        style = MaterialTheme.typography.bodyMedium,
-                    )
-                    Spacer(modifier = Modifier.width(4.dp))
-                    // Just wide enough for "100%" at this size, so the amount
-                    // sits right up against its share instead of a gap apart.
-                    Text(
-                        text = stringResource(R.string.overview_percent, percent),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        textAlign = TextAlign.End,
-                        modifier = Modifier.width(32.dp),
-                    )
-                }
+                        .size(10.dp)
+                        .clip(CircleShape)
+                        .background(slice.color),
+                )
+                Spacer(modifier = Modifier.width(10.dp))
+                Text(
+                    text = slice.label,
+                    style = MaterialTheme.typography.bodyMedium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f),
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = Money.format(slice.amountMinor),
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+                Spacer(modifier = Modifier.width(4.dp))
+                // Just wide enough for "100%" at this size, so the amount
+                // sits right up against its share instead of a gap apart.
+                Text(
+                    text = stringResource(R.string.overview_percent, percent),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.End,
+                    modifier = Modifier.width(32.dp),
+                )
             }
-            // The same closing line the twelve-month legend has, in the same
-            // shape. The figure is already in the hole of the donut above, and
-            // it is needed again here: a column of numbers the eye has just
-            // been reading down ends with the question "so how much is that
-            // altogether" — asking it should not mean looking back up.
-            LegendTotal(total = total, column = 32.dp, gap = 4.dp)
         }
+        // The same closing line the twelve-month legend has, in the same
+        // shape. The figure is already in the hole of the donut above, and
+        // it is needed again here: a column of numbers the eye has just
+        // been reading down ends with the question "so how much is that
+        // altogether" — asking it should not mean looking back up.
+        LegendTotal(total = total, column = 32.dp, gap = 4.dp)
     }
 }
 

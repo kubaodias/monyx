@@ -329,4 +329,8 @@
         <item quantity="many">%1$d transakcji</item>
         <item quantity="other">%1$d transakcji</item>
     </plurals>
+    <string name="transactions_account_archived">Konto archiwalne</string>
+    <string name="transactions_account_span">%1$s – %2$s</string>
+    <string name="budget_apply_forward">Zastosuj też do kolejnych miesięcy</string>
+    <string name="overview_day_open">Zobacz transakcje</string>
 </resources>

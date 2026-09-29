@@ -16,18 +16,19 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.drawText
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.monyx.R
 import com.monyx.data.Dates
 import com.monyx.data.Money
+import com.monyx.ui.theme.Palette
 
 /**
  * A month of days as one bar each: what went out, day by day.
@@ -42,15 +43,23 @@ import com.monyx.data.Money
  * them up would draw slopes that are not a rate of anything. Every day gets a
  * column whether or not money moved on it, so the shape of a week is readable.
  *
- * A tap on a day with spending on it opens that day in the ledger. A tap on an
- * empty one does nothing at all, deliberately: there is no list to show, and
- * landing on an empty screen reads as a bug rather than as an answer.
+ * Each bar is stacked in its categories' colours, so the chart answers "what
+ * was that Saturday" as well as "which Saturday" — and the colours are the ones
+ * the legend under it and the pie on the front of the card already use.
+ *
+ * A tap on a day with spending on it picks it out and opens the day, one step
+ * short of leaving the screen: the question is usually "what was that", not
+ * "take me away from here". A tap on an empty one does nothing at all,
+ * deliberately: there is no list to show, and landing on an empty screen reads
+ * as a bug rather than as an answer.
  */
 @Composable
 fun DailySpendChart(
     daily: DailySpend,
     onSelectDay: (String) -> Unit,
     modifier: Modifier = Modifier,
+    /** Picked out with a ring, and named in the sheet the caller opens. */
+    selected: String? = null,
 ) {
     if (daily.isEmpty) {
         Box(
@@ -74,29 +83,26 @@ fun DailySpendChart(
         fontSize = 9.sp,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
     )
-    // The one figure on the chart, over the one bar worth naming.
-    val peakStyle = axisStyle.copy(
-        fontSize = 10.sp,
-        color = MaterialTheme.colorScheme.onSurface,
-        fontWeight = FontWeight.SemiBold,
-    )
-
     val density = LocalDensity.current
     val gutterPx = remember(ticks, measurer, density) {
         ticks.maxOf { measurer.measure(Money.formatWhole(it), axisStyle).size.width } +
             with(density) { 6.dp.toPx() }
     }
-    val labelHeightPx = remember(measurer, density) {
-        measurer.measure("0", axisStyle).size.height + with(density) { 6.dp.toPx() }
-    }
-
     val gridColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.18f)
-    val barColor = MaterialTheme.colorScheme.primary
+    val fallbackColor = MaterialTheme.colorScheme.primary
+    val selectedRing = MaterialTheme.colorScheme.onSurface
     // A day nothing was spent on still gets a mark: a one-pixel stub on the
     // baseline, so the eye can count the quiet days instead of wondering whether
     // the chart is missing them.
     val emptyColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.22f)
     val count = daily.days.size
+    // Resolved once for the window, not per bar: Palette hashes when a category
+    // has no colour of its own, and doing that inside the draw loop would hash
+    // the same ids thirty-one times a frame.
+    val colors = remember(daily) {
+        daily.categories.associate { it.categoryId to Palette.colorFor(it.color, it.categoryId) }
+    }
+    val colorOf = { id: String -> colors[id] ?: fallbackColor }
 
     Canvas(
         modifier = modifier
@@ -113,9 +119,14 @@ fun DailySpendChart(
     ) {
         val plotLeft = gutterPx
         val plotWidth = size.width - plotLeft
-        val plotBottom = size.height - labelHeightPx
-        // Room above the tallest bar for the figure that sits over it.
-        val plotTop = 14.dp.toPx()
+        // No day numbers along the bottom any more — the day that matters is
+        // the one that was tapped, and it is named in full in the sheet. A row
+        // of 1 5 10 15 under thirty-one bars was a scale for a chart nobody
+        // reads by counting.
+        // Half a line of type below the baseline, so the "0" beside it is not
+        // sliced in half by the bottom of the canvas.
+        val plotBottom = size.height - measurer.measure("0", axisStyle).size.height / 2f
+        val plotTop = 6.dp.toPx()
         val plotHeight = plotBottom - plotTop
         if (plotWidth <= 0f || plotHeight <= 0f || count == 0) return@Canvas
 
@@ -144,48 +155,54 @@ fun DailySpendChart(
         daily.days.forEachIndexed { index, day ->
             val left = plotLeft + slot * index + (slot - barWidth) / 2f
             val height = plotHeight * (day.expenseMinor.toFloat() / ceiling.toFloat())
-            drawRoundRect(
-                color = if (day.expenseMinor > 0L) barColor else emptyColor,
-                topLeft = Offset(left, plotBottom - maxOf(height, stub)),
-                size = Size(barWidth, maxOf(height, stub)),
-                cornerRadius = CornerRadius(barWidth / 3f, barWidth / 3f),
-            )
 
-            // Every fifth day of the month, and the 1st. Not every bar: thirty-one
-            // numbers along the bottom of a phone overlap into a grey smear, and
-            // not a fixed every-Nth-bar either, which would label whichever days
-            // the window happened to start on.
-            val number = day.date.dayOfMonth
-            if (number == 1 || number % 5 == 0) {
-                val label = measurer.measure(number.toString(), axisStyle)
-                drawText(
-                    textLayoutResult = label,
-                    topLeft = Offset(
-                        left + (barWidth - label.size.width) / 2f,
-                        plotBottom + 4.dp.toPx(),
-                    ),
+            if (day.expenseMinor <= 0L) {
+                drawRoundRect(
+                    color = emptyColor,
+                    topLeft = Offset(left, plotBottom - stub),
+                    size = Size(barWidth, stub),
+                    cornerRadius = CornerRadius(barWidth / 3f, barWidth / 3f),
+                )
+            } else {
+                // Stacked from the baseline up, biggest block first. Square
+                // corners: rounding every segment would leave white nicks
+                // through the middle of a bar 9dp wide, so only the top of the
+                // whole stack is rounded, by the cap drawn after it.
+                var y = plotBottom
+                day.parts.forEach { part ->
+                    val share = plotHeight * (part.minorAmount.toFloat() / ceiling.toFloat())
+                    drawRect(
+                        color = colorOf(part.categoryId),
+                        topLeft = Offset(left, y - share),
+                        size = Size(barWidth, share),
+                    )
+                    y -= share
+                }
+                // The rounded cap, in the topmost block's colour — and never
+                // taller than that block, or the smallest category on a busy
+                // day would be painted over by its own corner.
+                val top = day.parts.last()
+                val topShare = plotHeight * (top.minorAmount.toFloat() / ceiling.toFloat())
+                val cap = minOf(barWidth / 2f, maxOf(topShare, stub), maxOf(height, stub))
+                drawRoundRect(
+                    color = colorOf(top.categoryId),
+                    topLeft = Offset(left, plotBottom - maxOf(height, stub)),
+                    size = Size(barWidth, cap),
+                    cornerRadius = CornerRadius(barWidth / 3f, barWidth / 3f),
                 )
             }
-        }
 
-        // The costliest day, named. It is what the face is FOR — the eye finds
-        // the tallest bar on its own, and then wants to know what it cost without
-        // having to open it.
-        daily.busiestIndex?.let { index ->
-            val day = daily.days[index]
-            val text = measurer.measure(Money.formatWhole(day.expenseMinor), peakStyle)
-            val centre = plotLeft + slot * index + slot / 2f
-            val height = plotHeight * (day.expenseMinor.toFloat() / ceiling.toFloat())
-            drawText(
-                textLayoutResult = text,
-                // Kept inside the canvas at both ends: the busiest day is often
-                // the 1st or the last, and a figure centred on that bar would
-                // hang half off the chart.
-                topLeft = Offset(
-                    (centre - text.size.width / 2f).coerceIn(plotLeft, size.width - text.size.width),
-                    (plotBottom - height - text.size.height - 2.dp.toPx()).coerceAtLeast(0f),
-                ),
-            )
+            // The tapped day, ringed. Whatever the sheet says, the chart has to
+            // show WHICH bar it is talking about.
+            if (day.date.toString() == selected) {
+                drawRoundRect(
+                    color = selectedRing,
+                    topLeft = Offset(left - 2.dp.toPx(), plotBottom - maxOf(height, stub) - 3.dp.toPx()),
+                    size = Size(barWidth + 4.dp.toPx(), maxOf(height, stub) + 3.dp.toPx()),
+                    cornerRadius = CornerRadius(barWidth / 2f, barWidth / 2f),
+                    style = Stroke(width = 1.5.dp.toPx()),
+                )
+            }
         }
     }
 }

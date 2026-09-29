@@ -331,26 +331,39 @@ private fun CategoryCell(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
     ) {
+        // The ring sits OUTSIDE the circle, with daylight between the two.
+        // Drawn on the circle's own edge it was invisible on the one cell that
+        // needed it most: a selected category is filled with its colour, and a
+        // border of that same colour on that same fill is nothing at all.
+        //
+        // The 56dp box is reserved whether or not the ring is drawn, so picking
+        // a category does not nudge every other icon in the grid.
         Box(
             modifier = Modifier
-                .size(48.dp)
-                .clip(CircleShape)
-                .background(if (selected) color else color.copy(alpha = 0.16f))
+                .size(56.dp)
                 .then(
-                    if (selected || open) {
-                        Modifier.border(2.dp, color, CircleShape)
-                    } else {
-                        Modifier
-                    },
+                    if (selected) Modifier.border(2.dp, color, CircleShape) else Modifier,
                 ),
             contentAlignment = Alignment.Center,
         ) {
-            Icon(
-                imageVector = Palette.icon(category.icon),
-                contentDescription = null,
-                tint = if (selected) Color.White else color,
-                modifier = Modifier.size(22.dp),
-            )
+            Box(
+                modifier = Modifier
+                    .size(48.dp)
+                    .clip(CircleShape)
+                    .background(if (selected) color else color.copy(alpha = 0.16f))
+                    // The family whose children are open, but not chosen itself:
+                    // a ring on the wash, which is a different mark from the one
+                    // above and has to stay that way.
+                    .then(if (open) Modifier.border(2.dp, color, CircleShape) else Modifier),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    imageVector = Palette.icon(category.icon),
+                    contentDescription = null,
+                    tint = if (selected) Color.White else color,
+                    modifier = Modifier.size(22.dp),
+                )
+            }
         }
         Spacer(Modifier.height(4.dp))
         Text(

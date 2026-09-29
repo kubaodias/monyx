@@ -49,6 +49,10 @@ class MonyxRepository(private val dao: MonyxDao) {
         accountIds: Set<String> = emptySet(),
     ) = dao.spendByCategoryPerMonth(fromPeriod, toPeriod, allAccounts(accountIds), accountIds.toList())
 
+    /** Day-by-day spending per category, for the 31-day chart. Both ends inclusive. */
+    fun spendByCategoryPerDay(fromDay: String, toDay: String, accountIds: Set<String> = emptySet()) =
+        dao.spendByCategoryPerDay(fromDay, toDay, allAccounts(accountIds), accountIds.toList())
+
     /** Day-by-day income and expense, under the same account filter as the rest
      *  of the overview. Both ends inclusive. */
     fun dailyTotals(fromDay: String, toDay: String, accountIds: Set<String> = emptySet()) =
@@ -314,18 +318,41 @@ class MonyxRepository(private val dao: MonyxDao) {
         dao.previousPlannedMinor(period)
             ?: dao.incomeMinorIn(Dates.shiftPeriod(period, -1))
 
-    suspend fun setBudget(categoryId: String, period: String, limitMinor: Long) {
+    /**
+     * Sets a limit for one month — and, unless [alsoFutureMonths], only that one.
+     *
+     * See [BudgetEdit] for what that costs in rows and why. The reads happen
+     * before the write on purpose: "the limit in force" has to be the one from
+     * before this edit, or the month after inherits the figure being set.
+     */
+    suspend fun setBudget(
+        categoryId: String,
+        period: String,
+        limitMinor: Long,
+        alsoFutureMonths: Boolean = false,
+    ) {
+        val inForce = dao.effectiveBudget(categoryId, period)?.limitMinor
+        val next = Dates.shiftPeriod(period, 1)
+        val nextHasRow = dao.budgetAt(categoryId, next) != null
+        val later = if (alsoFutureMonths) dao.budgetsAfter(categoryId, period).map { it.period } else emptyList()
         dao.upsertBudgets(
-            listOf(
+            BudgetEdit.writes(
+                period = period,
+                limitMinor = limitMinor,
+                alsoFutureMonths = alsoFutureMonths,
+                inForceMinor = inForce,
+                nextMonthHasRow = nextHasRow,
+                laterPeriods = later,
+            ).map { write ->
                 BudgetEntity(
-                    id = budgetId(categoryId, period),
+                    id = budgetId(categoryId, write.period),
                     categoryId = categoryId,
-                    period = period,
-                    limitMinor = limitMinor,
-                    deleted = 0,
+                    period = write.period,
+                    limitMinor = write.limitMinor,
+                    deleted = if (write.deleted) 1 else 0,
                     pending = 1,
-                ),
-            ),
+                )
+            },
         )
     }
 

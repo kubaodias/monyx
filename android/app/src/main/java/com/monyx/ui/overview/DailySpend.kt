@@ -1,6 +1,6 @@
 package com.monyx.ui.overview
 
-import com.monyx.data.DailyTotals
+import com.monyx.data.DailyCategorySpend
 import com.monyx.data.Dates
 import java.time.LocalDate
 
@@ -19,10 +19,20 @@ import java.time.LocalDate
  */
 const val DAILY_DAYS = 31
 
-/** One day of the window, and what was spent on it. */
+/** What one category cost, on one day or across the whole window. */
+data class SpendPart(
+    val categoryId: String,
+    val name: String,
+    val color: String?,
+    val minorAmount: Long,
+)
+
+/** One day of the window, what was spent on it, and what on. */
 data class DaySpend(
     val date: LocalDate,
     val expenseMinor: Long,
+    /** Biggest first, so a bar stacks with its largest block on the bottom. */
+    val parts: List<SpendPart> = emptyList(),
 )
 
 /**
@@ -44,15 +54,27 @@ data class DailySpend(
     val maxMinor: Long = days.maxOfOrNull { it.expenseMinor } ?: 0L
 
     /**
-     * The costliest day, which the chart prints the figure above.
+     * The window's categories, biggest first — the legend under the chart.
      *
-     * The LAST of them when several tie, because the window runs left to right
-     * in time and a tie is broken in favour of the more recent — and null when
-     * nothing was spent at all, where a "biggest day" would be a label pointing
-     * at an empty chart.
+     * The same list the pie shows for a month, over these thirty-one days
+     * instead. Without it the bars were a picture of colours nothing named: the
+     * face could say a Saturday cost 300 zł and not what any of it was.
      */
-    val busiestIndex: Int? = days.indexOfLast { it.expenseMinor == maxMinor }
-        .takeIf { it >= 0 && maxMinor > 0L }
+    val categories: List<SpendPart> = days
+        .flatMap { it.parts }
+        .groupBy { it.categoryId }
+        .map { (id, parts) ->
+            SpendPart(
+                categoryId = id,
+                name = parts.first().name,
+                color = parts.first().color,
+                minorAmount = parts.sumOf { it.minorAmount },
+            )
+        }
+        .sortedByDescending { it.minorAmount }
+
+    /** The day [date] falls on, or null when it is outside the window. */
+    fun day(date: LocalDate): DaySpend? = days.firstOrNull { it.date == date }
 }
 
 /**
@@ -68,19 +90,28 @@ fun dailyWindow(period: String, today: LocalDate = Dates.today()): ClosedRange<L
 }
 
 /**
- * One bar per day of [from]..[to], whether or not money moved on it.
+ * One bar per day of [from]..[to], whether or not money moved on it, each one
+ * split into the categories it was spent on.
  *
  * Quiet days are drawn as gaps rather than dropped, for the reason the trend
  * gives at length: bars spaced by the days that happen to have rows would put
  * Tuesday and Friday next to each other and the week would stop being readable.
  */
-fun dailySpend(rows: List<DailyTotals>, from: LocalDate, to: LocalDate): DailySpend {
-    val byDay = rows.associateBy { it.day }
+fun dailySpend(rows: List<DailyCategorySpend>, from: LocalDate, to: LocalDate): DailySpend {
+    val byDay = rows.groupBy { it.day }
     val last = if (to.isBefore(from)) from else to
     val days = ArrayList<DaySpend>()
     var day = from
     while (!day.isAfter(last)) {
-        days += DaySpend(day, byDay[day.toString()]?.expenseMinor ?: 0L)
+        val parts = byDay[day.toString()]
+            .orEmpty()
+            .map { SpendPart(it.categoryId, it.name, it.color, it.spentMinor) }
+            .sortedByDescending { it.minorAmount }
+        days += DaySpend(
+            date = day,
+            expenseMinor = parts.sumOf { it.minorAmount },
+            parts = parts,
+        )
         day = day.plusDays(1)
     }
     return DailySpend(days)
