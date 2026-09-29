@@ -54,8 +54,8 @@ with the new row on screen.
 - **Add** — a keypad that is also a calculator, a note, any date including the
   future, and *Make it repeat* to turn the row being typed into a repeating rule.
 - **History** — the month, searchable, filtered by account, category and then
-  subcategory, with any row that is not on the account the household mostly uses
-  carrying that account's name in its own colour; pick a category and the rows are totalled above them, so "how much
+  subcategory, with any row that is not on the household's default account — the
+  first one on the list — carrying that account's name in its own colour; pick a category and the rows are totalled above them, so "how much
   went on coffee" is a figure rather than an addition. Pulled down to sync. Today and
   yesterday are labelled as such, and *Planned* shows
   what the repeating rules are about to write.

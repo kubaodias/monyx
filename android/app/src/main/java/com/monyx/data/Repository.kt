@@ -18,9 +18,6 @@ class MonyxRepository(private val dao: MonyxDao) {
     fun incomeCategories() = dao.categoriesOfKind("income")
     fun accounts() = dao.accounts()
     fun activeAccounts() = dao.activeAccounts()
-
-    /** The account most of the ledger is on. See [MonyxDao.busiestAccountId]. */
-    fun busiestAccountId() = dao.busiestAccountId()
     fun members() = dao.members()
     fun accountBalances() = dao.accountBalances()
 

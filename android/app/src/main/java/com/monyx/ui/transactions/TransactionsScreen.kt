@@ -77,6 +77,7 @@ import com.monyx.R
 import com.monyx.data.AccountEntity
 import com.monyx.data.CategoryEntity
 import com.monyx.data.Dates
+import com.monyx.data.defaultAccountId
 import com.monyx.data.Money
 import com.monyx.data.TransactionEntity
 import com.monyx.data.TransactionListItem
@@ -135,14 +136,16 @@ fun TransactionsScreen(
     val totals by viewModel.filteredTotals.collectAsStateWithLifecycle()
     val accounts by viewModel.accounts.collectAsStateWithLifecycle()
     val transactions by viewModel.transactions.collectAsStateWithLifecycle()
-    val usualAccountId by viewModel.usualAccountId.collectAsStateWithLifecycle()
     // What a row is compared against before it is marked as coming from
-    // somewhere else. Normally the account most of the ledger is on. Under an
-    // account filter it is that account instead, so the mark disappears: every
-    // row matches, the chip overhead already names it, and a pill on all of them
-    // would be the same word forty times down a list.
-    val defaultAccountId = remember(usualAccountId, accountId) {
-        accountId ?: usualAccountId
+    // somewhere else: the household's default account, which is also the one the
+    // keypad starts on. See [defaultAccount] — the two have to agree, or the
+    // ledger marks rows as unusual that the app itself just made.
+    //
+    // Under an account filter it is that account instead, so the mark
+    // disappears: every row matches, the chip overhead already names it, and a
+    // pill on all of them would be the same word forty times down a list.
+    val defaultAccountId = remember(accounts, accountId) {
+        accountId ?: defaultAccountId(accounts)
     }
     // Each account's own colour, for the pill on a row from elsewhere. Resolved
     // once for the list rather than per row: Palette hashes when an account has
@@ -710,9 +713,9 @@ private fun TransactionRow(
     item: TransactionListItem,
     planned: Boolean = false,
     /**
-     * The account most of the ledger is on. Rows on any other account say so;
-     * rows on this one do not, or the mark would be on nearly every row and
-     * would mark nothing.
+     * The household's first open account — the one the keypad starts on. Rows on
+     * any other account say so; rows on this one do not, or the mark would be on
+     * nearly every row and would mark nothing.
      */
     defaultAccountId: String? = null,
     /** This row's account's own colour, for the pill. Never resolved here. */

@@ -67,17 +67,6 @@ class TransactionsViewModel(
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     /**
-     * The account a row is compared against before it is marked as coming from
-     * somewhere else — the one most of the ledger is on.
-     *
-     * Null until the query lands, and null on an empty ledger. No mark on any
-     * row is the right answer to both: on a ledger with nothing in it there is
-     * no "usual" account to be unusual against.
-     */
-    val usualAccountId: StateFlow<String?> = repository.busiestAccountId()
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
-
-    /**
      * First and last day on each account, keyed by id.
      *
      * Only read for the account the filter is pinned to, and only to say how far

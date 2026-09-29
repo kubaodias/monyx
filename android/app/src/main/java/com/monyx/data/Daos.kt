@@ -372,32 +372,6 @@ interface MonyxDao {
     @Query("SELECT * FROM accounts WHERE deleted = 0 AND archived = 0 ORDER BY sortOrder, name")
     fun activeAccounts(): Flow<List<AccountEntity>>
 
-    /**
-     * The open account the ledger is mostly on — the one a row does NOT need to
-     * name, because it is what the reader already assumes.
-     *
-     * Counted, not configured. The screen used to take the first account in
-     * sortOrder as the usual one, and sortOrder is 0 on every account nobody has
-     * ever dragged, so the tie fell to whichever name sorted first: a household
-     * with 1702 rows on Portfel and 42 on Cash was told, on nearly every row,
-     * that it was not on Cash. Which account the money actually goes through is
-     * a fact sitting right there in the table.
-     *
-     * Archived accounts cannot win it. A finished holiday account may well hold
-     * more rows than the current account does, and "unusual" would then mean
-     * "this year".
-     */
-    @Query(
-        """
-        SELECT a.id FROM accounts a
-        JOIN transactions t ON t.accountId = a.id AND t.deleted = 0
-        WHERE a.deleted = 0 AND a.archived = 0
-        GROUP BY a.id
-        ORDER BY COUNT(t.id) DESC, a.sortOrder, a.name
-        LIMIT 1
-        """,
-    )
-    fun busiestAccountId(): Flow<String?>
 
     /**
      * Oldest first. Who joined the household when is a fact about the household;

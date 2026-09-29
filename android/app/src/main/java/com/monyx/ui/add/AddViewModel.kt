@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.monyx.data.AccountEntity
 import com.monyx.data.CategoryEntity
 import com.monyx.data.Dates
+import com.monyx.data.defaultAccountId
 import com.monyx.data.MonyxRepository
 import com.monyx.ui.settings.RuleDraft
 import com.monyx.voice.SpokenTransaction
@@ -53,10 +54,17 @@ class AddViewModel(private val repository: MonyxRepository) : ViewModel() {
     val accounts: StateFlow<List<AccountEntity>> = repository.activeAccounts()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
-    /** Account and date come from defaults so the fast path stays two taps. */
+    /**
+     * Account and date come from defaults so the fast path stays two taps.
+     *
+     * Not `available.first()`. That is first in the table, and the table sorts
+     * outside-summary accounts in among the rest — so a savings account nobody
+     * spends from could be what the keypad opened on, which is the one account a
+     * mistyped expense must not land in. See [defaultAccount].
+     */
     fun ensureDefaultAccount(available: List<AccountEntity>) {
         if (_state.value.accountId == null && available.isNotEmpty()) {
-            _state.value = _state.value.copy(accountId = available.first().id)
+            _state.value = _state.value.copy(accountId = defaultAccountId(available))
         }
     }
 
