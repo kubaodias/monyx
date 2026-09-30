@@ -58,7 +58,9 @@ with the new row on screen.
   first one on the list — carrying that account's name in its own colour; pick a category and the rows are totalled above them, so "how much
   went on coffee" is a figure rather than an addition. Pulled down to sync. Today and
   yesterday are labelled as such, and *Planned* shows
-  what the repeating rules are about to write.
+  what the repeating rules are about to write. An archived account's rows are not
+  in here at all: the way to ask about a finished account is its row in Settings,
+  which opens this screen pinned to it.
 - **Budget** — what there is to spend this month, limits on main categories, and
   a warning before a limit is passed rather than after. A limit applies to the
   month you set it in and carries forward from there; changing it later changes
@@ -66,7 +68,9 @@ with the new row on screen.
   the same as having set none.
 - **Settings** — accounts, categories (two levels, dragged into order), repeating
   rules, language, backup health, the update check and what every release
-  changed.
+  changed. Archiving an account takes it out of the summary as well: a finished
+  account left counting is a balance inside every total with no chip anywhere to
+  switch it off. The toggle stays on the row if it should go back in.
 
 One month switcher, pinned above the scroll so it never leaves the screen, the
 same control in the same place on Summary, History and Budget: three views of one month, not three months. The arrows step to a

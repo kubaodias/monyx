@@ -24,9 +24,6 @@ class MonyxRepository(private val dao: MonyxDao) {
     /** The last day each account saw anything, for aiming a ledger at it. */
     fun accountActivity() = dao.accountActivity()
 
-    /** Everything ever spent from one account. See [MonyxDao.accountSpend]. */
-    fun accountSpend(accountId: String) = dao.accountSpend(accountId)
-
     /** Balances as they stood at the end of [through] (an ISO local date). */
     fun accountBalancesThrough(through: String) = dao.accountBalancesThrough(through)
     fun spendingAccountIds(period: String) = dao.spendingAccountIds(period)
@@ -205,9 +202,7 @@ class MonyxRepository(private val dao: MonyxDao) {
      * row keeps its id, its balance and every transaction pointing at it.
      */
     suspend fun setAccountArchived(entity: AccountEntity, archived: Boolean) {
-        dao.upsertAccounts(
-            listOf(entity.copy(archived = if (archived) 1 else 0, pending = 1, rejected = 0)),
-        )
+        dao.upsertAccounts(listOf(applyArchive(entity, archived)))
     }
 
     suspend fun deleteAccount(entity: AccountEntity) {
@@ -554,6 +549,34 @@ class MonyxRepository(private val dao: MonyxDao) {
          * no empty state to explain it.
          */
         internal fun allAccounts(ids: Set<String>): Int = if (ids.isEmpty()) 1 else 0
+
+        /**
+         * Archiving an account also takes it out of the summary.
+         *
+         * The two flags are orthogonal by design — `archived` is lifecycle,
+         * `excludedFromSummary` is ownership — and they stay orthogonal. This is
+         * about which way the default falls when someone sets only the first.
+         *
+         * An account is archived when it is finished with. A finished account
+         * still counted is then a balance inside every total with no chip
+         * anywhere to switch it off, because the strip only offers open
+         * accounts: a holiday that ended in August rode along invisibly in the
+         * carry-over for weeks, and the only way to find it was to re-open the
+         * account. Archiving says "stop counting this"; nothing else on the row
+         * was going to say it.
+         *
+         * Un-archiving deliberately does NOT put it back. The flag it would have
+         * to restore is gone — remembering it needs a column, and a schema
+         * change wipes every phone here (see MonyxDatabase). Leaving it off is
+         * the safe direction, and the toggle sits on the same row.
+         */
+        internal fun applyArchive(entity: AccountEntity, archived: Boolean): AccountEntity =
+            entity.copy(
+                archived = if (archived) 1 else 0,
+                excludedFromSummary = if (archived) 1 else entity.excludedFromSummary,
+                pending = 1,
+                rejected = 0,
+            )
 
         /**
          * The five fields an editor changes, folded onto a whole row.
