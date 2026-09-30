@@ -59,6 +59,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.monyx.R
 import com.monyx.data.AccountEntity
+import com.monyx.data.accountsInListOrder
 import com.monyx.data.CategoryEntity
 import com.monyx.data.Money
 import com.monyx.ui.JumpToToday
@@ -474,12 +475,18 @@ internal fun AccountPickerDialog(
     onDismiss: () -> Unit,
     selectedId: String? = null,
 ) {
+    // Ordered here rather than by whoever opens the dialog. Two screens show
+    // this picker and a third shows the same choice as circles, and the order
+    // is a property of the choice, not of the screen asking — left to the call
+    // sites they disagreed, which is how the keypad and the edit sheet came to
+    // list the same accounts differently.
+    val ordered = remember(accounts) { accountsInListOrder(accounts) }
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.add_pick_account)) },
         text = {
             Column {
-                accounts.forEach { account ->
+                ordered.forEach { account ->
                     val color = Palette.colorFor(account.color, account.id)
                     Row(
                         modifier = Modifier
