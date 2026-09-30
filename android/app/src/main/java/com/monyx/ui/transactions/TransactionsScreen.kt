@@ -155,7 +155,6 @@ fun TransactionsScreen(
         accounts.associate { it.id to Palette.colorFor(it.color, it.id) }
     }
     val accountActivity by viewModel.accountActivity.collectAsStateWithLifecycle()
-    val accountSpend by viewModel.accountSpend.collectAsStateWithLifecycle()
     // Pinned to a finished account, which only Settings can do. The filter then
     // stops being a filter: there is one account to look at, it is named in the
     // chip, and offering to swap it for another would undo the only reason this
@@ -258,22 +257,6 @@ fun TransactionsScreen(
                                 },
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                        // What the whole thing cost, across every month it ran.
-                        // The list under this shows one month; a holiday that
-                        // straddled July and August had its total stated
-                        // nowhere. Expenses only — money transferred in is how
-                        // the account was funded, not something it bought.
-                        if (accountSpend > 0L) {
-                            Text(
-                                text = stringResource(
-                                    R.string.transactions_account_spent,
-                                    Money.formatWithCurrency(accountSpend),
-                                ),
-                                style = MaterialTheme.typography.labelSmall,
-                                fontWeight = FontWeight.SemiBold,
-                                color = MaterialTheme.colorScheme.onSurface,
                             )
                         }
                     }

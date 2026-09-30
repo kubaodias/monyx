@@ -426,24 +426,6 @@ interface MonyxDao {
     fun accountActivity(): Flow<List<AccountActivity>>
 
     /**
-     * Everything ever spent FROM one account, whatever month it happened in.
-     *
-     * Expenses only. Money transferred in is how the account was funded, not
-     * something it bought — and for a holiday account the funding is the bigger
-     * number, so counting it would answer "how much passed through here" when
-     * the question is "what did this cost us".
-     *
-     * Not filtered by period on purpose: the ledger shows one month at a time,
-     * so a holiday spanning July and August had no figure anywhere that stated
-     * what the whole thing came to.
-     */
-    @Query(
-        """SELECT COALESCE(SUM(amountMinor), 0) FROM transactions
-           WHERE accountId = :accountId AND kind = 'expense' AND deleted = 0"""
-    )
-    fun accountSpend(accountId: String): Flow<Long>
-
-    /**
      * The same balances, as they stood at the end of [through].
      *
      * An account's position is a running total, so asking about a past month
@@ -863,6 +845,21 @@ interface MonyxDao {
              -- rows could not add up to the balance shown above them.
              AND (:accountId  IS NULL OR t.accountId  = :accountId
                   OR (t.kind = 'transfer' AND t.transferAccountId = :accountId))
+             -- A finished account's rows are not part of the ledger any more.
+             -- Eighty purchases from a holiday that ended in August were still
+             -- landing in August's list, under the same running totals as the
+             -- household's own spending, and no filter on the screen would take
+             -- them out. The way to ask about a finished account is its row in
+             -- Settings, which arrives here with :accountId already pinned to
+             -- it — so this clause stands down the moment one is set.
+             --
+             -- Hidden only when NO open account is involved. A transfer has two
+             -- ends, and money that arrived in an open account has to stay
+             -- visible there or that account's rows stop adding up to its
+             -- balance.
+             AND (:accountId IS NOT NULL
+                  OR COALESCE(a.archived, 0) = 0
+                  OR (t.kind = 'transfer' AND COALESCE(ta.archived, 0) = 0))
              AND (:period = '' OR substr(t.occurredOn, 1, 7) = :period)
            ORDER BY t.occurredAt DESC, t.id DESC"""
     )

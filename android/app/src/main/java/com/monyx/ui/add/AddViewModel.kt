@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.monyx.data.AccountEntity
 import com.monyx.data.CategoryEntity
 import com.monyx.data.Dates
+import com.monyx.data.accountsInListOrder
 import com.monyx.data.defaultAccountId
 import com.monyx.data.MonyxRepository
 import com.monyx.ui.settings.RuleDraft
@@ -13,6 +14,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.time.LocalDate
@@ -51,7 +53,17 @@ class AddViewModel(private val repository: MonyxRepository) : ViewModel() {
     val incomeCategories: StateFlow<List<CategoryEntity>> = repository.incomeCategories()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
+    /**
+     * In the household's own order, grouped the way Settings groups it.
+     *
+     * Straight from the table this list is `sortOrder, name`, which interleaves
+     * the groups: an account held outside the summary sat above the one
+     * everything is actually spent from, so the picker disagreed with the list
+     * the order was dragged into. See [accountsInListOrder] — the same call the
+     * ledger's filter makes.
+     */
     val accounts: StateFlow<List<AccountEntity>> = repository.activeAccounts()
+        .map(::accountsInListOrder)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     /**
@@ -135,10 +147,11 @@ class AddViewModel(private val repository: MonyxRepository) : ViewModel() {
      * A draft that survives is worse than no draft at all: coming back to a
      * screen already holding 47,50 against a category chosen an hour ago is how
      * a wrong amount gets saved, because the number looks like something you
-     * just typed. The account is kept — it is a default, not part of the entry.
+     * just typed. The account goes back to the default with everything else —
+     * see [nextEntry].
      */
     fun discardDraft() {
-        _state.value = AddUiState(accountId = _state.value.accountId)
+        _state.value = nextEntry(EntryKind.Expense, accounts.value)
     }
 
     /**
@@ -160,12 +173,10 @@ class AddViewModel(private val repository: MonyxRepository) : ViewModel() {
                 occurredAtMs = occurredAt(current.date),
                 createdBy = createdBy,
             )
-            // Reset for the next entry, keeping the account and kind the user
-            // already chose — the next expense is usually like the last one.
-            _state.value = AddUiState(
-                kind = current.kind,
-                accountId = current.accountId,
-            )
+            // Reset for the next entry, keeping the kind the user chose — the
+            // next expense is usually like the last one. The account is not
+            // kept; see [nextEntry].
+            _state.value = nextEntry(current.kind, accounts.value)
             onSaved()
         }
     }
@@ -194,8 +205,7 @@ class AddViewModel(private val repository: MonyxRepository) : ViewModel() {
                 createdBy = createdBy,
             )
             repository.materializeRecurring()
-            val current = _state.value
-            _state.value = AddUiState(kind = current.kind, accountId = current.accountId)
+            _state.value = nextEntry(_state.value.kind, accounts.value)
             onSaved()
         }
     }
@@ -210,4 +220,27 @@ class AddViewModel(private val repository: MonyxRepository) : ViewModel() {
         } else {
             Dates.startOfDayMillis(date) + 12 * 60 * 60 * 1000
         }
+
+    companion object {
+        /**
+         * The state the keypad starts the next entry in.
+         *
+         * The account goes back to the household's default every time, and does
+         * not carry over from the last entry. Carrying it over sounds like
+         * helpfulness — one purchase on a card, the next one probably on the
+         * same card — but the keypad is the screen people open without reading
+         * it: the account sits in a small control above the keys, it is right
+         * nine times out of ten, and the tenth time the money lands somewhere
+         * the person did not choose. Nothing about the screen changes to say so,
+         * and a wrong account is the one mistake here that is invisible
+         * afterwards — the amount and the category are still correct, so the row
+         * looks fine and only two balances quietly disagree with the bank.
+         *
+         * An empty list gives null, which is not a problem:
+         * [ensureDefaultAccount] fills it in on the next composition, and the
+         * save button is off until it does.
+         */
+        internal fun nextEntry(kind: EntryKind, accounts: List<AccountEntity>): AddUiState =
+            AddUiState(kind = kind, accountId = defaultAccountId(accounts))
+    }
 }

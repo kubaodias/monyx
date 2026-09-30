@@ -3,6 +3,8 @@ package com.monyx
 import com.monyx.data.AccountEntity
 import com.monyx.data.accountsInListOrder
 import com.monyx.data.defaultAccount
+import com.monyx.ui.add.AddViewModel
+import com.monyx.ui.add.EntryKind
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
@@ -159,5 +161,58 @@ class DefaultAccountTest {
             listOf("Zeta", "Alfa", "Beta"),
             accountsInListOrder(accounts).map { it.name },
         )
+    }
+}
+
+/**
+ * Which account the keypad opens on for the NEXT entry.
+ *
+ * It used to open on whichever account the last entry was booked to, which is
+ * the one wrong default nobody notices: the amount and the category are right,
+ * so the row reads correctly and only the balances disagree.
+ */
+class NextEntryTest {
+
+    private fun account(
+        name: String,
+        sortOrder: Int = 0,
+        archived: Int = 0,
+        outside: Int = 0,
+    ) = AccountEntity(
+        id = "acc-$name",
+        name = name,
+        sortOrder = sortOrder,
+        archived = archived,
+        excludedFromSummary = outside,
+    )
+
+    @Test
+    fun `starts on the household's default, not on the last account used`() {
+        val accounts = listOf(account("Portfel", sortOrder = 0), account("PZU", sortOrder = 1))
+        val next = AddViewModel.nextEntry(EntryKind.Expense, accounts)
+        assertEquals("acc-Portfel", next.accountId)
+    }
+
+    /** Amount, category, note and date are all gone. Only the kind survives. */
+    @Test
+    fun `keeps the kind and nothing else`() {
+        val next = AddViewModel.nextEntry(EntryKind.Income, listOf(account("Portfel")))
+        assertEquals(EntryKind.Income, next.kind)
+        assertNull(next.categoryId)
+        assertEquals("", next.note)
+        assertEquals(0L, next.amountMinor)
+        assertEquals(false, next.canSave)
+    }
+
+    /**
+     * Before the accounts flow has emitted. ensureDefaultAccount fills it in on
+     * the next composition, and canSave is false until it does — so the state is
+     * unsavable rather than wrong.
+     */
+    @Test
+    fun `no accounts yet leaves it unset rather than guessing`() {
+        val next = AddViewModel.nextEntry(EntryKind.Expense, emptyList())
+        assertNull(next.accountId)
+        assertEquals(false, next.canSave)
     }
 }
