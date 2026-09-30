@@ -681,6 +681,13 @@ interface MonyxDao {
      * lives only in the alert path, and both read the same synced rows.
      *
      * A budget includes its subcategories: a limit on Home covers Home > Repairs.
+     *
+     * Scoped to accounts, the same way monthTotals is. The screen passes the
+     * household's default account alone: a limit is what may be spent out of the
+     * money being managed, and spending from a savings pot or an insurance
+     * account was eating the month's limits without ever being what the limit was
+     * about. Empty :accountIds still means "every counted account", which is what
+     * makes it safe when the account list has not loaded yet.
      */
     @Query(
         """SELECT b.categoryId AS categoryId, c.name AS name, c.color AS color, c.icon AS icon,
@@ -689,7 +696,9 @@ interface MonyxDao {
                   COALESCE((SELECT SUM(t.amountMinor) FROM transactions t
                             WHERE t.deleted = 0 AND t.kind = 'expense'
                               AND substr(t.occurredOn, 1, 7) = :period
-                              AND t.accountId NOT IN (SELECT id FROM accounts WHERE excludedFromSummary = 1)
+                              AND ((:allAccounts = 1
+                                    AND t.accountId NOT IN (SELECT id FROM accounts WHERE excludedFromSummary = 1))
+                                   OR t.accountId IN (:accountIds))
                               AND (t.categoryId = b.categoryId
                                    OR t.categoryId IN (SELECT sc.id FROM categories sc
                                                        WHERE sc.parentId = b.categoryId
@@ -725,7 +734,7 @@ interface MonyxDao {
                          ORDER BY b3.pending DESC, b3.seq DESC, b3.id DESC LIMIT 1)
            ORDER BY c.sortOrder, c.name"""
     )
-    fun budgetUsage(period: String): Flow<List<BudgetUsage>>
+    fun budgetUsage(period: String, allAccounts: Int, accountIds: List<String>): Flow<List<BudgetUsage>>
 
     /**
      * Every budget row up to [toPeriod], for the chart's limit line.

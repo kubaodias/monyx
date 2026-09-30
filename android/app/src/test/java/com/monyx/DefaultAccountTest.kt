@@ -2,6 +2,7 @@ package com.monyx
 
 import com.monyx.data.AccountEntity
 import com.monyx.data.accountsInListOrder
+import com.monyx.data.budgetAccountIds
 import com.monyx.data.defaultAccount
 import com.monyx.ui.add.AddViewModel
 import com.monyx.ui.add.EntryKind
@@ -214,5 +215,56 @@ class NextEntryTest {
         val next = AddViewModel.nextEntry(EntryKind.Expense, emptyList())
         assertNull(next.accountId)
         assertEquals(false, next.canSave)
+    }
+}
+
+/**
+ * Which accounts a budget counts. The rule itself is [defaultAccount]'s, tested
+ * above; what matters here is the wrapper's two edges — one id, never several,
+ * and what an empty list means.
+ */
+class BudgetAccountsTest {
+
+    private fun account(
+        name: String,
+        sortOrder: Int = 0,
+        archived: Int = 0,
+        outside: Int = 0,
+    ) = AccountEntity(
+        id = "acc-$name",
+        name = name,
+        sortOrder = sortOrder,
+        archived = archived,
+        excludedFromSummary = outside,
+    )
+
+    @Test
+    fun `counts the default account alone`() {
+        val accounts = listOf(
+            account("Portfel", sortOrder = 0),
+            account("Poduszka", sortOrder = 1),
+            account("PZU", sortOrder = 2),
+        )
+        assertEquals(setOf("acc-Portfel"), budgetAccountIds(accounts))
+    }
+
+    /** A savings pot dragged to the top is still not what a limit is about. */
+    @Test
+    fun `skips an account held outside the summary`() {
+        val accounts = listOf(
+            account("Oszczędności", sortOrder = 0, outside = 1),
+            account("Portfel", sortOrder = 1),
+        )
+        assertEquals(setOf("acc-Portfel"), budgetAccountIds(accounts))
+    }
+
+    /**
+     * Empty means "every counted account" to the queries, which is the right
+     * fallback: it happens only before the accounts flow has emitted, and the
+     * month's real figures for one frame beat a screen full of zeros.
+     */
+    @Test
+    fun `no accounts yet means no narrowing`() {
+        assertEquals(emptySet<String>(), budgetAccountIds(emptyList()))
     }
 }

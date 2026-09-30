@@ -89,7 +89,20 @@ export async function budgetStatuses(
         AND t.deleted = 0
         AND t.kind = 'expense'
         AND substr(t.occurred_on, 1, 7) = ?2
-        AND t.account_id NOT IN (SELECT id FROM accounts WHERE excluded_from_summary = 1)
+        -- Only the household's default account, which is what the Budget
+        -- screen counts. This is the SECOND implementation of that rule: the
+        -- client's is defaultAccount() in DefaultAccount.kt, and the two have to
+        -- agree or a notification arrives for a limit the screen says is fine.
+        --
+        -- The rule, stated once: of the accounts still open, the ones counted in
+        -- the summary come before the ones held outside it, and within a group
+        -- the household's own dragged order wins. First row is the default.
+        AND t.account_id = (
+              SELECT a.id FROM accounts a
+               WHERE a.household_id = ?1 AND a.deleted = 0 AND a.archived = 0
+               ORDER BY a.excluded_from_summary, a.sort_order, a.name
+               LIMIT 1
+            )
         AND (
               t.category_id = eff.category_id
            OR t.category_id IN (

@@ -7,11 +7,14 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import com.monyx.data.BudgetUsage
 import com.monyx.data.CategoryEntity
 import com.monyx.data.MonyxRepository
+import com.monyx.data.budgetAccountIds
 import com.monyx.ui.SelectedMonth
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import java.time.YearMonth
 
@@ -98,23 +101,43 @@ class BudgetViewModel(
     private val _period = selectedMonth.period
     val period: StateFlow<String> = _period
 
-    val budgetUsage: StateFlow<List<BudgetUsage>> = _period
-        .flatMapLatest { p -> repository.budgetUsage(p) }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+    /**
+     * The accounts every figure on this screen counts: the default one — see
+     * [budgetAccountIds]. A flow, not a value read once, because the household
+     * can reorder its accounts and the answer has to move with them.
+     */
+    private val budgetAccounts: Flow<Set<String>> =
+        repository.accounts().map(::budgetAccountIds)
 
-    val plan: StateFlow<PlanState> = _period
-        .flatMapLatest { p ->
+    val budgetUsage: StateFlow<List<BudgetUsage>> =
+        combine(_period, budgetAccounts, ::Scope)
+            .flatMapLatest { (p, accounts) -> repository.budgetUsage(p, accounts) }
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    /** The two things every query here is scoped by, so one flatMapLatest sees both. */
+    private data class Scope(val period: String, val accounts: Set<String>)
+
+    val plan: StateFlow<PlanState> = combine(_period, budgetAccounts, ::Scope)
+        .flatMapLatest { (p, accounts) ->
             val previous = YearMonth.parse(p).minusMonths(1)
             val carryOver = combine(
                 repository.spendingAccountIds(previous.toString()),
                 repository.accountBalancesThrough(previous.atEndOfMonth().toString()),
             ) { ids, balances ->
-                balances.filter { it.id in ids }
+                // Narrowed the same way the limits and the spend are. "Left to
+                // spend" is this plus the plan minus the spend, so a carry-over
+                // counting every account against a spend counting one made that
+                // figure a mix of two questions: it told you there was money
+                // left when the account it comes out of was empty.
+                balances.filter { it.id in ids && (accounts.isEmpty() || it.id in accounts) }
             }
             combine(
                 repository.monthPlan(p),
-                repository.budgetUsage(p),
-                repository.monthTotals(p),
+                repository.budgetUsage(p, accounts),
+                // Scoped like the limits above it. Left unscoped, "spent this
+                // month" counted every account while each limit under it counted
+                // one, so the plan disagreed with the rows meant to add up to it.
+                repository.monthTotals(p, accounts),
                 carryOver,
             ) { planRow, usage, totals, carried ->
                 PlanState(

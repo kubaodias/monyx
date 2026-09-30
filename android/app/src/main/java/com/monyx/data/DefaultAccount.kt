@@ -63,3 +63,21 @@ fun defaultAccount(accounts: List<AccountEntity>): AccountEntity? =
 
 /** [defaultAccount]'s id, for the callers that only compare. */
 fun defaultAccountId(accounts: List<AccountEntity>): String? = defaultAccount(accounts)?.id
+
+/**
+ * Which accounts a budget's spending is counted from: the default one, alone.
+ *
+ * A limit answers "how much may go on this out of the money we manage", and the
+ * money being managed is the account everything is spent from. Counting every
+ * account meant an insurance premium leaving PZU, or a withdrawal from the
+ * cushion, ate the month's limit for its category — and neither was the spending
+ * the limit was set to govern. A savings pot is already out (it is held outside
+ * the summary), which made the rule look right for as long as there was only one
+ * other account.
+ *
+ * Empty when there is no account to name, which every query here reads as "every
+ * counted account". That only happens before the account list has loaded, and
+ * showing the month's real figures for a moment is better than showing zeros.
+ */
+fun budgetAccountIds(accounts: List<AccountEntity>): Set<String> =
+    defaultAccountId(accounts)?.let { setOf(it) } ?: emptySet()
