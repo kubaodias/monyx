@@ -295,12 +295,17 @@ fun CategoryHistoryLegend(
     onToggle: (String) -> Unit,
     onToggleAll: () -> Unit,
     /**
-     * Opens the category, or null where there is nothing to open.
+     * Opens the category's ledger, or null where there is nothing to open.
      *
-     * Null on the daily face: its rows describe thirty-one days, and a tap that
-     * filtered the ledger to "the last 31 days" would be answering the question
-     * with a different one. A null also takes the ripple away, so the row does
-     * not advertise a tap that does nothing.
+     * All three faces pass one. The daily face deliberately did not, on the
+     * grounds that its rows describe thirty-one days and the ledger has no
+     * filter for that window — but a list of names beside figures is the most
+     * obviously tappable thing on the card, and a row that answers on two faces
+     * and stays dead on the third reads as broken rather than as principled. It
+     * opens the month on screen, the same as the pie and the bars.
+     *
+     * Still nullable, and a null takes the ripple away with it, so no row ever
+     * advertises a tap that does nothing.
      */
     onOpen: ((String) -> Unit)? = null,
     modifier: Modifier = Modifier,
