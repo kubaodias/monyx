@@ -233,3 +233,77 @@ test("one row in this month is enough, and it is still one sweep", () => {
 test("an empty push sweeps nothing", () => {
   assert.deepEqual(alertPeriodsFor([], "2026-09"), []);
 });
+
+// --------------------------------------------------- which accounts count
+
+/** An expense on a named account, inserted directly. */
+function expenseOn(fake: FakeDb, id: string, accountId: string, amountMinor: number, categoryId = "cat1") {
+  fake.db.exec(
+    `INSERT INTO transactions (id, household_id, kind, amount_minor, account_id, category_id,
+                               occurred_at, occurred_on, created_by, created_at, seq, deleted)
+     VALUES ('${id}', 'hh1', 'expense', ${amountMinor}, '${accountId}', '${categoryId}',
+             ${NOW}, '2026-08-15', 'mem1', ${NOW},
+             (SELECT next_seq + 1 FROM households WHERE id='hh1'), 0);
+     UPDATE households SET next_seq = next_seq + 1 WHERE id='hh1';`,
+  );
+}
+
+/**
+ * The alert path has to count the same money the Budget screen counts, or a
+ * notification arrives about a limit the screen says is fine. See the query's
+ * own comment, and defaultAccount() in DefaultAccount.kt.
+ */
+test("only the default account's expenses count towards a limit", async () => {
+  const { fake, db } = setup();
+  budget(fake, "b1", "cat1", "2026-08", 100_000);
+  expenseOn(fake, "t1", "acc1", 30_000); // the default account
+  expenseOn(fake, "t2", "acc2", 70_000); // a second account: not the budget's
+
+  const statuses = await budgetStatuses(db, "2026-08");
+  assert.equal(statuses[0]?.spent_minor, 30_000, "acc2 is not part of the limit");
+});
+
+/** Subcategories still roll up — the account filter must not break that. */
+test("a subcategory on the default account still counts", async () => {
+  const { fake, db } = setup();
+  budget(fake, "b1", "cat1", "2026-08", 100_000);
+  expenseOn(fake, "t1", "acc1", 20_000, "cat2");
+  expenseOn(fake, "t2", "acc2", 50_000, "cat2");
+
+  assert.equal((await budgetStatuses(db, "2026-08"))[0]?.spent_minor, 20_000);
+});
+
+/**
+ * The default is the first account in the household's own order, not the first
+ * row in the table: accounts held outside the summary sort after the counted
+ * ones whatever their sort_order, and an archived account is never the default.
+ */
+test("the default account follows the household's order, not the table's", async () => {
+  const { fake, db } = setup();
+  // An account held outside the summary, dragged to the very top.
+  fake.db.exec(
+    `INSERT INTO accounts (id, household_id, name, initial_balance_minor, sort_order,
+                           excluded_from_summary, seq, deleted)
+     VALUES ('acc0', 'hh1', 'Oszczednosci', 0, 0, 1, 90, 0);
+     UPDATE accounts SET sort_order = 1 WHERE id = 'acc1';`,
+  );
+  budget(fake, "b1", "cat1", "2026-08", 100_000);
+  expenseOn(fake, "t1", "acc0", 80_000);
+  expenseOn(fake, "t2", "acc1", 10_000);
+
+  assert.equal(
+    (await budgetStatuses(db, "2026-08"))[0]?.spent_minor,
+    10_000,
+    "the savings account is not the default even sorted first",
+  );
+});
+
+test("an archived account is never the default", async () => {
+  const { fake, db } = setup();
+  fake.db.exec(`UPDATE accounts SET archived = 1 WHERE id = 'acc1';`);
+  budget(fake, "b1", "cat1", "2026-08", 100_000);
+  expenseOn(fake, "t1", "acc1", 80_000); // archived: out
+  expenseOn(fake, "t2", "acc2", 10_000); // now the default
+
+  assert.equal((await budgetStatuses(db, "2026-08"))[0]?.spent_minor, 10_000);
+});

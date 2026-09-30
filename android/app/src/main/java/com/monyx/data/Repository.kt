@@ -62,7 +62,13 @@ class MonyxRepository(private val dao: MonyxDao) {
     fun dailyDeltas(fromDay: String, toDay: String, accountIds: Set<String> = emptySet()) =
         dao.dailyDeltas(fromDay, toDay, allAccounts(accountIds), accountIds.toList())
 
-    fun budgetUsage(period: String) = dao.budgetUsage(period)
+    /**
+     * @param accountIds which accounts the spend counts, or empty for every
+     *   counted one. The budget screen passes the default account alone — see
+     *   [budgetAccountIds].
+     */
+    fun budgetUsage(period: String, accountIds: Set<String> = emptySet()) =
+        dao.budgetUsage(period, allAccounts(accountIds), accountIds.toList())
 
     /** Raw budget rows for the history chart's limit line. No account filter:
      *  a limit belongs to the household, not to an account. */
