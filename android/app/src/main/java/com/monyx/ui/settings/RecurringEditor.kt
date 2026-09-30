@@ -61,6 +61,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.monyx.R
 import com.monyx.data.AccountEntity
+import com.monyx.data.accountsInListOrder
 import com.monyx.data.CategoryEntity
 import com.monyx.data.Dates
 import com.monyx.data.Money
@@ -515,12 +516,15 @@ private fun AccountPicker(
     selectedId: String?,
     onSelect: (String) -> Unit,
 ) {
+    // The same order the keypad's picker shows, and the same order Settings
+    // lists them in one screen back. See [accountsInListOrder].
+    val ordered = remember(accounts) { accountsInListOrder(accounts) }
     FlowRow(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(10.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        accounts.forEach { account ->
+        ordered.forEach { account ->
             // colorFor, not color: an account with no colour set still gets a
             // stable one from its id, and it is the same one the overview and
             // the add screen give it.
