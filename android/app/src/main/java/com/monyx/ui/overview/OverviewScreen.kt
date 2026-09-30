@@ -578,6 +578,7 @@ private fun BreakdownCard(
                     onToggle = onToggleHidden,
                     onToggleAll = onToggleAllHidden,
                     onDayClick = onDayClick,
+                    onCategoryClick = onCategoryClick,
                 )
             } else {
                 val slices = if (!showsMonth) {
@@ -643,6 +644,19 @@ private fun DailyFace(
     onToggle: (String) -> Unit,
     onToggleAll: () -> Unit,
     onDayClick: (String) -> Unit,
+    /**
+     * A legend row opens that category's ledger, as it does on the other two
+     * faces. This face was the one that left the rows dead: the eye worked, the
+     * name did nothing, and a list of names beside figures is the most obviously
+     * tappable thing on the card.
+     *
+     * It opens the MONTH on screen, not these thirty-one days. The ledger is
+     * scoped to a month by design — see TransactionsViewModel.period — and there
+     * is no filter that says "the last thirty-one days", so the honest options
+     * were the screen's own month or nothing at all. It is also exactly what the
+     * pie and the bars do with the same tap.
+     */
+    onCategoryClick: (String) -> Unit,
 ) {
     // Which bar was tapped. A day, not a route: the tap asks "what was that
     // day", and the ledger is one more tap away inside the answer. Kept as a
@@ -691,6 +705,7 @@ private fun DailyFace(
             },
             onToggle = onToggle,
             onToggleAll = onToggleAll,
+            onOpen = onCategoryClick,
         )
     }
 
