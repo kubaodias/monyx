@@ -72,6 +72,7 @@ import com.monyx.data.CategoryEntity
 import com.monyx.data.Money
 import com.monyx.sync.SyncWorker
 import com.monyx.ui.MonthSwitcher
+import com.monyx.ui.SyncPullToRefresh
 import com.monyx.ui.theme.Palette
 import kotlinx.coroutines.launch
 
@@ -98,6 +99,8 @@ fun BudgetScreen(
     initialCategoryId: String? = null,
     initialPeriod: String? = null,
     onOpenCategoryTransactions: (String, String) -> Unit,
+    /** Pull-to-refresh. See [SyncPullToRefresh]. */
+    onSyncRequested: () -> Unit = {},
 ) {
     val app = LocalContext.current.applicationContext as MonyxApp
     val viewModel: BudgetViewModel = viewModel(factory = BudgetViewModel.factory(app.repository, app.selectedMonth))
@@ -150,79 +153,81 @@ fun BudgetScreen(
             // three screens and has to start at the same x on each.
             modifier = Modifier.padding(horizontal = 20.dp, vertical = 20.dp),
         )
-        LazyColumn(
-            modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
+        SyncPullToRefresh(onSyncRequested = onSyncRequested) {
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
 
-            item {
-                PlanCard(
-                    plan = plan,
-                    onEditPlan = {
-                        scope.launch {
-                            planSuggestionMinor = viewModel.suggestedPlanMinor()
-                            editingPlan = true
-                        }
-                    },
-                )
-            }
-
-            item { NotificationPermissionGate(modifier = Modifier.fillMaxWidth()) }
-
-            if (budgetUsage.isEmpty()) {
                 item {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 32.dp),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Text(
-                            text = stringResource(R.string.budget_empty),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                }
-            } else {
-                items(budgetUsage, key = { it.categoryId }) { usage ->
-                    BudgetRow(
-                        usage = usage,
-                        onEdit = {
-                            editTarget = EditTarget(usage.categoryId, usage.name, usage.icon, usage.color, usage.limitMinor)
+                    PlanCard(
+                        plan = plan,
+                        onEditPlan = {
+                            scope.launch {
+                                planSuggestionMinor = viewModel.suggestedPlanMinor()
+                                editingPlan = true
+                            }
                         },
-                        onOpenTransactions = { onOpenCategoryTransactions(usage.categoryId, period) },
                     )
                 }
-            }
 
-            if (availableToAdd.isNotEmpty()) {
-                item {
-                    Card(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { showAddPicker = true },
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-                    ) {
-                        Row(
+                item { NotificationPermissionGate(modifier = Modifier.fillMaxWidth()) }
+
+                if (budgetUsage.isEmpty()) {
+                    item {
+                        Box(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(16.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                .padding(vertical = 32.dp),
+                            contentAlignment = Alignment.Center,
                         ) {
-                            Icon(Icons.Filled.Add, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                             Text(
-                                text = stringResource(R.string.budget_add_category),
-                                style = MaterialTheme.typography.bodyLarge,
-                                color = MaterialTheme.colorScheme.primary,
+                                text = stringResource(R.string.budget_empty),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         }
                     }
+                } else {
+                    items(budgetUsage, key = { it.categoryId }) { usage ->
+                        BudgetRow(
+                            usage = usage,
+                            onEdit = {
+                                editTarget = EditTarget(usage.categoryId, usage.name, usage.icon, usage.color, usage.limitMinor)
+                            },
+                            onOpenTransactions = { onOpenCategoryTransactions(usage.categoryId, period) },
+                        )
+                    }
+                }
+
+                if (availableToAdd.isNotEmpty()) {
+                    item {
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { showAddPicker = true },
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(16.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            ) {
+                                Icon(Icons.Filled.Add, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                                Text(
+                                    text = stringResource(R.string.budget_add_category),
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    color = MaterialTheme.colorScheme.primary,
+                                )
+                            }
+                        }
+                    }
                 }
             }
-        }
+            }
     }
 
     editTarget?.let { target ->
