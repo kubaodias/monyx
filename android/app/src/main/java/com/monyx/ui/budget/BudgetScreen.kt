@@ -339,13 +339,21 @@ private fun PlanCard(plan: PlanState, onEditPlan: () -> Unit) {
             }
 
             Spacer(Modifier.height(12.dp))
-            // How much of the plan has been handed out to categories. Capped at
-            // 1f: over-assigning is shown by the red headline, not by a bar
-            // drawing past its own end.
-            val assignedFraction = if (plan.plannedMinor > 0) {
-                (plan.assignedMinor.toFloat() / plan.plannedMinor.toFloat()).coerceIn(0f, 1f)
-            } else {
-                0f
+            // How much of the month's money has been handed out to categories.
+            // Against what is available, not against the plan — a bar reading
+            // 82% under a headline reading -541,58 is the bar contradicting the
+            // figure it sits beneath. Capped at 1f: over-assigning is shown by
+            // the red headline, not by a bar drawing past its own end.
+            //
+            // A hole bigger than the plan leaves nothing to divide by, and then
+            // a full bar is the honest answer rather than an empty one: every
+            // złoty is claimed already. Nothing here may look calmer than the
+            // state before it.
+            val assignedFraction = when {
+                plan.availableMinor > 0 ->
+                    (plan.assignedMinor.toFloat() / plan.availableMinor.toFloat()).coerceIn(0f, 1f)
+                plan.assignedMinor > 0 -> 1f
+                else -> 0f
             }
             LinearProgressIndicator(
                 progress = { assignedFraction },
