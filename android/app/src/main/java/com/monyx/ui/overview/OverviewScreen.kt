@@ -74,6 +74,7 @@ import com.monyx.data.TransactionEntity
 import com.monyx.data.Money
 import com.monyx.data.TransactionListItem
 import com.monyx.ui.MonthSwitcher
+import com.monyx.ui.SyncPullToRefresh
 import com.monyx.ui.theme.Palette
 import com.monyx.ui.transactions.EditTransactionSheet
 import kotlinx.coroutines.launch
@@ -89,6 +90,8 @@ fun OverviewScreen(
     onOpenTransactions: (categoryId: String?, period: String?) -> Unit,
     /** One day of the ledger, scrolled to. See the daily face of the breakdown. */
     onOpenDay: (day: String) -> Unit = {},
+    /** Pull-to-refresh. See [SyncPullToRefresh]. */
+    onSyncRequested: () -> Unit = {},
 ) {
     val app = LocalContext.current.applicationContext as MonyxApp
     val viewModel: OverviewViewModel = viewModel(
@@ -111,62 +114,64 @@ fun OverviewScreen(
             onSelect = viewModel::setPeriod,
             modifier = Modifier.padding(horizontal = 20.dp, vertical = 20.dp),
         )
-        LazyColumn(
-            modifier = Modifier.fillMaxSize(),
-            // Room at the bottom for the call button to float over. The legends
-            // now END in a total, and the last line of a list is exactly what
-            // the button was sitting on: the figure was legible and the "zł"
-            // beside it was under a green circle.
-            contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = 96.dp),
-            verticalArrangement = Arrangement.spacedBy(20.dp),
-        ) {
-        if (state.accounts.size > 1) {
+        SyncPullToRefresh(onSyncRequested = onSyncRequested) {
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                // Room at the bottom for the call button to float over. The legends
+                // now END in a total, and the last line of a list is exactly what
+                // the button was sitting on: the figure was legible and the "zł"
+                // beside it was under a green circle.
+                contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = 96.dp),
+                verticalArrangement = Arrangement.spacedBy(20.dp),
+            ) {
+            if (state.accounts.size > 1) {
+                item {
+                    AccountFilter(
+                        accounts = state.accounts,
+                        selected = state.selectedAccountIds,
+                        onToggle = viewModel::toggleAccount,
+                    )
+                }
+            }
             item {
-                AccountFilter(
-                    accounts = state.accounts,
-                    selected = state.selectedAccountIds,
-                    onToggle = viewModel::toggleAccount,
+                SummaryCard(
+                    income = state.incomeMinor,
+                    expense = state.expenseMinor,
+                    net = state.netMinor,
+                    carryOver = state.carryOverMinor,
+                    windowIncome = state.windowIncomeMinor,
+                    windowExpense = state.windowExpenseMinor,
+                    balance = state.balanceMinor,
+                    balanceThroughPeriod = state.balanceThroughPeriod,
+                    trend = state.trend,
                 )
             }
-        }
-        item {
-            SummaryCard(
-                income = state.incomeMinor,
-                expense = state.expenseMinor,
-                net = state.netMinor,
-                carryOver = state.carryOverMinor,
-                windowIncome = state.windowIncomeMinor,
-                windowExpense = state.windowExpenseMinor,
-                balance = state.balanceMinor,
-                balanceThroughPeriod = state.balanceThroughPeriod,
-                trend = state.trend,
-            )
-        }
-        item {
-            BreakdownCard(
-                breakdown = state.breakdown,
-                history = history,
-                daily = daily,
-                hidden = hidden,
-                budgetHidden = budgetHidden,
-                onToggleHidden = viewModel::toggleHidden,
-                onToggleBudget = viewModel::toggleBudgetLine,
-                onToggleAllHidden = { viewModel.toggleAllHidden(history.categories.map { it.id }) },
-                // A slice is a question — "what made up that 340 zł?" — so it
-                // opens that category's transactions for the month on screen,
-                // not for today.
-                onCategoryClick = { categoryId -> onOpenTransactions(categoryId, state.period) },
-                // A day is the same question at a finer grain — "what did we buy
-                // on the 12th?" — and it opens the ledger at that day rather
-                // than filtered to it: the rows either side are the context.
-                onDayClick = onOpenDay,
-                // Tapping a bar moves the whole screen to that month, which is
-                // the same thing the switcher at the top does.
-                onSelectMonth = viewModel::setPeriod,
-                showsMonth = showsMonth,
-                onSelectAmountMode = viewModel::setAmountMode,
-            )
-        }
+            item {
+                BreakdownCard(
+                    breakdown = state.breakdown,
+                    history = history,
+                    daily = daily,
+                    hidden = hidden,
+                    budgetHidden = budgetHidden,
+                    onToggleHidden = viewModel::toggleHidden,
+                    onToggleBudget = viewModel::toggleBudgetLine,
+                    onToggleAllHidden = { viewModel.toggleAllHidden(history.categories.map { it.id }) },
+                    // A slice is a question — "what made up that 340 zł?" — so it
+                    // opens that category's transactions for the month on screen,
+                    // not for today.
+                    onCategoryClick = { categoryId -> onOpenTransactions(categoryId, state.period) },
+                    // A day is the same question at a finer grain — "what did we buy
+                    // on the 12th?" — and it opens the ledger at that day rather
+                    // than filtered to it: the rows either side are the context.
+                    onDayClick = onOpenDay,
+                    // Tapping a bar moves the whole screen to that month, which is
+                    // the same thing the switcher at the top does.
+                    onSelectMonth = viewModel::setPeriod,
+                    showsMonth = showsMonth,
+                    onSelectAmountMode = viewModel::setAmountMode,
+                )
+            }
+            }
         }
     }
 }

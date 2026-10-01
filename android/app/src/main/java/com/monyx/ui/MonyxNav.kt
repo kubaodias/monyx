@@ -470,6 +470,7 @@ private fun MainScaffold(
                             day = day,
                         )
                     },
+                    onSyncRequested = { SyncWorker.syncNow(context) },
                 )
             }
             composable(Destinations.TRANSACTIONS) {
@@ -504,6 +505,7 @@ private fun MainScaffold(
                     onOpenCategoryTransactions = { categoryId, period ->
                         openTransactions(categoryId, period)
                     },
+                    onSyncRequested = { SyncWorker.syncNow(context) },
                 )
             }
             composable(Destinations.SETTINGS) {

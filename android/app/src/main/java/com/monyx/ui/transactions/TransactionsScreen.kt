@@ -46,7 +46,6 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
-import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -83,6 +82,7 @@ import com.monyx.data.Money
 import com.monyx.data.TransactionEntity
 import com.monyx.data.TransactionListItem
 import com.monyx.ui.MonthSwitcher
+import com.monyx.ui.SyncPullToRefresh
 import com.monyx.ui.theme.Palette
 import kotlinx.coroutines.launch
 
@@ -167,7 +167,6 @@ fun TransactionsScreen(
     val plannedIds by viewModel.plannedIds.collectAsStateWithLifecycle()
 
     var editing by remember { mutableStateOf<TransactionEntity?>(null) }
-    var refreshing by remember { mutableStateOf(false) }
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     val deletedMessage = stringResource(R.string.transactions_deleted)
@@ -443,22 +442,7 @@ fun TransactionsScreen(
                 LaunchedEffect(scrollToDay, targetIndex, released) {
                     if (targetIndex >= 0 && !released) listState.animateScrollToItem(targetIndex)
                 }
-                PullToRefreshBox(
-                    isRefreshing = refreshing,
-                    onRefresh = {
-                        refreshing = true
-                        onSyncRequested()
-                        scope.launch {
-                            // The worker is fire-and-forget, so the spinner is
-                            // time-boxed rather than tied to its result. It is
-                            // an acknowledgement of the gesture, not a progress
-                            // bar: rows arrive on their own when the pull lands.
-                            kotlinx.coroutines.delay(1200)
-                            refreshing = false
-                        }
-                    },
-                    modifier = Modifier.fillMaxSize(),
-                ) {
+                SyncPullToRefresh(onSyncRequested = onSyncRequested) {
                     LazyColumn(
                         state = listState,
                         modifier = Modifier.fillMaxSize(),
