@@ -308,6 +308,51 @@ class InteractionTest {
         assertEquals(800_00L, first.leftToSpendMinor)
     }
 
+    @Test
+    fun `left to assign takes last month's shortfall off the top`() {
+        // October 2026, from the screen: 20 000 of income, Portfel 4 186,58 in
+        // the red, 16 355 already handed out. This read +3 645 — room to plan
+        // another three and a half thousand złoty that does not exist.
+        val october = plan(planned = 20_000_00, assigned = 16_355_00)
+            .copy(carryOverMinor = -4_186_58, carryOverAccounts = listOf("Portfel"))
+        assertEquals(15_813_42L, october.availableMinor)
+        assertEquals(-541_58L, october.leftToAssignMinor)
+        assertEquals("already past the line, and it must say so", true, october.overAssigned)
+    }
+
+    @Test
+    fun `money left over last month is there to be assigned`() {
+        // The same rule in the other direction: a surplus is money you may
+        // give a job to, not just money that quietly widens "left to spend".
+        val carried = plan(planned = 1_000_00, assigned = 1_000_00)
+            .copy(carryOverMinor = 300_00, carryOverAccounts = listOf("Portfel"))
+        assertEquals(300_00L, carried.leftToAssignMinor)
+        assertEquals(false, carried.overAssigned)
+    }
+
+    @Test
+    fun `both figures start from the same pot`() {
+        // The defect this guards: the two differed by the carry-over, so one
+        // line of the card said the month had 20 000 and another said 15 813,42.
+        // They may differ by assigned-versus-spent and by nothing else.
+        val state = plan(planned = 19_600_00, assigned = 12_000_00, spent = 16_640_32)
+            .copy(carryOverMinor = -1_111_86, carryOverAccounts = listOf("Portfel"))
+        val assignedVsSpent = state.spentMinor - state.assignedMinor
+        assertEquals(assignedVsSpent, state.leftToAssignMinor!! - state.leftToSpendMinor!!)
+    }
+
+    @Test
+    fun `a shortfall bigger than the plan leaves nothing to assign`() {
+        // Available goes negative rather than clamping at zero: the month is
+        // underwater before it starts, and rounding that up to "0 left" is the
+        // one reading that would make it look survivable.
+        val underwater = plan(planned = 1_000_00, assigned = 0)
+            .copy(carryOverMinor = -1_500_00, carryOverAccounts = listOf("Portfel"))
+        assertEquals(-500_00L, underwater.availableMinor)
+        assertEquals(-500_00L, underwater.leftToAssignMinor)
+        assertEquals(true, underwater.overAssigned)
+    }
+
     // ------------------------------------------------- what the server kept
 
     private fun rejection(id: String?, reason: String) = Rejection("month_plans", id, reason)

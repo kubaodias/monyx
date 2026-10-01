@@ -28,10 +28,12 @@ import java.time.YearMonth
 /**
  * The month's plan, as the screen needs it.
  *
- * Two different questions, deliberately both answered. "Left to assign" is
- * about the plan on paper — has every złoty been given a job. "Left to spend"
- * is about the month as it actually went, and it counts expenses in categories
- * with no budget at all, because unbudgeted spending empties the same pot.
+ * Two different questions, deliberately both answered — but against ONE pot.
+ * "Left to assign" is about the plan on paper: has every złoty been given a
+ * job. "Left to spend" is about the month as it actually went, and it counts
+ * expenses in categories with no budget at all, because unbudgeted spending
+ * empties the same pot. What they must never disagree about is how big the pot
+ * is; see [availableMinor].
  */
 data class PlanState(
     val period: String,
@@ -51,6 +53,22 @@ data class PlanState(
     val carryOverAccounts: List<String> = emptyList(),
 ) {
     /**
+     * The money this month actually has: the plan, less whatever last month
+     * ended up owing. Every other figure on the card divides or subtracts from
+     * this one.
+     *
+     * The carry-over used to be left out of "left to assign" and included only
+     * in "left to spend", which made them two different answers to how much
+     * money exists. On a month opening 4 186,58 in the red with 16 355 handed
+     * out against a 20 000 plan, "left to assign" read +3 645 — an invitation
+     * to plan money that was already spent — while the figure three lines below
+     * it was quietly counting the same hole. The shortfall is not a fact about
+     * spending; it is a claim on the pot, and it has to be taken off the top
+     * before anything is handed out.
+     */
+    val availableMinor: Long get() = plannedMinor + carryOverMinor
+
+    /**
      * Null when the month has no plan, and that is not the same as zero.
      *
      * Subtracting assignments from a plan that does not exist produces a large
@@ -59,8 +77,8 @@ data class PlanState(
      * against a total of nothing. There is no answer to "how much is left to
      * assign" until somebody says how much there is.
      */
-    val leftToAssignMinor: Long? get() = if (hasPlan) plannedMinor - assignedMinor else null
-    val leftToSpendMinor: Long? get() = if (hasPlan) plannedMinor + carryOverMinor - spentMinor else null
+    val leftToAssignMinor: Long? get() = if (hasPlan) availableMinor - assignedMinor else null
+    val leftToSpendMinor: Long? get() = if (hasPlan) availableMinor - spentMinor else null
     val hasCarryOver: Boolean get() = carryOverAccounts.isNotEmpty()
     val overAssigned: Boolean get() = (leftToAssignMinor ?: 0) < 0
 }
