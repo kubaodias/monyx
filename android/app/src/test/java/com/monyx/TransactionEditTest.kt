@@ -1,6 +1,7 @@
 package com.monyx
 
 import com.monyx.data.Dates
+import com.monyx.data.Currency
 import com.monyx.data.MonyxRepository
 import com.monyx.data.TransactionEntity
 import org.junit.Assert.assertEquals
@@ -42,15 +43,19 @@ class TransactionEditTest {
         accountId: String = original.accountId,
         note: String = original.note.orEmpty(),
         occurredAtMs: Long = original.occurredAt,
-    ) = MonyxRepository.applyEdit(original, amountMinor, categoryId, accountId, note, occurredAtMs)
+        currency: Currency = Currency.of(original.currency),
+    ) = MonyxRepository.applyEdit(
+        original, amountMinor, categoryId, accountId, note, occurredAtMs, currency,
+    )
 
     @Test
-    fun `the five fields an editor owns are the five it changes`() {
+    fun `the six fields an editor owns are the six it changes`() {
         val edited = edit(amountMinor = 4999, categoryId = "c-home", accountId = "a-card", note = "  paragon ")
         assertEquals(4999L, edited.amountMinor)
         assertEquals("c-home", edited.categoryId)
         assertEquals("a-card", edited.accountId)
         assertEquals("  paragon ", edited.note)
+        assertEquals("EUR", edit(currency = Currency.EUR).currency)
 
         // Everything else is carried, seq and the sync flags included — the
         // fold does not touch them, so nothing here can lose a row's place in
@@ -85,5 +90,25 @@ class TransactionEditTest {
     @Test
     fun `an edit that changes nothing changes nothing`() {
         assertEquals(original, edit())
+    }
+
+    @Test
+    fun `switching the account does not restate the amount in another currency`() {
+        // The amount that happened is what it was entered as. Moving a row from
+        // the euro card to the złoty one says where the money came from, not
+        // that 15 euro became 15 złoty.
+        val inEuro = original.copy(currency = "EUR")
+        val moved = MonyxRepository.applyEdit(
+            original = inEuro,
+            amountMinor = inEuro.amountMinor,
+            categoryId = inEuro.categoryId,
+            accountId = "a-zloty-card",
+            note = inEuro.note.orEmpty(),
+            occurredAtMs = inEuro.occurredAt,
+            currency = Currency.of(inEuro.currency),
+        )
+        assertEquals("a-zloty-card", moved.accountId)
+        assertEquals("EUR", moved.currency)
+        assertEquals(inEuro.amountMinor, moved.amountMinor)
     }
 }

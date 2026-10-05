@@ -30,6 +30,8 @@
     <string name="add_note_hint">Notatka</string>
     <string name="add_pick_category">Wybierz kategorię</string>
     <string name="add_pick_subcategory">Podkategoria (opcjonalnie)</string>
+    <string name="add_pick_currency">Waluta</string>
+    <string name="add_currency_account_default">domyślna konta</string>
     <string name="add_pick_account">Konto</string>
     <string name="add_saved">Zapisano</string>
     <string name="add_needs_amount">Podaj kwotę</string>

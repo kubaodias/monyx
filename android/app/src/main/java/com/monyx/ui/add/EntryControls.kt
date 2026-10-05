@@ -4,6 +4,8 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -668,4 +670,76 @@ internal fun SaveBar(
     ) {
         Text(text = label, fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
     }
+}
+
+/**
+ * The nine currencies, for one entry.
+ *
+ * Shared by the keypad and the edit sheet, like [AccountPickerDialog] beside it,
+ * so the same choice is not offered two ways. A dialog rather than the dropdown
+ * Settings uses: there the currency is one field among eight in a form, here it
+ * is reached from a chip on a screen whose whole lower half is a keypad.
+ *
+ * The account's own currency is marked, because it is the one this entry started
+ * in and "back to normal" is the most likely reason anybody opens this twice.
+ */
+@Composable
+internal fun CurrencyPickerDialog(
+    selected: Currency,
+    accountCurrency: Currency,
+    onPick: (Currency) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.add_pick_currency)) },
+        text = {
+            Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                Currency.entries.forEach { option ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(12.dp))
+                            .clickable { onPick(option) }
+                            .padding(vertical = 12.dp, horizontal = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        Text(
+                            text = option.suffix,
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            color = if (option == selected) {
+                                MaterialTheme.colorScheme.primary
+                            } else {
+                                MaterialTheme.colorScheme.onSurface
+                            },
+                            modifier = Modifier.width(44.dp),
+                        )
+                        Text(
+                            text = option.code,
+                            style = MaterialTheme.typography.bodyLarge,
+                            modifier = Modifier.weight(1f),
+                            color = if (option == selected) {
+                                MaterialTheme.colorScheme.primary
+                            } else {
+                                MaterialTheme.colorScheme.onSurface
+                            },
+                        )
+                        if (option == accountCurrency) {
+                            Text(
+                                text = stringResource(R.string.add_currency_account_default),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {},
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.settings_cancel)) }
+        },
+    )
 }

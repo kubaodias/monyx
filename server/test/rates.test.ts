@@ -7,6 +7,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { FakeDb, seedHousehold } from "./fake-db.ts";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { push } from "../src/sync.ts";
 import { budgetStatuses } from "../src/budgets.ts";
 import { expense } from "./fake-db.ts";
@@ -288,6 +290,8 @@ test("a budget alert converts a foreign default account's spending", async () =>
   const db = forHousehold("hh1", fake);
 
   // acc1 is the default account: first by excluded_from_summary, sort_order.
+  // Its currency is now only a default for new entries — what converts is the
+  // TRANSACTION's own currency, set below.
   fake.db.exec(`UPDATE accounts SET currency = 'EUR' WHERE id = 'acc1'`);
   await refreshRates(fake, "2026-08-15", "2026-08-15", NOW, fakeNbp({
     "2026-08-15": { EUR: 4.3745 },
@@ -299,7 +303,8 @@ test("a budget alert converts a foreign default account's spending", async () =>
              (SELECT next_seq + 1 FROM households WHERE id='hh1'), 0);
      UPDATE households SET next_seq = next_seq + 1 WHERE id='hh1';`,
   );
-  await push(db, [expense("t1", 100_00, "cat1")]);
+  const row = expense("t1", 100_00, "cat1");
+  await push(db, [{ ...row, row: { ...row.row, currency: "EUR" } }]);
 
   const statuses = await budgetStatuses(db, "2026-08");
   // 100,00 € at 4,3745 = 437,45 zł. Integer division, matching ledger_pln.
@@ -331,15 +336,102 @@ test("spending with no rate for its currency is not counted as zloty", async () 
   const fake = new FakeDb();
   seedHousehold(fake);
   const db = forHousehold("hh1", fake);
-  fake.db.exec(`UPDATE accounts SET currency = 'EUR' WHERE id = 'acc1'`);
   fake.db.exec(
     `INSERT INTO budgets (id, household_id, category_id, period, limit_minor, seq, deleted)
      VALUES ('b1', 'hh1', 'cat1', '2026-08', 50000,
              (SELECT next_seq + 1 FROM households WHERE id='hh1'), 0);
      UPDATE households SET next_seq = next_seq + 1 WHERE id='hh1';`,
   );
-  await push(db, [expense("t1", 100_00, "cat1")]);
+  const row = expense("t1", 100_00, "cat1");
+  await push(db, [{ ...row, row: { ...row.row, currency: "EUR" } }]);
 
   const statuses = await budgetStatuses(db, "2026-08");
   assert.equal(statuses[0]?.spent_minor, 0, "no rate means not counted, not counted wrongly");
+});
+
+test("the currency is the transaction's, not its account's", async () => {
+  // The whole point of 0010. A euro account can hold a złoty row — you paid in
+  // złoty from a euro card — and that row must not be multiplied by the rate.
+  const fake = new FakeDb();
+  seedHousehold(fake);
+  const db = forHousehold("hh1", fake);
+  fake.db.exec(`UPDATE accounts SET currency = 'EUR' WHERE id = 'acc1'`);
+  await refreshRates(fake, "2026-08-15", "2026-08-15", NOW, fakeNbp({
+    "2026-08-15": { EUR: 4.3745 },
+  }));
+  fake.db.exec(
+    `INSERT INTO budgets (id, household_id, category_id, period, limit_minor, seq, deleted)
+     VALUES ('b1', 'hh1', 'cat1', '2026-08', 500000,
+             (SELECT next_seq + 1 FROM households WHERE id='hh1'), 0);
+     UPDATE households SET next_seq = next_seq + 1 WHERE id='hh1';`,
+  );
+
+  const eur = expense("t1", 100_00, "cat1");
+  const pln = expense("t2", 100_00, "cat1");
+  await push(db, [
+    { ...eur, row: { ...eur.row, currency: "EUR" } },
+    { ...pln, row: { ...pln.row, currency: "PLN" } },
+  ]);
+
+  // 437,45 + 100,00. The account being EUR changes neither figure.
+  const statuses = await budgetStatuses(db, "2026-08");
+  assert.equal(statuses[0]?.spent_minor, 537_45);
+});
+
+test("a push without a currency is zloty, so an older client still works", async () => {
+  const fake = new FakeDb();
+  seedHousehold(fake);
+  const db = forHousehold("hh1", fake);
+  await push(db, [expense("t1", 100_00, "cat1")]);
+
+  const { results } = await fake
+    .prepare(`SELECT currency FROM transactions WHERE id = 't1'`)
+    .all<{ currency: string }>();
+  assert.equal(results[0]?.currency, "PLN");
+});
+
+test("an unknown transaction currency is refused rather than defaulted", async () => {
+  const fake = new FakeDb();
+  seedHousehold(fake);
+  const db = forHousehold("hh1", fake);
+  const row = expense("t1", 100_00, "cat1");
+  const result = await push(db, [{ ...row, row: { ...row.row, currency: "JPY" } }]);
+  assert.equal(result.rejected[0]?.reason, "bad_currency");
+  assert.equal(result.applied, 0);
+});
+
+test("0010's backfill restates existing rows in their account's currency", async () => {
+  // The upgrade path, which the fake cannot reach on its own: it replays the
+  // migrations against an empty table, so the UPDATE runs over no rows.
+  //
+  // Reading the statement out of the migration file rather than retyping it —
+  // a copy here would pass while the real one was wrong, which is the failure
+  // mode these tests have already had twice.
+  const fake = new FakeDb();
+  seedHousehold(fake);
+  const db = forHousehold("hh1", fake);
+  fake.db.exec(`UPDATE accounts SET currency = 'EUR' WHERE id = 'acc1'`);
+
+  // A row as it existed before 0010: no currency of its own, so the column
+  // default made it złoty.
+  await push(db, [expense("t1", 100_00, "cat1")]);
+  const before = await fake
+    .prepare(`SELECT currency FROM transactions WHERE id='t1'`)
+    .all<{ currency: string }>();
+  assert.equal(before.results[0]?.currency, "PLN");
+
+  const sql = readFileSync(
+    join(import.meta.dirname, "..", "migrations", "0010_transactions_currency.sql"),
+    "utf8",
+  );
+  const backfill = sql.slice(sql.indexOf("UPDATE transactions"));
+  fake.db.exec(backfill);
+
+  // Conversion already treated this row as euro, via its account. The backfill
+  // is what keeps that true after the authority moves to the row itself — no
+  // figure anyone has looked at moves.
+  const after = await fake
+    .prepare(`SELECT currency FROM transactions WHERE id='t1'`)
+    .all<{ currency: string }>();
+  assert.equal(after.results[0]?.currency, "EUR");
 });

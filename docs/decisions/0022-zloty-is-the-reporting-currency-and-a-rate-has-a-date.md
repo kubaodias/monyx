@@ -137,3 +137,36 @@ with each other, which is the property worth having; they differ from
 `convertMinor` by at most one grosz on a single row. Said plainly rather than
 quietly left as written, because "rounds half away from zero" is the kind of
 sentence someone later builds a reconciliation on.
+
+## Addendum, 2026-10-05: the currency belongs to the transaction
+
+The original decision put the currency on the **account** and assumed every row
+on an account was in that account's money. That is wrong in the ordinary case
+this feature exists for: you pay 15 EUR with a złoty card, or buy something in
+dollars from a euro account. The amount that happened is 15 EUR either way.
+
+So `transactions.currency` (migration 0010) is now the authority for conversion,
+and `accounts.currency` shrinks to two smaller jobs: the unit of the account's
+opening balance, and the currency a new entry on that account starts in.
+
+**0010 backfills from the account rather than taking the `'PLN'` default.** This
+is a refactor of where the currency lives, not a change to anyone's figures, and
+the test of that is that no total moves. Between 0.22.0 and 0.22.1 a row on a
+euro account was already converted as euro; leaving those rows at the default
+would have silently restated every one as złoty and moved balances and budgets
+somebody had already reconciled.
+
+**Switching a row's account does not restate its amount.** Moving a purchase from
+the euro card to the złoty one says where the money came from, not that 15 euro
+became 15 złoty. Picking a different account on the ADD screen does clear a
+hand-set override, because the next thing typed is almost certainly in the new
+account's currency and a stale override is expensive to not notice.
+
+**A transfer still has one amount and one currency.** This app has never modelled
+"100 zł left and 23 € arrived" as two figures, so both legs convert identically.
+`transferPlnMinor` is gone with the account-based conversion that justified it.
+
+**Repeating rules do not carry a currency yet.** Their occurrences take the
+account's, which is exactly what every row did before this change, so nothing
+regressed — but a euro subscription paid from a złoty card is wrong until
+`recurring_rules` gets the same column.

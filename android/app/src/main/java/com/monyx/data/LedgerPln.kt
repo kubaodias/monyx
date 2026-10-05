@@ -11,6 +11,16 @@ import androidx.room.DatabaseView
  * [plnMinor] where they used to read `amountMinor`, and the rule stays in one
  * place where it can be checked.
  *
+ * **Converted from the transaction's OWN currency**, not its account's. A euro
+ * account can hold a złoty row and a złoty account a euro one; the amount that
+ * happened is what it was entered as. The account's currency is only the unit of
+ * its opening balance and the default a new entry starts in.
+ *
+ * Both legs of a transfer use the one amount and so the one converted figure:
+ * a transfer is a single row with a single amount, and this app has never
+ * modelled "100 zł left and 23 € arrived" as two figures. [transferPlnMinor] is
+ * gone with the account-based conversion that justified it.
+ *
  * **Converted at the rate on the transaction's own date**, not today's. A
  * transaction is an event that happened on a day; the rate that day is a fact.
  * Revaluing history every morning would make last month's closed total a
@@ -58,26 +68,16 @@ import androidx.room.DatabaseView
                t.deleted AS deleted,
                t.pending AS pending,
                t.rejected AS rejected,
-               COALESCE(a.currency, 'PLN') AS currency,
-               CASE WHEN COALESCE(a.currency, 'PLN') = 'PLN' THEN t.amountMinor
+               COALESCE(t.currency, 'PLN') AS currency,
+               CASE WHEN COALESCE(t.currency, 'PLN') = 'PLN' THEN t.amountMinor
                     ELSE (t.amountMinor * (
                             SELECT r.rateMicro FROM fx_rates r
-                             WHERE r.currency = a.currency
+                             WHERE r.currency = t.currency
                                AND r.effectiveOn <= t.occurredOn
                              ORDER BY r.effectiveOn DESC LIMIT 1
                          )) / 1000000
-               END AS plnMinor,
-               CASE WHEN COALESCE(ta.currency, 'PLN') = 'PLN' THEN t.amountMinor
-                    ELSE (t.amountMinor * (
-                            SELECT r2.rateMicro FROM fx_rates r2
-                             WHERE r2.currency = ta.currency
-                               AND r2.effectiveOn <= t.occurredOn
-                             ORDER BY r2.effectiveOn DESC LIMIT 1
-                         )) / 1000000
-               END AS transferPlnMinor
+               END AS plnMinor
           FROM transactions t
-          LEFT JOIN accounts a  ON a.id  = t.accountId
-          LEFT JOIN accounts ta ON ta.id = t.transferAccountId
     """,
 )
 data class LedgerPln(
@@ -97,15 +97,8 @@ data class LedgerPln(
     val deleted: Int,
     val pending: Int,
     val rejected: Int,
-    /** The account's currency, so a row can print the unit it was entered in. */
+    /** The row's own currency, which is the unit [amountMinor] is in. */
     val currency: String,
     /** [amountMinor] in grosze, or null when the rate is unknown. */
     val plnMinor: Long?,
-    /**
-     * The same for the RECEIVING side of a transfer, which may be an account in
-     * a different currency again. A transfer out of a złoty account into a euro
-     * one is one row whose two legs are in two units, and the running-balance
-     * line sums each leg against the account it touches.
-     */
-    val transferPlnMinor: Long?,
 )

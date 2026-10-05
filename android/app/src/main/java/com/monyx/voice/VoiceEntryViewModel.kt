@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.monyx.data.AccountEntity
 import com.monyx.data.CategoryEntity
+import com.monyx.data.Currency
 import com.monyx.data.Dates
 import com.monyx.data.MonyxRepository
 import com.monyx.data.TransactionEntity
@@ -630,6 +631,10 @@ class VoiceEntryViewModel(
                     accountId = accountId,
                     note = note,
                     occurredAtMs = occurredAtMs,
+                    // Preserved. The voice summary has no currency control, and
+                    // a dictated sentence cannot name one yet, so an edit here
+                    // must not quietly restate the amount in a different unit.
+                    currency = Currency.of(original.currency),
                 ),
             )
             VoiceEntryState.Saved(

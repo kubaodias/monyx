@@ -496,6 +496,7 @@ fun TransactionsScreen(
                     accountId = edit.accountId,
                     note = edit.note,
                     occurredAtMs = edit.occurredAtMs,
+                    currency = edit.currency,
                 )
                 editing = null
                 scope.launch { snackbarHostState.showSnackbar(savedMessage) }

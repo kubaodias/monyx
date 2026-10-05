@@ -50,6 +50,7 @@ fun TransactionEntity.toRow(): JsonObject = buildJsonObject {
     put("source", JsonPrimitive(source))
     putNullable(this, "recurring_rule_id", recurringRuleId)
     put("created_at", JsonPrimitive(createdAt))
+    put("currency", JsonPrimitive(currency))
     put("deleted", JsonPrimitive(deleted))
 }
 
@@ -67,6 +68,9 @@ fun JsonObject.toTransaction(): TransactionEntity = TransactionEntity(
     source = str("source") ?: "manual",
     recurringRuleId = str("recurring_rule_id"),
     createdAt = long("created_at"),
+    // Absent from an older server, and złoty is the right reading of silence:
+    // every row written before this column existed was in złoty.
+    currency = str("currency") ?: Currency.PLN.code,
     seq = long("seq"),
     deleted = int("deleted"),
     pending = 0,
