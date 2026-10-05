@@ -100,3 +100,40 @@ Ordering of the three changes is forced by correctness rather than convenience:
 storage and rates first with nothing reading them; then the client, with
 non-PLN accounts held out of every aggregate so no total can be wrong while only
 half of it exists; then conversion, which replaces that exclusion.
+
+## Addendum, 2026-10-05: where conversion runs
+
+Written after the third change, because the first two were planned on a wrong
+assumption worth recording.
+
+**Conversion happens on the phone, not the server.** Every figure in this app is
+computed locally in Room — there is no endpoint that returns a total, and the
+Budget screen's header says so explicitly. So the rates have to be ON the
+device, and `GET /rates` replicates them during sync. Planning the server half
+first made it look as though the server would convert; it does so only for its
+own budget alert, which is a second implementation of one sum.
+
+**The rates endpoint refreshes before answering.** Nothing drives
+`POST /cron/daily`, so rates written only by that cron would never exist.
+Hanging the refresh off a request the phone already makes on every sync is what
+makes this self-driving rather than blocked on infrastructure that was never set
+up.
+
+**NBP is read by range, not by day.** One request per 93 days. The single-date
+endpoint made backfill unaffordable — 365 requests a year — which would have
+left every transaction older than the feature unconvertible.
+
+**A missing rate yields null and is skipped, not zeroed.** This was the open
+question in the original decision and this is the answer: the account falls out
+of the total, exactly as it did before conversion existed, and keeps showing its
+own balance so the money is not hidden.
+
+**Correction to the rounding above.** The Decision section says conversion rounds
+half away from zero. That is true of `convertMinor` in TypeScript, which is used
+by nothing that displays a figure. Every figure anyone sees is produced by SQL —
+`ledger_pln` on the phone, the alert query on the server — and SQLite integer
+division **truncates toward zero**. The two implementations that matter agree
+with each other, which is the property worth having; they differ from
+`convertMinor` by at most one grosz on a single row. Said plainly rather than
+quietly left as written, because "rounds half away from zero" is the kind of
+sentence someone later builds a reconciliation on.

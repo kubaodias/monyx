@@ -227,3 +227,30 @@ data class SyncStateEntity(
     val lastSyncAt: Long = 0,
     val lastBackupAt: Long = 0,
 )
+
+/**
+ * What one unit of a currency was worth in złoty, on a date.
+ *
+ * A replica of the server's fx_rates, pulled by [com.monyx.sync.SyncEngine],
+ * because every figure in this app is computed locally — so conversion is a SQL
+ * join against this table rather than a question asked over the network.
+ *
+ * Not household-scoped and carrying no pending/rejected flags: a rate is a fact
+ * about the world, the phone never authors one, and there is nothing here to
+ * push back. The only write path is the pull.
+ *
+ * rateMicro is scaled by 1e6. See [Currency] and ADR 0022.
+ */
+@Entity(tableName = "fx_rates", primaryKeys = ["currency", "effectiveOn"])
+data class FxRateEntity(
+    val currency: String,
+    /** The date the rate is used FOR. */
+    val effectiveOn: String,
+    /**
+     * The date NBP published it, which differs from [effectiveOn] across
+     * weekends and holidays. Carried here so a figure can be explained, not
+     * because any query needs it.
+     */
+    val publishedOn: String,
+    val rateMicro: Long,
+)

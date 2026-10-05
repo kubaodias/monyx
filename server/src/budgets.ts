@@ -78,7 +78,25 @@ export async function budgetStatuses(
        SELECT eff.category_id                     AS category_id,
               c.name                              AS category_name,
               eff.limit_minor                     AS limit_minor,
-              COALESCE(SUM(t.amount_minor), 0)    AS spent_minor
+              -- Converted to złoty, like everything the phone adds up. The
+              -- default account is normally in złoty and this is then a no-op,
+              -- but a household whose main account is a euro one would otherwise
+              -- get alerts comparing euro cents against a złoty limit — off by
+              -- the rate, in the direction of alerting far too late.
+              --
+              -- Integer division, matching the client's ledger_pln view rather
+              -- than convertMinor's half-away-from-zero rounding, so the two
+              -- implementations of this sum agree to the grosz.
+              COALESCE(SUM(
+                CASE WHEN COALESCE(ac.currency, 'PLN') = 'PLN' THEN t.amount_minor
+                     ELSE (t.amount_minor * (
+                             SELECT r.rate_micro FROM fx_rates r
+                              WHERE r.currency = ac.currency
+                                AND r.effective_on <= t.occurred_on
+                              ORDER BY r.effective_on DESC LIMIT 1
+                          )) / 1000000
+                END
+              ), 0)                                 AS spent_minor
        FROM eff
        JOIN categories c
          ON c.id = eff.category_id
@@ -112,6 +130,11 @@ export async function budgetStatuses(
                   AND sc.deleted = 0
               )
         )
+       -- Only for t's currency. Joined rather than sub-selected so the
+       -- conversion above reads as one expression instead of two nested ones.
+       LEFT JOIN accounts ac
+         ON ac.id = t.account_id
+        AND ac.household_id = ?1
        GROUP BY eff.category_id, c.name, eff.limit_minor`,
     )
     .bind(hh, period)

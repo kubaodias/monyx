@@ -8,6 +8,8 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { FakeDb, seedHousehold } from "./fake-db.ts";
 import { push } from "../src/sync.ts";
+import { budgetStatuses } from "../src/budgets.ts";
+import { expense } from "./fake-db.ts";
 import { forHousehold } from "../src/db.ts";
 import {
   BASE,
@@ -274,4 +276,70 @@ test("a currency the server has no rates for is refused, not defaulted", async (
   // NULL would drop the account out of every total. Refusing tells the client.
   assert.equal(result.rejected[0]?.reason, "bad_currency");
   assert.equal(result.applied, 0);
+});
+
+test("a budget alert converts a foreign default account's spending", async () => {
+  // The SECOND implementation of "what has been spent": budgets.ts for the
+  // notification, ledger_pln on the phone for the screen. An unconverted alert
+  // would compare euro cents against a złoty limit and fire far too late —
+  // 100,00 € of a 500,00 zł budget would read as 100,00 zł spent, not 437,45.
+  const fake = new FakeDb();
+  seedHousehold(fake);
+  const db = forHousehold("hh1", fake);
+
+  // acc1 is the default account: first by excluded_from_summary, sort_order.
+  fake.db.exec(`UPDATE accounts SET currency = 'EUR' WHERE id = 'acc1'`);
+  await refreshRates(fake, "2026-08-15", "2026-08-15", NOW, fakeNbp({
+    "2026-08-15": { EUR: 4.3745 },
+  }));
+
+  fake.db.exec(
+    `INSERT INTO budgets (id, household_id, category_id, period, limit_minor, seq, deleted)
+     VALUES ('b1', 'hh1', 'cat1', '2026-08', 50000,
+             (SELECT next_seq + 1 FROM households WHERE id='hh1'), 0);
+     UPDATE households SET next_seq = next_seq + 1 WHERE id='hh1';`,
+  );
+  await push(db, [expense("t1", 100_00, "cat1")]);
+
+  const statuses = await budgetStatuses(db, "2026-08");
+  // 100,00 € at 4,3745 = 437,45 zł. Integer division, matching ledger_pln.
+  assert.equal(statuses[0]?.spent_minor, 437_45);
+});
+
+test("a zloty default account is unaffected by the conversion", async () => {
+  // The no-op path, which is every household today. If this moves, the
+  // conversion has leaked into the ordinary case.
+  const fake = new FakeDb();
+  seedHousehold(fake);
+  const db = forHousehold("hh1", fake);
+  fake.db.exec(
+    `INSERT INTO budgets (id, household_id, category_id, period, limit_minor, seq, deleted)
+     VALUES ('b1', 'hh1', 'cat1', '2026-08', 50000,
+             (SELECT next_seq + 1 FROM households WHERE id='hh1'), 0);
+     UPDATE households SET next_seq = next_seq + 1 WHERE id='hh1';`,
+  );
+  await push(db, [expense("t1", 100_00, "cat1")]);
+
+  const statuses = await budgetStatuses(db, "2026-08");
+  assert.equal(statuses[0]?.spent_minor, 100_00);
+});
+
+test("spending with no rate for its currency is not counted as zloty", async () => {
+  // No rates at all. Counting 100_00 euro cents as 100,00 zł would understate
+  // by the rate; the conversion yields null and SUM skips it, which is the same
+  // degradation the phone has.
+  const fake = new FakeDb();
+  seedHousehold(fake);
+  const db = forHousehold("hh1", fake);
+  fake.db.exec(`UPDATE accounts SET currency = 'EUR' WHERE id = 'acc1'`);
+  fake.db.exec(
+    `INSERT INTO budgets (id, household_id, category_id, period, limit_minor, seq, deleted)
+     VALUES ('b1', 'hh1', 'cat1', '2026-08', 50000,
+             (SELECT next_seq + 1 FROM households WHERE id='hh1'), 0);
+     UPDATE households SET next_seq = next_seq + 1 WHERE id='hh1';`,
+  );
+  await push(db, [expense("t1", 100_00, "cat1")]);
+
+  const statuses = await budgetStatuses(db, "2026-08");
+  assert.equal(statuses[0]?.spent_minor, 0, "no rate means not counted, not counted wrongly");
 });

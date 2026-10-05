@@ -3,6 +3,7 @@ package com.monyx
 import com.monyx.data.AccountBalance
 import com.monyx.data.Currency
 import com.monyx.data.Money
+import com.monyx.ui.overview.OverviewViewModel
 import com.monyx.ui.settings.currencyLabel
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -95,54 +96,71 @@ class CurrencyTest {
 
     // ------------------------------------------- what the summary counts
 
-    private fun balance(id: String, currency: String, excluded: Int = 0) =
-        AccountBalance(
-            id = id,
-            name = id,
-            icon = null,
-            color = null,
-            balanceMinor = 100_00,
-            excludedFromSummary = excluded,
-            currency = currency,
-        )
+    private fun balance(
+        id: String,
+        currency: String,
+        excluded: Int = 0,
+        nativeMinor: Long = 100_00,
+        plnMinor: Long? = 100_00,
+    ) = AccountBalance(
+        id = id,
+        name = id,
+        icon = null,
+        color = null,
+        balanceMinor = nativeMinor,
+        excludedFromSummary = excluded,
+        currency = currency,
+        plnMinor = plnMinor,
+    )
 
     /**
-     * The predicate OverviewViewModel applies before summing balances. Kept
-     * here in the same shape so the rule is asserted rather than only read.
+     * These call OverviewViewModel.summedBalance directly.
+     *
+     * An earlier version of this file kept its own copy of the predicate, which
+     * meant the tests went on passing after the production rule changed under
+     * them — they were asserting the copy. Calling the real function is the
+     * whole point.
      */
-    private fun counted(accountIds: Set<String>): (AccountBalance) -> Boolean = {
-        Currency.of(it.currency).isReporting &&
-            if (accountIds.isEmpty()) it.excludedFromSummary == 0 else it.id in accountIds
+
+    @Test
+    fun `a converted account is counted in zloty, not at face value`() {
+        // 1 240,00 € converted to 5 424,38 zł, plus 100,00 zł.
+        val accounts = listOf(
+            balance("portfel", "PLN", nativeMinor = 100_00, plnMinor = 100_00),
+            balance("revolut", "EUR", nativeMinor = 124_000, plnMinor = 542_438),
+        )
+        assertEquals(552_438L, OverviewViewModel.summedBalance(accounts, emptySet()))
     }
 
     @Test
-    fun `a foreign account is left out of the balance total`() {
-        val accounts = listOf(balance("portfel", "PLN"), balance("revolut", "EUR"))
-        val summed = accounts.filter(counted(emptySet())).sumOf { it.balanceMinor }
-        // 100,00 zł, not 200,00 of two different things.
-        assertEquals(100_00L, summed)
+    fun `an account with no rate yet contributes nothing rather than its face value`() {
+        // The degradation that matters. Adding 124_000 euro cents to grosze
+        // would overstate the total by thousands of złoty, silently.
+        val accounts = listOf(
+            balance("portfel", "PLN", nativeMinor = 100_00, plnMinor = 100_00),
+            balance("revolut", "EUR", nativeMinor = 124_000, plnMinor = null),
+        )
+        assertEquals(100_00L, OverviewViewModel.summedBalance(accounts, emptySet()))
     }
 
     @Test
-    fun `selecting a foreign account explicitly still does not add it to a total`() {
-        // The guard is unconditional, in the DAO and here. Tapping the account
-        // on the Overview — if a chip for it existed — must not mix units; the
-        // chip is hidden too, which is belt and braces on the same rule.
-        val accounts = listOf(balance("portfel", "PLN"), balance("revolut", "EUR"))
-        val summed = accounts.filter(counted(setOf("portfel", "revolut"))).sumOf { it.balanceMinor }
-        assertEquals(100_00L, summed)
-    }
-
-    @Test
-    fun `a foreign account excluded from the summary is out for both reasons`() {
-        val accounts = listOf(balance("revolut", "EUR", excluded = 1))
-        assertEquals(0L, accounts.filter(counted(emptySet())).sumOf { it.balanceMinor })
-    }
-
-    @Test
-    fun `a zloty account kept out of the summary is still out`() {
-        // The currency guard must not have replaced the older rule.
+    fun `an account kept out of the summary is still out once convertible`() {
+        // Conversion must not have quietly replaced the older rule.
         val accounts = listOf(balance("pzu", "PLN", excluded = 1))
-        assertEquals(0L, accounts.filter(counted(emptySet())).sumOf { it.balanceMinor })
+        assertEquals(0L, OverviewViewModel.summedBalance(accounts, emptySet()))
+    }
+
+    @Test
+    fun `an explicit selection counts the converted figure`() {
+        val accounts = listOf(
+            balance("portfel", "PLN", nativeMinor = 100_00, plnMinor = 100_00),
+            balance("revolut", "EUR", nativeMinor = 124_000, plnMinor = 542_438),
+        )
+        // Selecting only the euro account gives its złoty value, not its cents.
+        assertEquals(542_438L, OverviewViewModel.summedBalance(accounts, setOf("revolut")))
+        // And an excluded account selected ON DEMAND does count — that is what
+        // the strip's buttons are for.
+        val withExcluded = listOf(balance("pzu", "PLN", excluded = 1))
+        assertEquals(100_00L, OverviewViewModel.summedBalance(withExcluded, setOf("pzu")))
     }
 }
