@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.monyx.data.AccountEntity
 import com.monyx.data.CategoryEntity
+import com.monyx.data.Currency
 import com.monyx.data.Dates
 import com.monyx.data.defaultAccountId
 import com.monyx.data.MonyxRepository
@@ -34,8 +35,20 @@ data class AddUiState(
     val accountId: String? = null,
     val note: String = "",
     val date: LocalDate = Dates.today(),
+    /**
+     * What this amount is in. Follows the chosen account unless it is changed.
+     *
+     * Null means "whatever the account says", which is the state a fresh entry
+     * starts in: the account is picked before the keypad settles and storing a
+     * copy of its currency here would go stale the moment another account is
+     * chosen. [currencyOr] resolves it.
+     */
+    val currency: Currency? = null,
 ) {
     val amountMinor: Long get() = amount.evaluate().toMinor()
+
+    /** The entry's currency, falling back to [accountCurrency]'s. */
+    fun currencyOr(accountCurrency: Currency): Currency = currency ?: accountCurrency
     val canSave: Boolean
         get() = amountMinor > 0 && accountId != null && categoryId != null
 }
@@ -95,8 +108,21 @@ class AddViewModel(private val repository: MonyxRepository) : ViewModel() {
         _state.value = _state.value.copy(categoryId = id)
     }
 
+    /**
+     * Picking an account also drops any currency chosen by hand.
+     *
+     * Switching from the złoty card to the euro one means the next thing typed
+     * is almost certainly euro, and carrying over an override from the previous
+     * account is how an amount ends up in a unit nobody chose for it. The
+     * override is cheap to set again and expensive to not notice.
+     */
     fun selectAccount(id: String) {
-        _state.value = _state.value.copy(accountId = id)
+        _state.value = _state.value.copy(accountId = id, currency = null)
+    }
+
+    /** An explicit choice for THIS entry, overriding the account's. */
+    fun selectCurrency(currency: Currency) {
+        _state.value = _state.value.copy(currency = currency)
     }
 
     fun setNote(note: String) {
@@ -155,6 +181,7 @@ class AddViewModel(private val repository: MonyxRepository) : ViewModel() {
         val current = _state.value
         if (!current.canSave) return
         val accountId = current.accountId ?: return
+        val account = accounts.value.firstOrNull { it.id == accountId }
 
         viewModelScope.launch {
             repository.addTransaction(
@@ -165,6 +192,7 @@ class AddViewModel(private val repository: MonyxRepository) : ViewModel() {
                 note = current.note,
                 occurredAtMs = occurredAt(current.date),
                 createdBy = createdBy,
+                currency = current.currencyOr(Currency.of(account?.currency)),
             )
             // Reset for the next entry, keeping the kind the user chose — the
             // next expense is usually like the last one. The account is not

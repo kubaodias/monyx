@@ -60,6 +60,7 @@ import com.monyx.data.Dates
 import com.monyx.data.TransactionEntity
 import com.monyx.ui.add.AccountPickerDialog
 import com.monyx.ui.add.AmountDisplay
+import com.monyx.ui.add.CurrencyPickerDialog
 import com.monyx.ui.add.AmountInput
 import com.monyx.ui.add.NoteField
 import com.monyx.ui.add.press
@@ -80,6 +81,14 @@ data class TransactionEdit(
     val accountId: String,
     val note: String,
     val occurredAtMs: Long,
+    /**
+     * The row's own currency, which an edit may change.
+     *
+     * Seeded from the row rather than from its account: an entry made in euro
+     * stays in euro when its account is switched, because switching the account
+     * says where the money came from and not what was spent.
+     */
+    val currency: Currency,
 )
 
 /**
@@ -129,6 +138,8 @@ fun EditTransactionSheet(
     var amount by remember(original.id) { mutableStateOf(AmountInput.ofMinor(original.amountMinor)) }
     var categoryId by remember(original.id) { mutableStateOf(original.categoryId) }
     var accountId by remember(original.id) { mutableStateOf(original.accountId) }
+    var currency by remember(original.id) { mutableStateOf(Currency.of(original.currency)) }
+    var showCurrencyPicker by remember { mutableStateOf(false) }
     var note by remember(original.id) { mutableStateOf(original.note.orEmpty()) }
     var date by remember(original.id) { mutableStateOf(LocalDate.parse(original.occurredOn)) }
 
@@ -326,6 +337,16 @@ fun EditTransactionSheet(
                     accent = accountColor,
                     onClick = { showAccountPicker = true },
                 )
+                // Next to the account, because the two answer adjacent questions
+                // — where the money came from, and what it was counted in — and
+                // because the pairing is what makes it obvious the two can
+                // disagree. No icon: the symbol IS the icon.
+                ContextChip(
+                    icon = null,
+                    label = currency.suffix,
+                    accent = null,
+                    onClick = { showCurrencyPicker = true },
+                )
                 ContextChip(
                     icon = {
                         Icon(
@@ -345,10 +366,22 @@ fun EditTransactionSheet(
 
             // [account] is already resolved above for the picker; the figure
             // and the account chip beside it must agree about the unit.
+            if (showCurrencyPicker) {
+                CurrencyPickerDialog(
+                    selected = currency,
+                    accountCurrency = Currency.of(account?.currency),
+                    onPick = {
+                        currency = it
+                        showCurrencyPicker = false
+                    },
+                    onDismiss = { showCurrencyPicker = false },
+                )
+            }
+
             AmountDisplay(
                 amount = amount,
                 onClick = { editAmount() },
-                currency = Currency.of(account?.currency),
+                currency = currency,
             )
 
             // The note is laid out as on the add screen: last in the grid,
@@ -418,7 +451,7 @@ fun EditTransactionSheet(
                 blocker = null,
                 enabled = amountMinor > 0 && (isTransfer || categoryId != null),
                 amountMinor = amountMinor,
-                currency = Currency.of(account?.currency),
+                currency = currency,
                 onSave = {
                     val edit = TransactionEdit(
                         amountMinor = amountMinor,
@@ -426,6 +459,7 @@ fun EditTransactionSheet(
                         accountId = accountId,
                         note = note.trim(),
                         occurredAtMs = occurredAtFor(date, original.occurredAt, original.occurredOn),
+                        currency = currency,
                     )
                     closeThen { onSave(edit) }
                 },

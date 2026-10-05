@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.monyx.data.AccountActivity
 import com.monyx.data.AccountEntity
 import com.monyx.data.CategoryEntity
+import com.monyx.data.Currency
 import com.monyx.data.Dates
 import com.monyx.data.MonyxRepository
 import com.monyx.data.Planned
@@ -312,6 +313,7 @@ class TransactionsViewModel(
         accountId: String,
         note: String,
         occurredAtMs: Long,
+        currency: Currency,
     ) {
         viewModelScope.launch {
             repository.updateTransaction(
@@ -322,6 +324,7 @@ class TransactionsViewModel(
                     accountId = accountId,
                     note = note,
                     occurredAtMs = occurredAtMs,
+                    currency = currency,
                 ),
             )
             SyncWorker.enqueue(appContext)

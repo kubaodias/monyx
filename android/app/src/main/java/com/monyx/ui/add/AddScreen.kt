@@ -138,6 +138,7 @@ fun AddScreen(
     }
 
     var showAccountPicker by remember { mutableStateOf(false) }
+    var showCurrencyPicker by remember { mutableStateOf(false) }
     var showDatePicker by remember { mutableStateOf(false) }
     var editing by remember { mutableStateOf(Editing.Amount) }
 
@@ -201,6 +202,7 @@ fun AddScreen(
             state = state,
             accounts = accounts,
             onPickAccount = { showAccountPicker = true },
+            onPickCurrency = { showCurrencyPicker = true },
             onPickDate = { showDatePicker = true },
             onMakeRecurring = {
                 focusManager.clearFocus()
@@ -217,12 +219,15 @@ fun AddScreen(
 
         KindSelector(selected = state.kind, onSelect = viewModel::setKind)
 
-        // The unit follows the chosen account, so typing 50 against a euro
-        // account reads "50,00 €" rather than claiming złoty.
+        // The ENTRY's unit, which follows the account until the currency chip
+        // says otherwise. Typing 50 for a euro purchase reads "50,00 €"
+        // whichever card it settled on.
         AmountDisplay(
             amount = state.amount,
             onClick = { editAmount() },
-            currency = Currency.of(accounts.firstOrNull { it.id == state.accountId }?.currency),
+            currency = state.currencyOr(
+                Currency.of(accounts.firstOrNull { it.id == state.accountId }?.currency),
+            ),
         )
 
         CategoryGrid(
@@ -274,7 +279,9 @@ fun AddScreen(
 
         SaveBar(
             state = state,
-            currency = Currency.of(accounts.firstOrNull { it.id == state.accountId }?.currency),
+            currency = state.currencyOr(
+                Currency.of(accounts.firstOrNull { it.id == state.accountId }?.currency),
+            ),
             hasMember = memberId != null,
             onSave = {
                 memberId?.let {
@@ -282,6 +289,19 @@ fun AddScreen(
                     editAmount()
                 }
             },
+        )
+    }
+
+    if (showCurrencyPicker) {
+        val account = accounts.firstOrNull { it.id == state.accountId }
+        CurrencyPickerDialog(
+            selected = state.currencyOr(Currency.of(account?.currency)),
+            accountCurrency = Currency.of(account?.currency),
+            onPick = {
+                viewModel.selectCurrency(it)
+                showCurrencyPicker = false
+            },
+            onDismiss = { showCurrencyPicker = false },
         )
     }
 
@@ -391,6 +411,7 @@ private fun ContextRow(
     state: AddUiState,
     accounts: List<AccountEntity>,
     onPickAccount: () -> Unit,
+    onPickCurrency: () -> Unit,
     onPickDate: () -> Unit,
     onMakeRecurring: () -> Unit,
 ) {
@@ -422,6 +443,15 @@ private fun ContextRow(
             label = account?.name ?: stringResource(R.string.add_needs_account),
             accent = accountColor,
             onClick = onPickAccount,
+        )
+        // Beside the account: the two answer adjacent questions — where the
+        // money came from, and what it was counted in — and the pairing is what
+        // makes it obvious the two can disagree. No icon; the symbol is one.
+        ContextChip(
+            icon = null,
+            label = state.currencyOr(Currency.of(account?.currency)).suffix,
+            accent = null,
+            onClick = onPickCurrency,
         )
         ContextChip(
             icon = { Icon(Icons.Filled.CalendarToday, contentDescription = null, modifier = Modifier.size(16.dp)) },

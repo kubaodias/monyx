@@ -117,6 +117,16 @@ data class TransactionEntity(
      */
     val recurringRuleId: String? = null,
     val createdAt: Long,
+    /**
+     * ISO 4217 — what THIS amount is denominated in, and the authority for
+     * conversion. See [Currency] and ADR 0022.
+     *
+     * Not the account's currency. You can pay 15 EUR with a złoty card, or buy
+     * something in dollars from a euro account, and the amount that happened is
+     * 15 EUR either way. The account's currency is now only the unit of its
+     * opening balance and the currency a new entry on it starts in.
+     */
+    val currency: String = Currency.PLN.code,
     val seq: Long = 0,
     val deleted: Int = 0,
     val pending: Int = 0,

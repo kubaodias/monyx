@@ -88,10 +88,10 @@ export async function budgetStatuses(
               -- than convertMinor's half-away-from-zero rounding, so the two
               -- implementations of this sum agree to the grosz.
               COALESCE(SUM(
-                CASE WHEN COALESCE(ac.currency, 'PLN') = 'PLN' THEN t.amount_minor
+                CASE WHEN COALESCE(t.currency, 'PLN') = 'PLN' THEN t.amount_minor
                      ELSE (t.amount_minor * (
                              SELECT r.rate_micro FROM fx_rates r
-                              WHERE r.currency = ac.currency
+                              WHERE r.currency = t.currency
                                 AND r.effective_on <= t.occurred_on
                               ORDER BY r.effective_on DESC LIMIT 1
                           )) / 1000000
@@ -130,11 +130,6 @@ export async function budgetStatuses(
                   AND sc.deleted = 0
               )
         )
-       -- Only for t's currency. Joined rather than sub-selected so the
-       -- conversion above reads as one expression instead of two nested ones.
-       LEFT JOIN accounts ac
-         ON ac.id = t.account_id
-        AND ac.household_id = ?1
        GROUP BY eff.category_id, c.name, eff.limit_minor`,
     )
     .bind(hh, period)

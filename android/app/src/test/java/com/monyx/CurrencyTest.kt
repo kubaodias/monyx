@@ -4,6 +4,9 @@ import com.monyx.data.AccountBalance
 import com.monyx.data.Currency
 import com.monyx.data.Money
 import com.monyx.data.TransactionListItem
+import com.monyx.ui.add.AddUiState
+import com.monyx.ui.add.AddViewModel
+import com.monyx.ui.add.EntryKind
 import com.monyx.ui.overview.OverviewViewModel
 import com.monyx.ui.transactions.TransactionsViewModel
 import com.monyx.ui.settings.currencyLabel
@@ -243,5 +246,33 @@ class CurrencyTest {
         assertEquals(" €", suffixFor("EUR"))
         assertEquals(" SEK", suffixFor("SEK"))
         assertEquals("", suffixFor("PLN"))
+    }
+
+    // ------------------------------------------- one entry's own currency
+
+    @Test
+    fun `an entry follows its account until it is told otherwise`() {
+        // null is "whatever the account says", which is the state a fresh entry
+        // starts in. Storing a copy of the account's currency instead would go
+        // stale the moment another account was picked.
+        val fresh = AddUiState()
+        assertEquals(Currency.EUR, fresh.currencyOr(Currency.EUR))
+        assertEquals(Currency.PLN, fresh.currencyOr(Currency.PLN))
+    }
+
+    @Test
+    fun `an explicit choice wins over the account`() {
+        // The case this feature exists for: 15 EUR paid with a złoty card.
+        val overridden = AddUiState(currency = Currency.EUR)
+        assertEquals(Currency.EUR, overridden.currencyOr(Currency.PLN))
+    }
+
+    @Test
+    fun `the keypad's next entry carries no override`() {
+        // nextEntry is what the keypad resets to after a save. An override left
+        // behind would silently apply to the following purchase, which is the
+        // same mistake carrying the ACCOUNT over would have been — see the note
+        // on nextEntry.
+        assertEquals(null, AddViewModel.nextEntry(EntryKind.Expense, emptyList()).currency)
     }
 }

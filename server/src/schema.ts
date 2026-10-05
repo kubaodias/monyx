@@ -74,7 +74,7 @@ export const COLUMNS: Record<TableName, readonly string[]> = {
     "id", "household_id", "kind", "amount_minor", "account_id",
     "transfer_account_id", "category_id", "note", "occurred_at",
     "occurred_on", "created_by", "source", "recurring_rule_id",
-    "created_at", "seq", "deleted",
+    "created_at", "currency", "seq", "deleted",
   ],
 };
 
@@ -284,6 +284,13 @@ export function validateChange(raw: unknown): ValidationResult {
       if (!isInt(row["created_at"])) return reject("bad_created_at");
       if (row["source"] !== undefined && !SOURCES.has(String(row["source"]))) return reject("bad_source");
       if (!optionalId(row["recurring_rule_id"])) return reject("bad_recurring_rule_id");
+      // Absent means PLN, so a client built before this column keeps working.
+      // A present-but-unknown code is refused for the same reason as on an
+      // account: there are no rates for it, so it would convert to nothing and
+      // drop the row out of every total with nothing on screen to say so.
+      if (row["currency"] !== undefined && !isCurrency(row["currency"])) {
+        return reject("bad_currency");
+      }
       // A transfer has no category and never enters spending statistics.
       if (kind === "transfer") {
         if (typeof row["transfer_account_id"] !== "string") return reject("transfer_needs_target");

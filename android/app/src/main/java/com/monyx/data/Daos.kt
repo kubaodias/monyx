@@ -124,6 +124,9 @@ data class DailyTotals(
  */
 data class DailyDelta(val day: String, val deltaMinor: Long)
 
+/** See [MonyxDao.accountCurrencies]. */
+data class AccountCurrency(val id: String, val currency: String)
+
 data class AccountBalance(
     val id: String,
     val name: String,
@@ -282,6 +285,18 @@ interface MonyxDao {
     /** For the Settings line that says whether conversion is current. */
     @Query("SELECT COUNT(*) FROM fx_rates")
     suspend fun rateCount(): Int
+
+    /**
+     * Each account's currency, for the one write path with no screen behind it.
+     *
+     * A repeating rule does not carry a currency of its own yet, so the
+     * occurrences it materialises take their account's — which is exactly what
+     * every row did before transactions had one, so no behaviour changes. A rule
+     * for a euro subscription on a złoty card is the case this does not serve,
+     * and it needs a currency on recurring_rules to fix properly.
+     */
+    @Query("SELECT id, currency FROM accounts WHERE deleted = 0")
+    suspend fun accountCurrencies(): List<AccountCurrency>
 
     // ---------------------------------------------------------------- writes
 
@@ -745,7 +760,9 @@ interface MonyxDao {
                         (SELECT id FROM accounts WHERE deleted = 0 AND excludedFromSummary = 0))
                      OR accountId IN (:accountIds))
              UNION ALL
-             SELECT occurredOn AS day, transferPlnMinor AS deltaMinor
+             -- The receiving leg of a transfer: the same one amount, so the
+             -- same converted figure. A transfer is a single row.
+             SELECT occurredOn AS day, plnMinor AS deltaMinor
                FROM ledger_pln
               WHERE deleted = 0 AND kind = 'transfer' AND transferAccountId IS NOT NULL
                 AND occurredOn >= :fromDay AND occurredOn <= :toDay

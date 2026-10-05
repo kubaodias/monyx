@@ -115,7 +115,7 @@ monyx/
 ```sh
 cd server
 npm install
-npm test          # 132 tests: sync, auth, budgets, voice, notes, releases, rates
+npm test          # 136 tests: sync, auth, budgets, voice, notes, releases, rates
 npm run typecheck
 telnyx-edge ship  # deploy
 ```
@@ -153,6 +153,17 @@ On the phone, an account's currency is picked in Settings and its balance is
 shown in that currency; `Money.formatIn` is the only formatter that takes one,
 while `Money.formatWithCurrency` prints a **total** and deliberately cannot be
 handed anything but złoty.
+
+**A currency belongs to a transaction**, not to its account. You can pay 15 EUR
+with a złoty card, so the keypad and the edit sheet carry a currency chip beside
+the account chip: it follows the account by default and can be changed per
+entry. `accounts.currency` is now only the unit of the account's **opening
+balance** and the currency a new entry on it **starts in**.
+
+A repeating rule has no currency of its own yet, so its occurrences take their
+account's — which is what every row did before, so nothing changed. A euro
+subscription on a złoty card is the case that still needs a column on
+`recurring_rules`.
 
 **Conversion happens on the phone**, because every figure in the app is computed
 locally in Room. `GET /rates` replicates `fx_rates` to the device during sync,

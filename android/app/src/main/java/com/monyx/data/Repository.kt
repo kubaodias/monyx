@@ -115,6 +115,13 @@ class MonyxRepository(private val dao: MonyxDao) {
          * parser was right.
          */
         source: String = "manual",
+        /**
+         * What the amount is in. Defaults to złoty rather than to the account's
+         * currency, so that a caller which has not thought about it cannot
+         * silently multiply a figure by a rate — the screens that can answer
+         * this pass it explicitly.
+         */
+        currency: Currency = Currency.PLN,
     ): String {
         val id = newId()
         dao.upsertTransactions(
@@ -126,6 +133,7 @@ class MonyxRepository(private val dao: MonyxDao) {
                     accountId = accountId,
                     transferAccountId = transferAccountId,
                     categoryId = if (kind == "transfer") null else categoryId,
+                    currency = currency.code,
                     note = note?.takeIf { it.isNotBlank() },
                     occurredAt = occurredAtMs,
                     // The client computes the local date.
@@ -473,6 +481,8 @@ class MonyxRepository(private val dao: MonyxDao) {
      */
     suspend fun materializeRecurring(today: LocalDate = Dates.today()): Int {
         var written = 0
+        // Read once, outside the loop: one query rather than one per rule.
+        val currencyOf = dao.accountCurrencies().associate { it.id to it.currency }
         for (rule in dao.activeRecurringRules()) {
             val anchor = parseDate(rule.startsOn) ?: continue
             val dates = Recurrence.occurrences(
@@ -513,6 +523,9 @@ class MonyxRepository(private val dao: MonyxDao) {
                         createdBy = rule.createdBy,
                         recurringRuleId = rule.id,
                         createdAt = at,
+                        // See MonyxDao.accountCurrencies: a rule has no currency
+                        // of its own, so its occurrences take the account's.
+                        currency = currencyOf[rule.accountId] ?: Currency.PLN.code,
                         pending = 1,
                     )
                 },
@@ -606,10 +619,12 @@ class MonyxRepository(private val dao: MonyxDao) {
             accountId: String,
             note: String,
             occurredAtMs: Long,
+            currency: Currency,
         ): TransactionEntity = original.copy(
             amountMinor = amountMinor,
             categoryId = categoryId,
             accountId = accountId,
+            currency = currency.code,
             note = note.ifBlank { null },
             occurredAt = occurredAtMs,
             occurredOn = Dates.localDate(occurredAtMs),
