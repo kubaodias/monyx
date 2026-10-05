@@ -4,6 +4,7 @@ import com.monyx.data.AccountEntity
 import com.monyx.data.BudgetEntity
 import com.monyx.data.MonthPlanEntity
 import com.monyx.data.CategoryEntity
+import com.monyx.data.Currency
 import com.monyx.data.MemberEntity
 import com.monyx.data.RecurringRuleEntity
 import com.monyx.data.TransactionEntity
@@ -81,6 +82,7 @@ fun AccountEntity.toRow(): JsonObject = buildJsonObject {
     put("sort_order", JsonPrimitive(sortOrder))
     put("archived", JsonPrimitive(archived))
     put("excluded_from_summary", JsonPrimitive(excludedFromSummary))
+    put("currency", JsonPrimitive(currency))
     put("deleted", JsonPrimitive(deleted))
 }
 
@@ -96,6 +98,9 @@ fun JsonObject.toAccount(): AccountEntity = AccountEntity(
     archived = int("archived"),
     // Absent from an older server, and counted is the right reading of silence.
     excludedFromSummary = int("excluded_from_summary"),
+    // Absent from an older server, and złoty is the right reading of silence —
+    // every account that existed before the column did was in złoty.
+    currency = str("currency") ?: Currency.PLN.code,
     seq = long("seq"),
     deleted = int("deleted"),
 )

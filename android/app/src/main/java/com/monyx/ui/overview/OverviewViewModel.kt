@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.monyx.data.AccountBalance
+import com.monyx.data.Currency
 import com.monyx.data.AccountEntity
 import com.monyx.data.CategoryRef
 import com.monyx.data.CategorySpend
@@ -333,8 +334,14 @@ class OverviewViewModel(
                 // the same accounts income and spending are counted over, so
                 // carry-over + income − expenses lands on the balance. Except
                 // those kept out of the summary, which the queries skip too.
-                val counted: (AccountBalance) -> Boolean =
-                    { if (accountIds.isEmpty()) it.excludedFromSummary == 0 else it.id in accountIds }
+                // Non-PLN accounts are out whatever the filter says — the same
+                // unconditional rule the DAO aggregates carry, for the same
+                // reason: these balances get summed, and summing two currencies
+                // is not addition. See the header of MonyxDao and ADR 0022.
+                val counted: (AccountBalance) -> Boolean = {
+                    Currency.of(it.currency).isReporting &&
+                        if (accountIds.isEmpty()) it.excludedFromSummary == 0 else it.id in accountIds
+                }
                 val balanceMinor = asOf.filter(counted).sumOf { it.balanceMinor }
                 val carryOverMinor = opening.filter(counted).sumOf { it.balanceMinor }
                 val trend = trendSeries(
@@ -368,7 +375,15 @@ class OverviewViewModel(
                     breakdown = breakdown,
                     // An archived account is not offered as a chip, but its
                     // transactions are still in every unfiltered figure above.
-                    accounts = accounts.filter { it.archived == 0 },
+                    // Non-PLN accounts get no chip. Every figure the chips
+                    // filter is a total, and a foreign account is held out of
+                    // all of them — so a chip for one would be a control that
+                    // visibly does nothing, which reads as a bug rather than as
+                    // the deliberate interim it is. The account is still on
+                    // Settings, still bookable, still shows its own balance.
+                    accounts = accounts.filter {
+                        it.archived == 0 && Currency.of(it.currency).isReporting
+                    },
                     archivedIds = accounts
                         .filter { it.archived == 1 && it.excludedFromSummary == 0 }
                         .map { it.id }

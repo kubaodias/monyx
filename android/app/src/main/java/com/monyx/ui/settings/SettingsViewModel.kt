@@ -6,6 +6,7 @@ import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.monyx.MonyxApp
 import com.monyx.data.AccountEntity
+import com.monyx.data.Currency
 import com.monyx.data.CategoryEntity
 import com.monyx.data.RecurringRuleListItem
 import com.monyx.sync.Api
@@ -109,9 +110,16 @@ class SettingsViewModel(private val app: MonyxApp) : ViewModel() {
     private val _reuploadRequested = MutableStateFlow(false)
     val reuploadRequested: StateFlow<Boolean> = _reuploadRequested.asStateFlow()
 
-    fun addAccount(name: String, initialBalanceMinor: Long, icon: String?, color: String?, inSummary: Boolean) {
+    fun addAccount(
+        name: String,
+        initialBalanceMinor: Long,
+        icon: String?,
+        color: String?,
+        inSummary: Boolean,
+        currency: Currency,
+    ) {
         viewModelScope.launch {
-            repository.addAccount(name, initialBalanceMinor, icon, color, inSummary)
+            repository.addAccount(name, initialBalanceMinor, icon, color, inSummary, currency)
             SyncWorker.enqueue(app)
         }
     }

@@ -180,6 +180,8 @@
     <string name="settings_add_category">Add a category</string>
     <string name="settings_account_name">Account name</string>
     <string name="settings_account_balance">Current balance</string>
+    <string name="settings_account_currency">Currency</string>
+    <string name="settings_account_currency_hint">Totals stay in złoty. This account is left out of them until its rate is converted.</string>
     <string name="settings_account_in_summary">Include in summary</string>
     <string name="settings_account_in_summary_hint">Off: its balance and its spending stay out of every total, budget and chart. You can still book transactions on it.</string>
     <string name="settings_account_outside_summary">outside the summary</string>

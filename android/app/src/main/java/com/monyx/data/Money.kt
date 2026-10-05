@@ -91,8 +91,19 @@ object Money {
         return "$sign${absolute / 100}$fraction"
     }
 
-    /** "1 324,00 zł" — the full form. */
+    /** "1 324,00 zł" — the full form, in the reporting currency. */
     fun formatWithCurrency(minor: Long): String = "${format(minor)} $CURRENCY"
+
+    /**
+     * "1 240,00 €" — the full form for an account that holds something else.
+     *
+     * A separate function rather than a default argument on the one above, so
+     * that every call site which prints a TOTAL keeps printing złoty and cannot
+     * be quietly handed a currency. A total is always in the reporting
+     * currency; only a single account's own figures are ever in another.
+     */
+    fun formatIn(minor: Long, currency: Currency): String =
+        "${format(minor)} ${currency.suffix}"
 
     /** Signed for a ledger row: "-45,99" for an expense. */
     fun formatSigned(minor: Long, kind: String): String = when (kind) {

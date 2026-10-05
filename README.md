@@ -149,6 +149,19 @@ NBP publishes nothing on weekends or holidays — the API answers 404 — so eac
 closed day stores the previous publication carried forward, with `published_on`
 recording which day's rate it actually is.
 
+On the phone, an account's currency is picked in Settings and its balance is
+shown in that currency; `Money.formatIn` is the only formatter that takes one,
+while `Money.formatWithCurrency` prints a **total** and deliberately cannot be
+handed anything but złoty.
+
+**Until conversion lands, a non-PLN account is held out of every total.** It is
+visible in Settings, bookable from the keypad and shows its own balance, but it
+contributes to no Overview figure, no budget and no carry-over, and it gets no
+chip on the Overview filter. The guard is unconditional — see the header of
+`MonyxDao`, which states it once for the ten query sites that carry it — so
+selecting such an account explicitly cannot mix units either. Summing grosze
+and euro cents produces a number that is not money.
+
 All nine are two-decimal currencies in ISO 4217. That is what lets
 `amount_minor` keep meaning "hundredths of the unit" everywhere with no
 per-currency minor-unit handling, so **a currency does not go on the list

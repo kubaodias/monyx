@@ -128,9 +128,16 @@ data class AccountBalance(
     val name: String,
     val icon: String?,
     val color: String?,
+    /**
+     * In [currency], not necessarily in złoty. This is one account's own
+     * position, so it is the one figure in the app that is legitimately in
+     * another unit — which is also why nothing may sum these without checking
+     * the currency first. See [Currency] and ADR 0022.
+     */
     val balanceMinor: Long,
     val archived: Int = 0,
     val excludedFromSummary: Int = 0,
+    val currency: String = Currency.PLN.code,
 )
 
 /**
@@ -219,6 +226,24 @@ data class RecurringRuleListItem(
     val rejected: Int,
 )
 
+/**
+ * Currencies and the aggregates, stated once rather than at ten query sites.
+ *
+ * Every query that SUMS across accounts carries
+ * `NOT IN (SELECT id FROM accounts WHERE currency <> 'PLN')`. Adding grosze to
+ * euro cents produces a number that is not money, and it would be a number
+ * nothing on screen admitted was wrong.
+ *
+ * The guard is unconditional rather than part of the `:allAccounts` branch, so
+ * that explicitly selecting a foreign account on the Overview cannot mix units
+ * either. Queries that return one row PER account — [accountBalances] and
+ * [accountBalancesThrough] — deliberately do not carry it: an account's own
+ * balance in its own currency is exactly what those are for.
+ *
+ * This is interim. ADR 0022 sequences it: conversion replaces the exclusion,
+ * and when it does these ten clauses come out together. Until then a foreign
+ * account is visible, bookable, and absent from every total.
+ */
 @Dao
 interface MonyxDao {
 
@@ -408,7 +433,8 @@ interface MonyxDao {
                   + COALESCE((SELECT SUM(t.amountMinor) FROM transactions t
                      WHERE t.transferAccountId = a.id AND t.kind = 'transfer'
                        AND t.deleted = 0), 0) AS balanceMinor,
-                  a.archived AS archived, a.excludedFromSummary AS excludedFromSummary
+                  a.archived AS archived, a.excludedFromSummary AS excludedFromSummary,
+                  a.currency AS currency
            FROM accounts a WHERE a.deleted = 0 ORDER BY a.archived, a.sortOrder, a.name"""
     )
     fun accountBalances(): Flow<List<AccountBalance>>
@@ -452,7 +478,8 @@ interface MonyxDao {
                   + COALESCE((SELECT SUM(t.amountMinor) FROM transactions t
                      WHERE t.transferAccountId = a.id AND t.kind = 'transfer'
                        AND t.deleted = 0 AND t.occurredOn <= :through), 0) AS balanceMinor,
-                  a.archived AS archived, a.excludedFromSummary AS excludedFromSummary
+                  a.archived AS archived, a.excludedFromSummary AS excludedFromSummary,
+                  a.currency AS currency
            FROM accounts a WHERE a.deleted = 0 ORDER BY a.archived, a.sortOrder, a.name"""
     )
     fun accountBalancesThrough(through: String): Flow<List<AccountBalance>>
@@ -466,6 +493,7 @@ interface MonyxDao {
     @Query(
         """SELECT DISTINCT accountId FROM transactions
            WHERE deleted = 0 AND kind = 'expense' AND substr(occurredOn, 1, 7) = :period
+             AND accountId NOT IN (SELECT id FROM accounts WHERE currency <> 'PLN')
              AND accountId NOT IN (SELECT id FROM accounts WHERE excludedFromSummary = 1)"""
     )
     fun spendingAccountIds(period: String): Flow<List<String>>
@@ -505,6 +533,7 @@ interface MonyxDao {
              COALESCE(SUM(CASE WHEN kind = 'expense' THEN amountMinor ELSE 0 END), 0) AS expenseMinor
            FROM transactions
            WHERE deleted = 0 AND substr(occurredOn, 1, 7) = :period
+             AND accountId NOT IN (SELECT id FROM accounts WHERE currency <> 'PLN')
              AND ((:allAccounts = 1 AND accountId NOT IN (SELECT id FROM accounts WHERE excludedFromSummary = 1))
                   OR accountId IN (:accountIds))"""
     )
@@ -528,6 +557,7 @@ interface MonyxDao {
            LEFT JOIN categories p ON p.id = c.parentId
            WHERE t.deleted = 0 AND t.kind = 'expense'
              AND substr(t.occurredOn, 1, 7) = :period
+             AND t.accountId NOT IN (SELECT id FROM accounts WHERE currency <> 'PLN')
              AND ((:allAccounts = 1 AND t.accountId NOT IN (SELECT id FROM accounts WHERE excludedFromSummary = 1))
                   OR t.accountId IN (:accountIds))
            GROUP BY COALESCE(p.id, c.id)
@@ -553,6 +583,7 @@ interface MonyxDao {
            LEFT JOIN categories p ON p.id = c.parentId
            WHERE t.deleted = 0 AND t.kind = 'expense'
              AND t.occurredOn >= :fromDay AND t.occurredOn <= :toDay
+             AND t.accountId NOT IN (SELECT id FROM accounts WHERE currency <> 'PLN')
              AND ((:allAccounts = 1 AND t.accountId NOT IN (SELECT id FROM accounts WHERE excludedFromSummary = 1))
                   OR t.accountId IN (:accountIds))
            GROUP BY t.occurredOn, COALESCE(p.id, c.id)
@@ -590,6 +621,7 @@ interface MonyxDao {
            WHERE t.deleted = 0 AND t.kind = 'expense'
              AND substr(t.occurredOn, 1, 7) >= :fromPeriod
              AND substr(t.occurredOn, 1, 7) <= :toPeriod
+             AND t.accountId NOT IN (SELECT id FROM accounts WHERE currency <> 'PLN')
              AND ((:allAccounts = 1 AND t.accountId NOT IN (SELECT id FROM accounts WHERE excludedFromSummary = 1))
                   OR t.accountId IN (:accountIds))
            GROUP BY period, COALESCE(p.id, c.id)
@@ -617,6 +649,7 @@ interface MonyxDao {
              COALESCE(SUM(CASE WHEN kind = 'expense' THEN amountMinor ELSE 0 END), 0) AS expenseMinor
            FROM transactions
            WHERE deleted = 0 AND occurredOn >= :fromDay AND occurredOn <= :toDay
+             AND accountId NOT IN (SELECT id FROM accounts WHERE currency <> 'PLN')
              AND ((:allAccounts = 1 AND accountId NOT IN (SELECT id FROM accounts WHERE excludedFromSummary = 1))
                   OR accountId IN (:accountIds))
            GROUP BY occurredOn
@@ -654,6 +687,7 @@ interface MonyxDao {
                     CASE WHEN kind = 'income' THEN amountMinor ELSE -amountMinor END AS deltaMinor
                FROM transactions
               WHERE deleted = 0 AND occurredOn >= :fromDay AND occurredOn <= :toDay
+                AND accountId NOT IN (SELECT id FROM accounts WHERE currency <> 'PLN')
                 AND ((:allAccounts = 1 AND accountId IN
                         (SELECT id FROM accounts WHERE deleted = 0 AND excludedFromSummary = 0))
                      OR accountId IN (:accountIds))
@@ -662,6 +696,7 @@ interface MonyxDao {
                FROM transactions
               WHERE deleted = 0 AND kind = 'transfer' AND transferAccountId IS NOT NULL
                 AND occurredOn >= :fromDay AND occurredOn <= :toDay
+                AND transferAccountId NOT IN (SELECT id FROM accounts WHERE currency <> 'PLN')
                 AND ((:allAccounts = 1 AND transferAccountId IN
                         (SELECT id FROM accounts WHERE deleted = 0 AND excludedFromSummary = 0))
                      OR transferAccountId IN (:accountIds))
@@ -699,6 +734,7 @@ interface MonyxDao {
                               AND ((:allAccounts = 1
                                     AND t.accountId NOT IN (SELECT id FROM accounts WHERE excludedFromSummary = 1))
                                    OR t.accountId IN (:accountIds))
+                                  AND t.accountId NOT IN (SELECT id FROM accounts WHERE currency <> 'PLN')
                               AND (t.categoryId = b.categoryId
                                    OR t.categoryId IN (SELECT sc.id FROM categories sc
                                                        WHERE sc.parentId = b.categoryId
@@ -822,6 +858,7 @@ interface MonyxDao {
         """SELECT COALESCE(SUM(amountMinor), 0) FROM transactions
            WHERE deleted = 0 AND kind = 'income'
              AND substr(occurredOn, 1, 7) = :period
+             AND accountId NOT IN (SELECT id FROM accounts WHERE currency <> 'PLN')
              AND accountId NOT IN (SELECT id FROM accounts WHERE excludedFromSummary = 1)"""
     )
     suspend fun incomeMinorIn(period: String): Long

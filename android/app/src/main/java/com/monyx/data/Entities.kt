@@ -55,6 +55,15 @@ data class AccountEntity(
      * leaves it out until that button is switched on.
      */
     val excludedFromSummary: Int = 0,
+    /**
+     * ISO 4217, and "PLN" for every account that does not say otherwise.
+     *
+     * What the rows of THIS account are counted in. Not what the app reports
+     * in, which is always złoty — see [Currency] and ADR 0022. Stored as the
+     * code rather than the enum so that a value this build does not recognise
+     * survives a round trip instead of failing to deserialise.
+     */
+    val currency: String = Currency.PLN.code,
     val seq: Long = 0,
     val deleted: Int = 0,
     val pending: Int = 0,
