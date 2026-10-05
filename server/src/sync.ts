@@ -14,6 +14,7 @@ import {
   type Rejection,
   type TableName,
 } from "./schema.ts";
+import { BASE } from "./rates.ts";
 
 export interface PushResult {
   seq: number;
@@ -158,6 +159,7 @@ function normalize(table: TableName, col: string, value: unknown): unknown {
     if (col === "initial_balance_minor") return 0;
     if (col === "archived") return 0;
     if (col === "excluded_from_summary") return 0;
+    if (col === "currency") return BASE;
     return null;
   }
   return value;

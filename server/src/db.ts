@@ -155,3 +155,19 @@ export async function releaseByCode(
     .bind(versionCode)
     .first<ReleaseRow>();
 }
+
+/**
+ * Exception five: an exchange rate is a fact about the world.
+ *
+ * fx_rates has no household_id — every household converts euro to złoty with
+ * the same number — so there is no household to scope the handle to. This is
+ * the one exception that is about the TABLE rather than about the stage of a
+ * request: the four above all exist because a household is not yet known, and
+ * this one because there is not one to know.
+ *
+ * Returns the raw binding, so rates.ts can both read and write without a
+ * second path to env.DB existing anywhere else. See migrations/0009_fx_rates.sql.
+ */
+export function sharedDb(db: SqlDatabase = binding()): SqlDatabase {
+  return db;
+}
