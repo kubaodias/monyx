@@ -29,6 +29,11 @@ import androidx.room.DatabaseView
  * That is the honest failure — a missing rate silently worth nothing would
  * understate a total with nothing on screen admitting it.
  *
+ * It carries every column of `transactions` plus the converted amounts, so a
+ * query can read this in place of the table and lose nothing — which is what the
+ * ledger list does, to show each row in the unit it was entered in and still
+ * total the month in złoty.
+ *
  * Integer division by 1000000 matches `convertMinor` on the server, which
  * rounds half away from zero. SQLite's integer division truncates toward zero
  * instead, so the two can differ by one grosz on a single row. They are never
@@ -51,6 +56,9 @@ import androidx.room.DatabaseView
                t.source AS source,
                t.recurringRuleId AS recurringRuleId,
                t.deleted AS deleted,
+               t.pending AS pending,
+               t.rejected AS rejected,
+               COALESCE(a.currency, 'PLN') AS currency,
                CASE WHEN COALESCE(a.currency, 'PLN') = 'PLN' THEN t.amountMinor
                     ELSE (t.amountMinor * (
                             SELECT r.rateMicro FROM fx_rates r
@@ -87,6 +95,10 @@ data class LedgerPln(
     val source: String,
     val recurringRuleId: String?,
     val deleted: Int,
+    val pending: Int,
+    val rejected: Int,
+    /** The account's currency, so a row can print the unit it was entered in. */
+    val currency: String,
     /** [amountMinor] in grosze, or null when the rate is unknown. */
     val plnMinor: Long?,
     /**

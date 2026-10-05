@@ -173,6 +173,23 @@ Overview strip, so the money is visible; it is just not claimed to be złoty.
 Counting euro cents as grosze would overstate a total with nothing on screen
 admitting it.
 
+**Which unit each figure is printed in** follows one rule: anything that is a
+total is złoty, anything that is one entry or one account's position may be its
+own currency.
+
+- **Totals** — Overview, Bilans, Budget, the ledger's month figure — złoty,
+  always. `Money.formatWithCurrency` takes no currency so it cannot be handed
+  one.
+- **The Overview account strip** shows the converted figure as its main number,
+  because the strip is what Bilans is the sum of, with the account's own balance
+  smaller underneath. A strip of euro figures over a złoty total is a screen
+  whose arithmetic does not visibly work.
+- **A ledger row** shows what was entered, in its own unit, and carries its
+  symbol **only when it is not złoty** — marking the exception rather than
+  putting "zł" on hundreds of rows.
+- **The keypad and the save button** follow the chosen account, since that is
+  the unit the figure being typed is in.
+
 `budgets.ts` carries a **second** implementation of the same sum, for the alert
 the server sends. It converts too, with integer division matching the view
 rather than `convertMinor`'s rounding, so the notification and the screen agree

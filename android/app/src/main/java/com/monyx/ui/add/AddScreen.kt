@@ -274,6 +274,7 @@ fun AddScreen(
 
         SaveBar(
             state = state,
+            currency = Currency.of(accounts.firstOrNull { it.id == state.accountId }?.currency),
             hasMember = memberId != null,
             onSave = {
                 memberId?.let {
@@ -360,7 +361,12 @@ private fun KindSelector(selected: EntryKind, onSelect: (EntryKind) -> Unit) {
  * simply refused to save would be a bug report.
  */
 @Composable
-private fun SaveBar(state: AddUiState, hasMember: Boolean, onSave: () -> Unit) {
+private fun SaveBar(
+    state: AddUiState,
+    currency: Currency,
+    hasMember: Boolean,
+    onSave: () -> Unit,
+) {
     // Always there, greyed until the entry is complete. It used to appear only
     // once amount and category were both in — which is mid-typing when the
     // category goes first — and a 62dp bar arriving under the keypad shoved
@@ -371,6 +377,7 @@ private fun SaveBar(state: AddUiState, hasMember: Boolean, onSave: () -> Unit) {
         // it, so it is the one the bar still names.
         blocker = if (state.accountId == null) R.string.add_needs_account else null,
         amountMinor = state.amountMinor,
+        currency = currency,
         // No member id means enrolment has not landed; there is nobody to
         // credit the row to and saving would write an orphan.
         enabled = hasMember && !unfinished,

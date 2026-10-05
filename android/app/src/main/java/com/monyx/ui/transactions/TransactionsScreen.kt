@@ -75,6 +75,7 @@ import com.monyx.MonyxApp
 import com.monyx.R
 import com.monyx.data.AccountEntity
 import com.monyx.data.CategoryEntity
+import com.monyx.data.Currency
 import com.monyx.data.Dates
 import com.monyx.data.accountsInListOrder
 import com.monyx.data.defaultAccountId

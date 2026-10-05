@@ -172,13 +172,7 @@ class TransactionsViewModel(
      * should not make the month look worse.
      */
     val filteredTotals: StateFlow<FilteredTotals> = transactions
-        .map { rows ->
-            FilteredTotals(
-                count = rows.size,
-                expenseMinor = rows.filter { it.kind == "expense" }.sumOf { it.amountMinor },
-                incomeMinor = rows.filter { it.kind == "income" }.sumOf { it.amountMinor },
-            )
-        }
+        .map(::totalsOf)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), FilteredTotals())
 
     data class FilteredTotals(
@@ -213,6 +207,25 @@ class TransactionsViewModel(
     }
 
     companion object {
+        /**
+         * The figures under the search box, in złoty.
+         *
+         * [TransactionListItem.plnMinor], not amountMinor. These get added
+         * together and printed with "zł" beside them, so summing each row's own
+         * currency produced a figure that was not money — a euro row and a
+         * złoty row contributing as though one cent were one grosz. A 15,00 €
+         * coffee and an 89,99 zł shop came to "104,99 zł".
+         *
+         * Null means no rate has synced for that currency and contributes
+         * nothing, the same degradation every other total in the app has.
+         */
+        internal fun totalsOf(rows: List<TransactionListItem>): FilteredTotals =
+            FilteredTotals(
+                count = rows.size,
+                expenseMinor = rows.filter { it.kind == "expense" }.sumOf { it.plnMinor ?: 0L },
+                incomeMinor = rows.filter { it.kind == "income" }.sumOf { it.plnMinor ?: 0L },
+            )
+
         /**
          * The accounts the filter offers: the open ones, plus whichever is
          * already selected.

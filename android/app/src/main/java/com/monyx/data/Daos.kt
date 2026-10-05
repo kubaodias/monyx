@@ -196,6 +196,10 @@ data class TransactionListItem(
     val categoryColorKey: String?,
     val accountName: String?,
     val transferAccountName: String?,
+    /** The account's currency. [amountMinor] is in THIS, not necessarily złoty. */
+    val currency: String = Currency.PLN.code,
+    /** [amountMinor] in grosze, or null when no rate is known. See [LedgerPln]. */
+    val plnMinor: Long? = null,
     /** Non-null when a repeating rule wrote this row rather than a person. */
     val recurringRuleId: String?,
     val pending: Int,
@@ -921,8 +925,12 @@ interface MonyxDao {
                   COALESCE(c.color, pc.color) AS categoryColor,
                   COALESCE(c.parentId, c.id) AS categoryColorKey,
                   a.name AS accountName, ta.name AS transferAccountName,
-                  t.recurringRuleId, t.pending, t.rejected
-           FROM transactions t
+                  t.recurringRuleId, t.pending, t.rejected,
+                  -- The row prints amountMinor in its own currency; the month's
+                  -- total adds up plnMinor. Reading the view rather than the
+                  -- table is what makes both available from one query.
+                  t.currency AS currency, t.plnMinor AS plnMinor
+           FROM ledger_pln t
            LEFT JOIN categories c ON c.id = t.categoryId
            LEFT JOIN categories pc ON pc.id = c.parentId
            LEFT JOIN accounts   a ON a.id = t.accountId
@@ -969,8 +977,12 @@ interface MonyxDao {
                   COALESCE(c.color, pc.color) AS categoryColor,
                   COALESCE(c.parentId, c.id) AS categoryColorKey,
                   a.name AS accountName, ta.name AS transferAccountName,
-                  t.recurringRuleId, t.pending, t.rejected
-           FROM transactions t
+                  t.recurringRuleId, t.pending, t.rejected,
+                  -- The row prints amountMinor in its own currency; the month's
+                  -- total adds up plnMinor. Reading the view rather than the
+                  -- table is what makes both available from one query.
+                  t.currency AS currency, t.plnMinor AS plnMinor
+           FROM ledger_pln t
            LEFT JOIN categories c ON c.id = t.categoryId
            LEFT JOIN categories pc ON pc.id = c.parentId
            LEFT JOIN accounts   a ON a.id = t.accountId

@@ -2,7 +2,7 @@
   "formatVersion": 1,
   "database": {
     "version": 8,
-    "identityHash": "4d4e3bff0120e585edfc98a80247c8de",
+    "identityHash": "a9957238482b8968a4ad7f5cf057ae70",
     "entities": [
       {
         "tableName": "members",
@@ -731,12 +731,12 @@
     "views": [
       {
         "viewName": "ledger_pln",
-        "createSql": "CREATE VIEW `${VIEW_NAME}` AS SELECT t.id AS id,\n               t.kind AS kind,\n               t.amountMinor AS amountMinor,\n               t.accountId AS accountId,\n               t.transferAccountId AS transferAccountId,\n               t.categoryId AS categoryId,\n               t.note AS note,\n               t.occurredAt AS occurredAt,\n               t.occurredOn AS occurredOn,\n               t.createdBy AS createdBy,\n               t.source AS source,\n               t.recurringRuleId AS recurringRuleId,\n               t.deleted AS deleted,\n               CASE WHEN COALESCE(a.currency, 'PLN') = 'PLN' THEN t.amountMinor\n                    ELSE (t.amountMinor * (\n                            SELECT r.rateMicro FROM fx_rates r\n                             WHERE r.currency = a.currency\n                               AND r.effectiveOn <= t.occurredOn\n                             ORDER BY r.effectiveOn DESC LIMIT 1\n                         )) / 1000000\n               END AS plnMinor,\n               CASE WHEN COALESCE(ta.currency, 'PLN') = 'PLN' THEN t.amountMinor\n                    ELSE (t.amountMinor * (\n                            SELECT r2.rateMicro FROM fx_rates r2\n                             WHERE r2.currency = ta.currency\n                               AND r2.effectiveOn <= t.occurredOn\n                             ORDER BY r2.effectiveOn DESC LIMIT 1\n                         )) / 1000000\n               END AS transferPlnMinor\n          FROM transactions t\n          LEFT JOIN accounts a  ON a.id  = t.accountId\n          LEFT JOIN accounts ta ON ta.id = t.transferAccountId"
+        "createSql": "CREATE VIEW `${VIEW_NAME}` AS SELECT t.id AS id,\n               t.kind AS kind,\n               t.amountMinor AS amountMinor,\n               t.accountId AS accountId,\n               t.transferAccountId AS transferAccountId,\n               t.categoryId AS categoryId,\n               t.note AS note,\n               t.occurredAt AS occurredAt,\n               t.occurredOn AS occurredOn,\n               t.createdBy AS createdBy,\n               t.source AS source,\n               t.recurringRuleId AS recurringRuleId,\n               t.deleted AS deleted,\n               t.pending AS pending,\n               t.rejected AS rejected,\n               COALESCE(a.currency, 'PLN') AS currency,\n               CASE WHEN COALESCE(a.currency, 'PLN') = 'PLN' THEN t.amountMinor\n                    ELSE (t.amountMinor * (\n                            SELECT r.rateMicro FROM fx_rates r\n                             WHERE r.currency = a.currency\n                               AND r.effectiveOn <= t.occurredOn\n                             ORDER BY r.effectiveOn DESC LIMIT 1\n                         )) / 1000000\n               END AS plnMinor,\n               CASE WHEN COALESCE(ta.currency, 'PLN') = 'PLN' THEN t.amountMinor\n                    ELSE (t.amountMinor * (\n                            SELECT r2.rateMicro FROM fx_rates r2\n                             WHERE r2.currency = ta.currency\n                               AND r2.effectiveOn <= t.occurredOn\n                             ORDER BY r2.effectiveOn DESC LIMIT 1\n                         )) / 1000000\n               END AS transferPlnMinor\n          FROM transactions t\n          LEFT JOIN accounts a  ON a.id  = t.accountId\n          LEFT JOIN accounts ta ON ta.id = t.transferAccountId"
       }
     ],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '4d4e3bff0120e585edfc98a80247c8de')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'a9957238482b8968a4ad7f5cf057ae70')"
     ]
   }
 }

@@ -3,7 +3,9 @@ package com.monyx
 import com.monyx.data.AccountBalance
 import com.monyx.data.Currency
 import com.monyx.data.Money
+import com.monyx.data.TransactionListItem
 import com.monyx.ui.overview.OverviewViewModel
+import com.monyx.ui.transactions.TransactionsViewModel
 import com.monyx.ui.settings.currencyLabel
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -162,5 +164,84 @@ class CurrencyTest {
         // the strip's buttons are for.
         val withExcluded = listOf(balance("pzu", "PLN", excluded = 1))
         assertEquals(100_00L, OverviewViewModel.summedBalance(withExcluded, setOf("pzu")))
+    }
+
+    // ------------------------------------- the ledger's rows and its total
+
+    private fun row(kind: String, amountMinor: Long, currency: String, plnMinor: Long?) =
+        TransactionListItem(
+            id = "t-$currency-$amountMinor",
+            kind = kind,
+            amountMinor = amountMinor,
+            note = null,
+            occurredAt = 0,
+            occurredOn = "2026-10-05",
+            categoryId = null,
+            accountId = "a",
+            categoryName = null,
+            categoryIcon = null,
+            categoryColor = null,
+            categoryColorKey = null,
+            accountName = null,
+            transferAccountName = null,
+            currency = currency,
+            plnMinor = plnMinor,
+            recurringRuleId = null,
+            pending = 0,
+            rejected = 0,
+        )
+
+    /**
+     * The real sum, not a copy of it.
+     *
+     * The first draft of these tests reimplemented the filter here, which is
+     * the same mistake the balance tests above were written to undo: a test
+     * asserting its own copy passes forever, whatever the app does.
+     */
+    private fun expenseTotal(rows: List<TransactionListItem>): Long =
+        TransactionsViewModel.totalsOf(rows).expenseMinor
+
+    @Test
+    fun `the ledger total converts instead of adding two currencies together`() {
+        // The bug: 15,00 € and 89,99 zł summed to 104,99 and were printed with
+        // "zł" beside them. 15,00 € is 65,78 zł, so the real total is 155,77.
+        val rows = listOf(
+            row("expense", 15_00, "EUR", 65_78),
+            row("expense", 89_99, "PLN", 89_99),
+        )
+        assertEquals(155_77L, expenseTotal(rows))
+        // And emphatically not the old answer.
+        assertEquals(false, expenseTotal(rows) == 104_99L)
+    }
+
+    @Test
+    fun `a row with no rate contributes nothing to the ledger total`() {
+        val rows = listOf(
+            row("expense", 15_00, "EUR", null),
+            row("expense", 89_99, "PLN", 89_99),
+        )
+        assertEquals(89_99L, expenseTotal(rows))
+    }
+
+    @Test
+    fun `income rows stay out of the expense total`() {
+        // Guarding the existing split while changing the column it sums.
+        val rows = listOf(
+            row("income", 5_000_00, "PLN", 5_000_00),
+            row("expense", 89_99, "PLN", 89_99),
+        )
+        assertEquals(89_99L, expenseTotal(rows))
+    }
+
+    @Test
+    fun `a foreign row carries its unit and a zloty row does not`() {
+        // The rule the ledger row applies: mark the exception, leave the rest
+        // bare. Two identical-looking "-15,00" rows for different money was
+        // the complaint.
+        fun suffixFor(code: String) =
+            Currency.of(code).let { if (it.isReporting) "" else " ${it.suffix}" }
+        assertEquals(" €", suffixFor("EUR"))
+        assertEquals(" SEK", suffixFor("SEK"))
+        assertEquals("", suffixFor("PLN"))
     }
 }

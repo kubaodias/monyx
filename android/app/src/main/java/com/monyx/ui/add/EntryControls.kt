@@ -632,12 +632,22 @@ internal fun SaveBar(
     amountMinor: Long,
     onSave: () -> Unit,
     enabled: Boolean = true,
+    /**
+     * The unit of the figure on the label — the chosen account's currency.
+     *
+     * The comment above says this label catches the mis-tap the verb alone would
+     * not. It cannot do that printing the wrong unit: "Zapisz · 47,50 zł" under
+     * a euro account is the last thing read before money is written down, and it
+     * was asserting something false. Defaults to złoty for the callers that
+     * genuinely are in it.
+     */
+    currency: Currency = Currency.PLN,
 ) {
     val label = blocker?.let { stringResource(it) } ?: stringResource(
         R.string.add_save_amount,
         // The evaluated total, not the digits on screen: with "60 +" pending and
         // 40 typed, this reads 100,00 — which is what pressing it will write.
-        Money.formatWithCurrency(amountMinor),
+        Money.formatIn(amountMinor, currency),
     )
 
     Button(

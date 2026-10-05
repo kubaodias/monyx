@@ -61,6 +61,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.monyx.R
 import com.monyx.data.AccountEntity
+import com.monyx.data.Currency
 import com.monyx.data.accountsInListOrder
 import com.monyx.data.CategoryEntity
 import com.monyx.data.Dates
@@ -226,6 +227,7 @@ fun RecurringEditor(
             SaveButton(
                 blocker = blocker,
                 amountMinor = amountMinor,
+                currency = Currency.of(accounts.firstOrNull { it.id == accountId }?.currency),
                 onSave = {
                     onSave(
                         RuleDraft(
@@ -613,7 +615,12 @@ private fun KindToggle(selected: String, onSelect: (String) -> Unit) {
  * refuses to explain is the bug, not the guard.
  */
 @Composable
-private fun SaveButton(blocker: Int?, amountMinor: Long, onSave: () -> Unit) {
+private fun SaveButton(
+    blocker: Int?,
+    amountMinor: Long,
+    currency: Currency,
+    onSave: () -> Unit,
+) {
     Surface(color = MaterialTheme.colorScheme.background) {
         Button(
             onClick = onSave,
@@ -632,7 +639,10 @@ private fun SaveButton(blocker: Int?, amountMinor: Long, onSave: () -> Unit) {
                 text = blocker?.let { stringResource(it) }
                     ?: stringResource(
                         R.string.add_save_amount,
-                        Money.formatWithCurrency(amountMinor),
+                        // The rule's account's unit, like the add screen's bar.
+                        // A repeating rule in euro saved under a "zł" label is
+                        // the same false assertion, just one screen further in.
+                        Money.formatIn(amountMinor, currency),
                     ),
                 fontSize = 17.sp,
                 fontWeight = FontWeight.SemiBold,
