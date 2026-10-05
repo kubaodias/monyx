@@ -117,6 +117,18 @@ internal fun AmountDisplay(
      * telling the user the wrong thing about what they just entered.
      */
     currency: Currency = Currency.PLN,
+    /**
+     * Opens the currency picker, or null where the unit is not a choice.
+     *
+     * Null on the budget keypad: a limit is a figure in złoty whatever account
+     * the spending comes from. On the add screen and the edit sheet the unit IS
+     * a choice, and it is made right here — the symbol beside the figure is
+     * where somebody looks to check what they just typed, so it is also where
+     * they reach to correct it. It used to be a separate chip up beside the
+     * account, which answered the question two inches away from where it was
+     * being asked.
+     */
+    onPickCurrency: (() -> Unit)? = null,
 ) {
     Row(
         modifier = Modifier
@@ -130,7 +142,12 @@ internal fun AmountDisplay(
         // line that does not mean "type the amount" does not have to be outside
         // the line to say so.
         action?.let { Box(modifier = Modifier.padding(bottom = 10.dp)) { it() } }
-        AmountFigure(amount = amount, currency = currency, modifier = Modifier.weight(1f))
+        AmountFigure(
+            amount = amount,
+            currency = currency,
+            onPickCurrency = onPickCurrency,
+            modifier = Modifier.weight(1f),
+        )
     }
 }
 
@@ -138,6 +155,7 @@ internal fun AmountDisplay(
 private fun AmountFigure(
     amount: AmountInput,
     currency: Currency,
+    onPickCurrency: (() -> Unit)?,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -165,15 +183,32 @@ private fun AmountFigure(
                 color = MaterialTheme.colorScheme.onBackground,
             )
             Spacer(Modifier.width(6.dp))
-            Text(
-                // Not R.string.currency_suffix: that one is the reporting
-                // currency and is deliberately not translated, which is a
-                // different question from which unit THIS figure is in.
-                text = currency.suffix,
-                fontSize = 20.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(bottom = 8.dp),
-            )
+            // Not R.string.currency_suffix: that one is the reporting currency
+            // and is deliberately not translated, which is a different question
+            // from which unit THIS figure is in.
+            val unit: @Composable () -> Unit = {
+                Text(
+                    text = currency.suffix,
+                    fontSize = 20.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            if (onPickCurrency == null) {
+                Box(modifier = Modifier.padding(bottom = 8.dp)) { unit() }
+            } else {
+                // A quiet pill, the same wash a ContextChip carries, because an
+                // unmarked tappable word next to a 52sp number is not a control
+                // anybody finds. Its own clickable, so a tap here opens the
+                // picker rather than the keypad the rest of the line opens.
+                Box(
+                    modifier = Modifier
+                        .padding(bottom = 4.dp)
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(MaterialTheme.colorScheme.surface)
+                        .clickable(onClick = onPickCurrency)
+                        .padding(horizontal = 10.dp, vertical = 6.dp),
+                ) { unit() }
+            }
         }
     }
 }

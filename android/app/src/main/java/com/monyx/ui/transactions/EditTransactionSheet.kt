@@ -337,16 +337,6 @@ fun EditTransactionSheet(
                     accent = accountColor,
                     onClick = { showAccountPicker = true },
                 )
-                // Next to the account, because the two answer adjacent questions
-                // — where the money came from, and what it was counted in — and
-                // because the pairing is what makes it obvious the two can
-                // disagree. No icon: the symbol IS the icon.
-                ContextChip(
-                    icon = null,
-                    label = currency.suffix,
-                    accent = null,
-                    onClick = { showCurrencyPicker = true },
-                )
                 ContextChip(
                     icon = {
                         Icon(
@@ -364,8 +354,6 @@ fun EditTransactionSheet(
                 )
             }
 
-            // [account] is already resolved above for the picker; the figure
-            // and the account chip beside it must agree about the unit.
             if (showCurrencyPicker) {
                 CurrencyPickerDialog(
                     selected = currency,
@@ -382,6 +370,10 @@ fun EditTransactionSheet(
                 amount = amount,
                 onClick = { editAmount() },
                 currency = currency,
+                // The unit is changed where it is shown: the symbol beside the
+                // figure. [account] is resolved above for the picker's "this is
+                // the account's own" mark.
+                onPickCurrency = { showCurrencyPicker = true },
             )
 
             // The note is laid out as on the add screen: last in the grid,

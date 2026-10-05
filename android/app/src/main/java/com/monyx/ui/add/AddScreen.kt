@@ -202,7 +202,6 @@ fun AddScreen(
             state = state,
             accounts = accounts,
             onPickAccount = { showAccountPicker = true },
-            onPickCurrency = { showCurrencyPicker = true },
             onPickDate = { showDatePicker = true },
             onMakeRecurring = {
                 focusManager.clearFocus()
@@ -219,15 +218,17 @@ fun AddScreen(
 
         KindSelector(selected = state.kind, onSelect = viewModel::setKind)
 
-        // The ENTRY's unit, which follows the account until the currency chip
-        // says otherwise. Typing 50 for a euro purchase reads "50,00 €"
-        // whichever card it settled on.
+        // The ENTRY's unit, which follows the account until the symbol beside
+        // the figure is tapped. Typing 50 for a euro purchase reads "50,00 €"
+        // whichever card it settled on, and that symbol is the control that
+        // changes it.
         AmountDisplay(
             amount = state.amount,
             onClick = { editAmount() },
             currency = state.currencyOr(
                 Currency.of(accounts.firstOrNull { it.id == state.accountId }?.currency),
             ),
+            onPickCurrency = { showCurrencyPicker = true },
         )
 
         CategoryGrid(
@@ -411,7 +412,6 @@ private fun ContextRow(
     state: AddUiState,
     accounts: List<AccountEntity>,
     onPickAccount: () -> Unit,
-    onPickCurrency: () -> Unit,
     onPickDate: () -> Unit,
     onMakeRecurring: () -> Unit,
 ) {
@@ -443,15 +443,6 @@ private fun ContextRow(
             label = account?.name ?: stringResource(R.string.add_needs_account),
             accent = accountColor,
             onClick = onPickAccount,
-        )
-        // Beside the account: the two answer adjacent questions — where the
-        // money came from, and what it was counted in — and the pairing is what
-        // makes it obvious the two can disagree. No icon; the symbol is one.
-        ContextChip(
-            icon = null,
-            label = state.currencyOr(Currency.of(account?.currency)).suffix,
-            accent = null,
-            onClick = onPickCurrency,
         )
         ContextChip(
             icon = { Icon(Icons.Filled.CalendarToday, contentDescription = null, modifier = Modifier.size(16.dp)) },

@@ -199,7 +199,7 @@ data class TransactionListItem(
     val categoryColorKey: String?,
     val accountName: String?,
     val transferAccountName: String?,
-    /** The account's currency. [amountMinor] is in THIS, not necessarily złoty. */
+    /** The ROW's own currency. [amountMinor] is in THIS, not necessarily złoty. */
     val currency: String = Currency.PLN.code,
     /** [amountMinor] in grosze, or null when no rate is known. See [LedgerPln]. */
     val plnMinor: Long? = null,

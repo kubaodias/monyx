@@ -155,10 +155,11 @@ while `Money.formatWithCurrency` prints a **total** and deliberately cannot be
 handed anything but złoty.
 
 **A currency belongs to a transaction**, not to its account. You can pay 15 EUR
-with a złoty card, so the keypad and the edit sheet carry a currency chip beside
-the account chip: it follows the account by default and can be changed per
-entry. `accounts.currency` is now only the unit of the account's **opening
-balance** and the currency a new entry on it **starts in**.
+with a złoty card, so on the keypad and in the edit sheet the **symbol beside
+the amount** is the control that changes it: it follows the account by default
+and can be changed per entry, where the figure it describes is being typed.
+`accounts.currency` is now only the unit of the account's **opening balance**
+and the currency a new entry on it **starts in**.
 
 A repeating rule has no currency of its own yet, so its occurrences take their
 account's — which is what every row did before, so nothing changed. A euro
@@ -191,15 +192,23 @@ own currency.
 - **Totals** — Overview, Bilans, Budget, the ledger's month figure — złoty,
   always. `Money.formatWithCurrency` takes no currency so it cannot be handed
   one.
-- **The Overview account strip** shows the converted figure as its main number,
-  because the strip is what Bilans is the sum of, with the account's own balance
-  smaller underneath. A strip of euro figures over a złoty total is a screen
-  whose arithmetic does not visibly work.
-- **A ledger row** shows what was entered, in its own unit, and carries its
-  symbol **only when it is not złoty** — marking the exception rather than
-  putting "zł" on hundreds of rows.
-- **The keypad and the save button** follow the chosen account, since that is
-  the unit the figure being typed is in.
+- **The Overview account strip** leads with the converted figure and puts the
+  account's own money in brackets after it, on **one line**:
+  `-65,78 zł (-15,00 €)`. Złoty leads because the strip is what Bilans is the
+  sum of — a strip of euro figures over a złoty total is a screen whose
+  arithmetic does not visibly work. One line, because a second one made exactly
+  one tile in the strip taller than its neighbours.
+- **A ledger row** is the other way round: what was entered, with its symbol,
+  and its złoty value smaller underneath. A row is an event, and the figure on
+  the receipt is the one to lead with. A złoty row carries no unit and no second
+  figure at all — marking the exception rather than putting "zł" on hundreds of
+  rows to disambiguate three.
+- **The keypad and the save button** follow the entry's currency, which starts
+  as the chosen account's; that is the unit the figure being typed is in.
+
+Both of those come from `Money.accountStripFigure` and `Money.ledgerRowFigure`,
+so each rule is stated once and the tests call the same function the screen
+does.
 
 `budgets.ts` carries a **second** implementation of the same sum, for the alert
 the server sends. It converts too, with integer division matching the view

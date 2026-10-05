@@ -1051,36 +1051,39 @@ private fun AccountButton(
             }
         }
         Spacer(modifier = Modifier.height(2.dp))
-        // Złoty first, because these chips are what Bilans is the sum OF: a
-        // strip of euro figures above a złoty total is a screen whose own
-        // arithmetic does not visibly work, and nothing on it says why.
-        //
-        // The account's own figure stays, smaller and dimmer underneath — "how
-        // many euro have I got" is a real question and Settings is two taps
-        // away. Only for a foreign account: a second line repeating the same
-        // number in the same unit would be noise on every other chip.
-        val shown = if (currency.isReporting) balanceMinor else plnMinor
-        Text(
-            text = shown?.let { Money.formatWithCurrency(it) }
-                // No rate yet. An em dash rather than the euro figure dressed
-                // up as złoty, and the account's own balance is on the line
-                // below either way, so nothing is hidden.
-                ?: "—",
-            style = MaterialTheme.typography.bodyMedium.copy(fontFeatureSettings = "tnum"),
-            maxLines = 1,
-            color = if ((shown ?: 0) < 0) {
-                MaterialTheme.colorScheme.error
-            } else {
-                MaterialTheme.colorScheme.onSurfaceVariant
-            },
-        )
-        if (!currency.isReporting) {
+        // "-65,78 zł (-15,00 €)" — one line, złoty leading. See
+        // Money.accountStripFigure for why that order and why one line: a
+        // foreign account used to take a second line here, which made exactly
+        // one tile in the strip taller than its neighbours.
+        val figure = Money.accountStripFigure(balanceMinor, currency, plnMinor)
+        // Red follows the figure actually printed, which for a foreign account
+        // is the converted one — and is nothing at all when no rate is known,
+        // so an em dash is not drawn as though it were a debt.
+        val printedMinor = (if (currency.isReporting) balanceMinor else plnMinor) ?: 0L
+        Row(
+            verticalAlignment = Alignment.Bottom,
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
             Text(
-                text = Money.formatIn(balanceMinor, currency),
-                style = MaterialTheme.typography.labelSmall.copy(fontFeatureSettings = "tnum"),
+                text = figure.main,
+                style = MaterialTheme.typography.bodyMedium.copy(fontFeatureSettings = "tnum"),
                 maxLines = 1,
-                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                color = if (printedMinor < 0) {
+                    MaterialTheme.colorScheme.error
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                },
+                modifier = Modifier.alignByBaseline(),
             )
+            figure.aside?.let { own ->
+                Text(
+                    text = own,
+                    style = MaterialTheme.typography.labelSmall.copy(fontFeatureSettings = "tnum"),
+                    maxLines = 1,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                    modifier = Modifier.alignByBaseline(),
+                )
+            }
         }
     }
 }
