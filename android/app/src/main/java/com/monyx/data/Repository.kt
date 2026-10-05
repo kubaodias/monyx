@@ -163,6 +163,7 @@ class MonyxRepository(private val dao: MonyxDao) {
         icon: String?,
         color: String?,
         inSummary: Boolean = true,
+        currency: Currency = Currency.PLN,
     ) {
         dao.upsertAccounts(
             listOf(
@@ -173,6 +174,7 @@ class MonyxRepository(private val dao: MonyxDao) {
                     color = color,
                     initialBalanceMinor = initialBalanceMinor,
                     excludedFromSummary = if (inSummary) 0 else 1,
+                    currency = currency.code,
                     pending = 1,
                 ),
             ),

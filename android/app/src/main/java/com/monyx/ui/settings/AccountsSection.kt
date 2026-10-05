@@ -54,6 +54,13 @@ import com.monyx.R
 import com.monyx.data.AccountEntity
 import com.monyx.data.Money
 import com.monyx.ui.theme.Palette
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.material3.FilterChip
+import com.monyx.data.Currency
 
 /**
  * Accounts: list, add, edit, archive, restore and delete. Editing offers name,
@@ -66,7 +73,14 @@ import com.monyx.ui.theme.Palette
 @Composable
 fun AccountsSection(
     accounts: List<AccountRow>,
-    onAdd: (name: String, initialBalanceMinor: Long, icon: String?, color: String?, inSummary: Boolean) -> Unit,
+    onAdd: (
+        name: String,
+        initialBalanceMinor: Long,
+        icon: String?,
+        color: String?,
+        inSummary: Boolean,
+        currency: Currency,
+    ) -> Unit,
     onUpdate: (AccountEntity) -> Unit,
     onArchive: (AccountEntity, Boolean) -> Unit,
     onDelete: (AccountEntity) -> Unit,
@@ -193,9 +207,10 @@ fun AccountsSection(
             initialIcon = null,
             initialColor = null,
             initialInSummary = true,
+            initialCurrency = Currency.PLN,
             onDismiss = { showAdd = false },
-            onSave = { name, balanceMinor, icon, color, inSummary ->
-                onAdd(name, balanceMinor, icon, color, inSummary)
+            onSave = { name, balanceMinor, icon, color, inSummary, currency ->
+                onAdd(name, balanceMinor, icon, color, inSummary, currency)
                 showAdd = false
             },
         )
@@ -215,8 +230,9 @@ fun AccountsSection(
             initialIcon = entity.icon,
             initialColor = entity.color,
             initialInSummary = entity.excludedFromSummary == 0,
+            initialCurrency = Currency.of(entity.currency),
             onDismiss = { editing = null },
-            onSave = { name, balanceMinor, icon, color, inSummary ->
+            onSave = { name, balanceMinor, icon, color, inSummary, currency ->
                 onUpdate(
                     entity.copy(
                         name = name,
@@ -224,6 +240,7 @@ fun AccountsSection(
                         icon = icon,
                         color = color,
                         excludedFromSummary = if (inSummary) 0 else 1,
+                        currency = currency.code,
                     ),
                 )
                 editing = null
@@ -369,8 +386,12 @@ private fun AccountRowItem(
                     )
                 }
             }
+            // In the account's OWN currency. This is the figure that is
+            // legitimately not in złoty — a balance is one account's position,
+            // not a total — and printing "zł" after a euro balance is the
+            // misstatement this whole feature exists to stop.
             Text(
-                Money.formatWithCurrency(row.balanceMinor),
+                Money.formatIn(row.balanceMinor, Currency.of(row.entity.currency)),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -442,14 +463,23 @@ private fun AccountEditDialog(
     initialIcon: String?,
     initialColor: String?,
     initialInSummary: Boolean,
+    initialCurrency: Currency,
     onDismiss: () -> Unit,
-    onSave: (name: String, balanceMinor: Long, icon: String?, color: String?, inSummary: Boolean) -> Unit,
+    onSave: (
+        name: String,
+        balanceMinor: Long,
+        icon: String?,
+        color: String?,
+        inSummary: Boolean,
+        currency: Currency,
+    ) -> Unit,
 ) {
     var name by remember { mutableStateOf(initialName) }
     var balanceText by remember { mutableStateOf(if (balanceMinor == 0L) "" else Money.format(balanceMinor)) }
     var icon by remember { mutableStateOf(initialIcon) }
     var color by remember { mutableStateOf(initialColor) }
     var inSummary by remember { mutableStateOf(initialInSummary) }
+    var currency by remember { mutableStateOf(initialCurrency) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -477,7 +507,16 @@ private fun AccountEditDialog(
                 OutlinedTextField(
                     value = balanceText,
                     onValueChange = { balanceText = it },
-                    label = { Text(stringResource(R.string.settings_account_balance)) },
+                    // The unit rides on the label, because this field is the
+                    // one place a wrong currency is silently expensive: typing
+                    // a euro balance under a label saying "zł" is a mistake
+                    // nothing downstream can detect.
+                    label = {
+                        Text(
+                            stringResource(R.string.settings_account_balance) +
+                                " (" + currency.suffix + ")",
+                        )
+                    },
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                     modifier = Modifier.fillMaxWidth(),
@@ -491,7 +530,7 @@ private fun AccountEditDialog(
                     Text(
                         stringResource(
                             R.string.settings_account_opening,
-                            Money.formatWithCurrency(Money.parseToMinor(balanceText) - movementsMinor),
+                            Money.formatIn(Money.parseToMinor(balanceText) - movementsMinor, currency),
                         ),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -505,6 +544,23 @@ private fun AccountEditDialog(
                 Text(stringResource(R.string.settings_color), style = MaterialTheme.typography.labelMedium)
                 Spacer(Modifier.height(6.dp))
                 ColorSwatchRow(selected = color, onSelect = { color = it })
+                SectionRule()
+                Text(
+                    stringResource(R.string.settings_account_currency),
+                    style = MaterialTheme.typography.labelMedium,
+                )
+                Spacer(Modifier.height(6.dp))
+                CurrencyRow(selected = currency, onSelect = { currency = it })
+                // What picking a foreign currency costs, said on the screen
+                // that does the picking rather than discovered on the Overview.
+                if (!currency.isReporting) {
+                    Spacer(Modifier.height(6.dp))
+                    Text(
+                        stringResource(R.string.settings_account_currency_hint),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
                 SectionRule()
                 // Savings held somewhere else: still an account you can book
                 // on, just not money to add to what is there to spend.
@@ -532,7 +588,9 @@ private fun AccountEditDialog(
         },
         confirmButton = {
             TextButton(
-                onClick = { onSave(name.trim(), Money.parseToMinor(balanceText), icon, color, inSummary) },
+                onClick = {
+                    onSave(name.trim(), Money.parseToMinor(balanceText), icon, color, inSummary, currency)
+                },
                 enabled = name.isNotBlank(),
             ) { Text(stringResource(R.string.settings_save)) }
         },
@@ -540,4 +598,31 @@ private fun AccountEditDialog(
             TextButton(onClick = onDismiss) { Text(stringResource(R.string.settings_cancel)) }
         },
     )
+}
+
+/**
+ * The nine currencies, as chips.
+ *
+ * Chips rather than a dropdown: nine is few enough to see at once, and the one
+ * that is selected being visible without opening anything is what stops an
+ * account quietly holding the wrong unit. The code is the label even where a
+ * symbol exists, because "PLN" beside "EUR" compares and "zł" beside "€" does
+ * not — the symbol's job is on the rows, not here.
+ */
+@Composable
+private fun CurrencyRow(selected: Currency, onSelect: (Currency) -> Unit) {
+    LazyVerticalGrid(
+        columns = GridCells.Adaptive(minSize = 72.dp),
+        modifier = Modifier.fillMaxWidth().heightIn(max = 132.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        items(Currency.entries.toList(), key = { it.code }) { option ->
+            FilterChip(
+                selected = option == selected,
+                onClick = { onSelect(option) },
+                label = { Text(option.code) },
+            )
+        }
+    }
 }
