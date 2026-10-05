@@ -115,7 +115,7 @@ monyx/
 ```sh
 cd server
 npm install
-npm test          # 126 tests: sync, auth, budgets, voice, notes, releases, rates
+npm test          # 132 tests: sync, auth, budgets, voice, notes, releases, rates
 npm run typecheck
 telnyx-edge ship  # deploy
 ```
@@ -154,13 +154,29 @@ shown in that currency; `Money.formatIn` is the only formatter that takes one,
 while `Money.formatWithCurrency` prints a **total** and deliberately cannot be
 handed anything but złoty.
 
-**Until conversion lands, a non-PLN account is held out of every total.** It is
-visible in Settings, bookable from the keypad and shows its own balance, but it
-contributes to no Overview figure, no budget and no carry-over, and it gets no
-chip on the Overview filter. The guard is unconditional — see the header of
-`MonyxDao`, which states it once for the ten query sites that carry it — so
-selecting such an account explicitly cannot mix units either. Summing grosze
-and euro cents produces a number that is not money.
+**Conversion happens on the phone**, because every figure in the app is computed
+locally in Room. `GET /rates` replicates `fx_rates` to the device during sync,
+and the `ledger_pln` view (see `LedgerPln.kt`) exposes each transaction's amount
+in złoty. The ten aggregates read `plnMinor` from that view; the conversion
+lives in the view, once.
+
+A **balance** converts differently from a **transaction**, on purpose. A balance
+is a position now, so it is valued at one rate — the latest for a current
+balance, the one in force on the as-of day for a past one. A month's spending is
+converted row by row at the rate on each row's own date. Both are right and they
+are not the same arithmetic; see `AccountBalance.plnMinor`.
+
+**A missing rate is null, never zero.** `SUM` skips nulls, so a currency whose
+rates have not synced yet degrades to the account simply not being counted —
+the behaviour before conversion existed. It still shows its own balance on the
+Overview strip, so the money is visible; it is just not claimed to be złoty.
+Counting euro cents as grosze would overstate a total with nothing on screen
+admitting it.
+
+`budgets.ts` carries a **second** implementation of the same sum, for the alert
+the server sends. It converts too, with integer division matching the view
+rather than `convertMinor`'s rounding, so the notification and the screen agree
+to the grosz.
 
 All nine are two-decimal currencies in ISO 4217. That is what lets
 `amount_minor` keep meaning "hundredths of the unit" everywhere with no
@@ -330,10 +346,16 @@ capped at 30 days and runs inside a `try`: rates are a day of arithmetic that
 catches up tomorrow, and a failure there must not make the run look broken or
 leave the alert sweep unreported. The response reports each part separately.
 
-**Nothing calling `/cron/daily` means no rates.** Conversion of a
-foreign-currency account depends on a rate having been fetched for the date in
-question, so until something drives this route on a schedule, a non-PLN account
-has nothing to convert at.
+**Rates do not depend on this route.** `GET /rates` refreshes before answering,
+and the phone calls it on every sync — app open, after a local write, hourly —
+so rates arrive without anything driving the cron. That is deliberate: rates
+written only by a schedule nobody runs are no rates at all. The cron still
+refreshes them when it is called, through the same `ensureRatesCurrent`.
+
+NBP is read through its **range** endpoint, one request per 93 days, which is
+what makes backfill affordable: the first refresh reaches two years back in
+eight requests, so a household adding a euro account today can convert the
+history it already has.
 
 Backups are manual for a harder reason: `sqldb export` is CLI-only, with no REST
 equivalent, so the function cannot dump its own database.

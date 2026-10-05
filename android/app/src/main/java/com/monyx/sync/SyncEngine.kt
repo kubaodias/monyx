@@ -1,6 +1,7 @@
 package com.monyx.sync
 
 import androidx.room.withTransaction
+import com.monyx.data.FxRateEntity
 import com.monyx.data.MonyxDatabase
 import com.monyx.data.SyncStateEntity
 import kotlinx.serialization.json.JsonObject
@@ -24,6 +25,40 @@ class SyncEngine(
         val token = session.token() ?: return@runCatching
         pushPending(token)
         pullAll(token)
+        pullRates(token)
+    }
+
+    // ----------------------------------------------------------------- rates
+
+    /**
+     * Exchange rates, pulled into Room so conversion can be a local join.
+     *
+     * Last, and deliberately not fatal. Rates are not household data: nothing
+     * the user typed depends on them, and a figure converted at yesterday's
+     * rate is worth far more than a sync that failed and left this morning's
+     * expenses unsent. A failure here leaves the rates as they were and the
+     * next sync tries again.
+     *
+     * Resumes from the newest date stored, so an established phone asks for a
+     * day or two. A fresh install has none and gets the server's backfill
+     * window, which is what lets history convert rather than showing blanks
+     * behind the date rates started.
+     */
+    private suspend fun pullRates(token: String) {
+        runCatching {
+            val response = Api.rates(token, dao.latestRateDate())
+            if (response.rates.isEmpty()) return@runCatching
+            dao.upsertFxRates(
+                response.rates.map {
+                    FxRateEntity(
+                        currency = it.currency,
+                        effectiveOn = it.effectiveOn,
+                        publishedOn = it.publishedOn,
+                        rateMicro = it.rateMicro,
+                    )
+                },
+            )
+        }
     }
 
     // ------------------------------------------------------------------ push

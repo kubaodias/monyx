@@ -15,7 +15,7 @@ import {
   type PendingAlert,
 } from "./budgets.ts";
 import { allHouseholds, forHousehold, releaseByCode, releasesAfter, sharedDb, type HouseholdDb } from "./db.ts";
-import { datesBetween, latestStoredDate, refreshRates } from "./rates.ts";
+import { latestStoredDate, ratesSince, refreshRates } from "./rates.ts";
 import { sendBudgetAlert, type DeviceToken } from "./fcm.ts";
 import { parseNoteInput, suggestNote } from "./note.ts";
 import { describeUpdate, parseVersionCode, presign } from "./releases.ts";
@@ -289,39 +289,78 @@ async function handleCron(req: Request, nowMs: number): Promise<Response> {
   // job this route exists for; rates are a day's worth of arithmetic that can
   // be caught up tomorrow, and a 500 here would make the whole cron look broken
   // and leave the alerts unreported.
-  const rates = await refreshRatesForCron(nowMs);
+  const rates = await ensureRatesCurrent(nowMs);
 
   return json({ ok: true, households: households.length, alerts: delivered, period, rates });
 }
 
 /**
- * Bring fx_rates up to today, starting from the last date stored.
+ * How far back the first ever refresh reaches.
  *
- * Backfills rather than fetching only today: a function that has been down for
- * a week would otherwise leave a hole, and a transaction inside that hole would
- * convert at whatever older rate the lookup walked back to. Capped at 30 days
- * so one long outage cannot turn a cron run into a hundred sequential fetches.
- *
- * The first run ever has nothing stored and starts 7 days back, which is enough
- * to cover a weekend plus a holiday either side of it.
+ * Two years, so that a household adding a euro account today can convert the
+ * history it already has rather than seeing blanks behind the date rates
+ * started. At 93 days per request that is eight requests, once.
  */
-async function refreshRatesForCron(nowMs: number): Promise<Record<string, unknown>> {
+const BACKFILL_DAYS = 730;
+
+/** The most any single refresh will fetch, so one call cannot run away. */
+const MAX_REFRESH_DAYS = 400;
+
+/**
+ * Rates for the phone, which is where conversion actually happens.
+ *
+ * Every figure in the app is computed locally in Room — there is no endpoint
+ * that returns a total — so the rates have to be ON the device. This is the only
+ * thing that puts them there.
+ *
+ * It refreshes before answering, because nothing drives POST /cron/daily on a
+ * schedule and rates that are only written by a cron nobody calls are no rates
+ * at all. A sync already happens on app open and hourly, so hanging the refresh
+ * off a request the phone was going to make anyway is what makes this
+ * self-driving. Inside a try: stale rates beat a sync that fails.
+ */
+async function handleRates(url: URL, nowMs: number): Promise<Response> {
+  const db = sharedDb();
+  const refreshed = await ensureRatesCurrent(nowMs);
+
+  // Default covers the backfill window, so a phone with no rates yet gets the
+  // history its transactions need rather than only today's.
+  const since = url.searchParams.get("since")
+    ?? new Date(nowMs - BACKFILL_DAYS * 86_400_000).toISOString().slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(since)) return fail(400, "bad_since");
+
+  const rates = await ratesSince(db, since);
+  return json({ rates, latest: await latestStoredDate(db), refreshed });
+}
+
+/**
+ * Fetch whatever is missing between the last stored date and today.
+ *
+ * Never throws: every caller is on a path the user is waiting on, and a rate
+ * that is a day stale is a far better outcome than a failed sync. The result
+ * says what happened so a caller can report it.
+ */
+async function ensureRatesCurrent(nowMs: number): Promise<Record<string, unknown>> {
   try {
     const db = sharedDb();
     const today = new Date(nowMs).toISOString().slice(0, 10);
     const latest = await latestStoredDate(db);
+    const earliestWanted = nowMs - BACKFILL_DAYS * 86_400_000;
     const startMs = latest
-      ? Math.max(Date.parse(`${latest}T00:00:00Z`) + 86_400_000, nowMs - 30 * 86_400_000)
-      : nowMs - 7 * 86_400_000;
-    if (startMs > Date.parse(`${today}T00:00:00Z`)) return { ok: true, skipped: "already_current" };
-
-    const from = new Date(startMs).toISOString().slice(0, 10);
-    const result = await refreshRates(db, datesBetween(from, today), nowMs);
+      ? Date.parse(`${latest}T00:00:00Z`) + 86_400_000
+      : earliestWanted;
+    if (startMs > Date.parse(`${today}T00:00:00Z`)) {
+      return { ok: true, skipped: "already_current" };
+    }
+    const cappedMs = Math.max(startMs, nowMs - MAX_REFRESH_DAYS * 86_400_000);
+    const from = new Date(cappedMs).toISOString().slice(0, 10);
+    const result = await refreshRates(db, from, today, nowMs);
     return { ok: true, from, to: today, ...result };
   } catch (error) {
     return { ok: false, error: error instanceof Error ? error.message : "unknown" };
   }
 }
+
 
 // ---------------------------------------------------------------- voice
 
@@ -476,6 +515,9 @@ export default {
       }
       if (path === "/sync/pull" && req.method === "GET") {
         return await handlePull(url, session);
+      }
+      if (path === "/rates" && req.method === "GET") {
+        return await handleRates(url, nowMs);
       }
       if (path === "/voice/note" && req.method === "POST") {
         return await handleVoiceNote(req, session);

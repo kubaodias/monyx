@@ -110,6 +110,19 @@ object Api {
     fun pull(token: String, since: Long, limit: Int = 500): PullResponse =
         json.decodeFromString(get("/sync/pull?since=$since&limit=$limit", token))
 
+    /**
+     * Exchange rates the phone does not have yet.
+     *
+     * [since] is the newest date already stored, so an established phone asks
+     * for a day or two and a fresh one asks for the backfill window. The server
+     * refreshes from NBP before answering — see handleRates — which is what
+     * makes rates arrive at all, since nothing drives its daily cron.
+     */
+    fun rates(token: String, since: String?): RatesResponse =
+        json.decodeFromString(
+            get(if (since == null) "/rates" else "/rates?since=$since", token),
+        )
+
     /** Whether a newer release is published. `update` is null when this is the newest. */
     fun latestRelease(token: String, versionCode: Int): LatestReleaseResponse =
         json.decodeFromString(get("/app/latest?version_code=$versionCode", token))
@@ -231,6 +244,20 @@ data class PullResponse(
     val seq: Long,
     @SerialName("has_more") val hasMore: Boolean,
     @SerialName("last_backup_at") val lastBackupAt: Long? = null,
+)
+
+@Serializable
+data class RateRow(
+    val currency: String,
+    @SerialName("effective_on") val effectiveOn: String,
+    @SerialName("published_on") val publishedOn: String,
+    @SerialName("rate_micro") val rateMicro: Long,
+)
+
+@Serializable
+data class RatesResponse(
+    val rates: List<RateRow> = emptyList(),
+    val latest: String? = null,
 )
 
 @Serializable

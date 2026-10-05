@@ -334,16 +334,8 @@ class OverviewViewModel(
                 // the same accounts income and spending are counted over, so
                 // carry-over + income − expenses lands on the balance. Except
                 // those kept out of the summary, which the queries skip too.
-                // Non-PLN accounts are out whatever the filter says — the same
-                // unconditional rule the DAO aggregates carry, for the same
-                // reason: these balances get summed, and summing two currencies
-                // is not addition. See the header of MonyxDao and ADR 0022.
-                val counted: (AccountBalance) -> Boolean = {
-                    Currency.of(it.currency).isReporting &&
-                        if (accountIds.isEmpty()) it.excludedFromSummary == 0 else it.id in accountIds
-                }
-                val balanceMinor = asOf.filter(counted).sumOf { it.balanceMinor }
-                val carryOverMinor = opening.filter(counted).sumOf { it.balanceMinor }
+                val balanceMinor = summedBalance(asOf, accountIds)
+                val carryOverMinor = summedBalance(opening, accountIds)
                 val trend = trendSeries(
                     rows = daily,
                     from = window.start,
@@ -504,6 +496,30 @@ class OverviewViewModel(
     }
 
     companion object {
+
+        /**
+         * The accounts' combined position in złoty, under the current filter.
+         *
+         * [AccountBalance.plnMinor], never balanceMinor: these get added
+         * together, so they have to be in one unit, and balanceMinor is each
+         * account's own currency. Summing those would produce a number that is
+         * not money and nothing on screen would admit it.
+         *
+         * A null plnMinor means no rate for that currency has synced yet. Such
+         * an account contributes nothing rather than contributing its face value
+         * in the wrong unit — the same degradation the aggregates have, where
+         * SUM skips nulls. It is visible on the strip with its own balance, so
+         * the money is not hidden; it is just not claimed to be złoty.
+         *
+         * An empty [accountIds] is the unfiltered query and means every account
+         * counted in the summary. See [visibleSelection].
+         */
+        internal fun summedBalance(
+            balances: List<AccountBalance>,
+            accountIds: Set<String>,
+        ): Long = balances
+            .filter { if (accountIds.isEmpty()) it.excludedFromSummary == 0 else it.id in accountIds }
+            .sumOf { it.plnMinor ?: 0L }
         /**
          * The selection after tapping [id]. Empty is the default view: every
          * button except the ones kept out of the summary ([defaults] are the

@@ -925,13 +925,11 @@ private fun AccountChip(
     all: List<AccountBalance>,
     onToggle: (String, List<AccountBalance>) -> Unit,
 ) {
-    // Not in złoty means not in any total yet, so the chip cannot be switched
-    // on: a lit chip whose money is absent from the figures beside it would be
-    // the chip lying. It is still HERE, with its balance, because this strip is
-    // the only place the Overview shows a per-account balance at all — hiding
-    // it made the account vanish from the tab, which was worse than showing it
-    // as something the totals do not yet include.
-    val convertible = Currency.of(account.currency).isReporting
+    // Convertible once a rate for its currency has synced. Until then the
+    // account shows its own balance but cannot be switched on: a lit chip whose
+    // money is absent from the figures beside it would be the chip lying. PLN
+    // needs no rate and is always convertible.
+    val convertible = Currency.of(account.currency).isReporting || account.plnMinor != null
     AccountButton(
         name = account.name,
         balanceMinor = account.balanceMinor,

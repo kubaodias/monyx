@@ -4,6 +4,7 @@ import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import androidx.room.Upsert
 import kotlinx.coroutines.flow.Flow
 
 /**
@@ -138,6 +139,20 @@ data class AccountBalance(
     val archived: Int = 0,
     val excludedFromSummary: Int = 0,
     val currency: String = Currency.PLN.code,
+    /**
+     * [balanceMinor] in grosze, or null when no rate for [currency] is known.
+     *
+     * A balance is a position NOW, so it is valued at one rate — the most recent
+     * one for a current balance, the one in force on the as-of day for a past
+     * one — and not transaction by transaction. That is a different question
+     * from how much was SPENT in a month, which is converted per row at the rate
+     * on each row's date. Both are right; see ADR 0022.
+     *
+     * Null is "not known yet" and must never be read as zero. Anything summing
+     * these skips nulls, which degrades to exactly the old behaviour: before the
+     * first rates sync a foreign account simply does not count.
+     */
+    val plnMinor: Long? = null,
 )
 
 /**
@@ -227,25 +242,42 @@ data class RecurringRuleListItem(
 )
 
 /**
- * Currencies and the aggregates, stated once rather than at ten query sites.
+ * Currencies and the aggregates.
  *
- * Every query that SUMS across accounts carries
- * `NOT IN (SELECT id FROM accounts WHERE currency <> 'PLN')`. Adding grosze to
- * euro cents produces a number that is not money, and it would be a number
- * nothing on screen admitted was wrong.
+ * Złoty is the reporting currency, so every query that SUMS across accounts
+ * sums one unit. It does that by reading [LedgerPln] — the `ledger_pln` view —
+ * instead of `transactions`, and `plnMinor` instead of `amountMinor`. The
+ * conversion itself lives in that view, once, where it can be checked.
  *
- * The guard is unconditional rather than part of the `:allAccounts` branch, so
- * that explicitly selecting a foreign account on the Overview cannot mix units
- * either. Queries that return one row PER account — [accountBalances] and
- * [accountBalancesThrough] — deliberately do not carry it: an account's own
- * balance in its own currency is exactly what those are for.
+ * These queries previously carried `NOT IN (accounts WHERE currency <> 'PLN')`
+ * instead, which held foreign accounts out of every figure. That guard is gone:
+ * conversion is what it was waiting for.
  *
- * This is interim. ADR 0022 sequences it: conversion replaces the exclusion,
- * and when it does these ten clauses come out together. Until then a foreign
- * account is visible, bookable, and absent from every total.
+ * `plnMinor` is null when no rate is known, and SUM skips nulls — so a currency
+ * whose rates have not synced yet degrades back to exactly that old behaviour
+ * rather than counting as zero.
+ *
+ * Queries returning one row PER account convert differently and deliberately:
+ * see [AccountBalance.plnMinor]. A balance is a position now, valued at one
+ * rate; a month's spending is converted row by row at the rate on each row's
+ * date. Both are right, and they are not the same arithmetic.
  */
 @Dao
 interface MonyxDao {
+
+    // ------------------------------------------------------------- fx rates
+
+    /** Pull-only. The phone never authors a rate, so there is no pending flag. */
+    @Upsert
+    suspend fun upsertFxRates(rates: List<FxRateEntity>)
+
+    /** Where the next rates pull should resume from, or null on a fresh install. */
+    @Query("SELECT MAX(effectiveOn) FROM fx_rates")
+    suspend fun latestRateDate(): String?
+
+    /** For the Settings line that says whether conversion is current. */
+    @Query("SELECT COUNT(*) FROM fx_rates")
+    suspend fun rateCount(): Int
 
     // ---------------------------------------------------------------- writes
 
@@ -422,20 +454,30 @@ interface MonyxDao {
      * plus or minus transfers.
      */
     @Query(
-        """SELECT a.id AS id, a.name AS name, a.icon AS icon, a.color AS color,
-                  a.initialBalanceMinor
-                  + COALESCE((SELECT SUM(CASE
-                        WHEN t.kind = 'income'   THEN  t.amountMinor
-                        WHEN t.kind = 'expense'  THEN -t.amountMinor
-                        WHEN t.kind = 'transfer' THEN -t.amountMinor
-                     END) FROM transactions t
-                     WHERE t.accountId = a.id AND t.deleted = 0), 0)
-                  + COALESCE((SELECT SUM(t.amountMinor) FROM transactions t
-                     WHERE t.transferAccountId = a.id AND t.kind = 'transfer'
-                       AND t.deleted = 0), 0) AS balanceMinor,
-                  a.archived AS archived, a.excludedFromSummary AS excludedFromSummary,
-                  a.currency AS currency
-           FROM accounts a WHERE a.deleted = 0 ORDER BY a.archived, a.sortOrder, a.name"""
+        """WITH b AS (
+             SELECT a.id AS id, a.name AS name, a.icon AS icon, a.color AS color,
+                    a.initialBalanceMinor
+                    + COALESCE((SELECT SUM(CASE
+                          WHEN t.kind = 'income'   THEN  t.amountMinor
+                          WHEN t.kind = 'expense'  THEN -t.amountMinor
+                          WHEN t.kind = 'transfer' THEN -t.amountMinor
+                       END) FROM transactions t
+                       WHERE t.accountId = a.id AND t.deleted = 0), 0)
+                    + COALESCE((SELECT SUM(t.amountMinor) FROM transactions t
+                       WHERE t.transferAccountId = a.id AND t.kind = 'transfer'
+                         AND t.deleted = 0), 0) AS balanceMinor,
+                    a.archived AS archived, a.excludedFromSummary AS excludedFromSummary,
+                    a.currency AS currency, a.sortOrder AS sortOrder
+               FROM accounts a WHERE a.deleted = 0
+           )
+           SELECT b.id, b.name, b.icon, b.color, b.balanceMinor, b.archived,
+                  b.excludedFromSummary, b.currency,
+                  CASE WHEN b.currency = 'PLN' THEN b.balanceMinor
+                       ELSE (b.balanceMinor * (SELECT r.rateMicro FROM fx_rates r
+                                                WHERE r.currency = b.currency
+                                                ORDER BY r.effectiveOn DESC LIMIT 1)) / 1000000
+                  END AS plnMinor
+             FROM b ORDER BY b.archived, b.sortOrder, b.name"""
     )
     fun accountBalances(): Flow<List<AccountBalance>>
 
@@ -466,21 +508,35 @@ interface MonyxDao {
      * household says it happened.
      */
     @Query(
-        """SELECT a.id AS id, a.name AS name, a.icon AS icon, a.color AS color,
-                  a.initialBalanceMinor
-                  + COALESCE((SELECT SUM(CASE
-                        WHEN t.kind = 'income'   THEN  t.amountMinor
-                        WHEN t.kind = 'expense'  THEN -t.amountMinor
-                        WHEN t.kind = 'transfer' THEN -t.amountMinor
-                     END) FROM transactions t
-                     WHERE t.accountId = a.id AND t.deleted = 0
-                       AND t.occurredOn <= :through), 0)
-                  + COALESCE((SELECT SUM(t.amountMinor) FROM transactions t
-                     WHERE t.transferAccountId = a.id AND t.kind = 'transfer'
-                       AND t.deleted = 0 AND t.occurredOn <= :through), 0) AS balanceMinor,
-                  a.archived AS archived, a.excludedFromSummary AS excludedFromSummary,
-                  a.currency AS currency
-           FROM accounts a WHERE a.deleted = 0 ORDER BY a.archived, a.sortOrder, a.name"""
+        """WITH b AS (
+             SELECT a.id AS id, a.name AS name, a.icon AS icon, a.color AS color,
+                    a.initialBalanceMinor
+                    + COALESCE((SELECT SUM(CASE
+                          WHEN t.kind = 'income'   THEN  t.amountMinor
+                          WHEN t.kind = 'expense'  THEN -t.amountMinor
+                          WHEN t.kind = 'transfer' THEN -t.amountMinor
+                       END) FROM transactions t
+                       WHERE t.accountId = a.id AND t.deleted = 0
+                         AND t.occurredOn <= :through), 0)
+                    + COALESCE((SELECT SUM(t.amountMinor) FROM transactions t
+                       WHERE t.transferAccountId = a.id AND t.kind = 'transfer'
+                         AND t.deleted = 0 AND t.occurredOn <= :through), 0) AS balanceMinor,
+                    a.archived AS archived, a.excludedFromSummary AS excludedFromSummary,
+                    a.currency AS currency, a.sortOrder AS sortOrder
+               FROM accounts a WHERE a.deleted = 0
+           )
+           SELECT b.id, b.name, b.icon, b.color, b.balanceMinor, b.archived,
+                  b.excludedFromSummary, b.currency,
+                  -- Valued on the as-of day, not today. A carry-over is what the
+                  -- month CLOSED at, so revaluing it every morning at a newer
+                  -- rate is the thing that would make a closed month move.
+                  CASE WHEN b.currency = 'PLN' THEN b.balanceMinor
+                       ELSE (b.balanceMinor * (SELECT r.rateMicro FROM fx_rates r
+                                                WHERE r.currency = b.currency
+                                                  AND r.effectiveOn <= :through
+                                                ORDER BY r.effectiveOn DESC LIMIT 1)) / 1000000
+                  END AS plnMinor
+             FROM b ORDER BY b.archived, b.sortOrder, b.name"""
     )
     fun accountBalancesThrough(through: String): Flow<List<AccountBalance>>
 
@@ -493,7 +549,6 @@ interface MonyxDao {
     @Query(
         """SELECT DISTINCT accountId FROM transactions
            WHERE deleted = 0 AND kind = 'expense' AND substr(occurredOn, 1, 7) = :period
-             AND accountId NOT IN (SELECT id FROM accounts WHERE currency <> 'PLN')
              AND accountId NOT IN (SELECT id FROM accounts WHERE excludedFromSummary = 1)"""
     )
     fun spendingAccountIds(period: String): Flow<List<String>>
@@ -529,11 +584,10 @@ interface MonyxDao {
      */
     @Query(
         """SELECT
-             COALESCE(SUM(CASE WHEN kind = 'income'  THEN amountMinor ELSE 0 END), 0) AS incomeMinor,
-             COALESCE(SUM(CASE WHEN kind = 'expense' THEN amountMinor ELSE 0 END), 0) AS expenseMinor
-           FROM transactions
+             COALESCE(SUM(CASE WHEN kind = 'income'  THEN plnMinor ELSE 0 END), 0) AS incomeMinor,
+             COALESCE(SUM(CASE WHEN kind = 'expense' THEN plnMinor ELSE 0 END), 0) AS expenseMinor
+           FROM ledger_pln
            WHERE deleted = 0 AND substr(occurredOn, 1, 7) = :period
-             AND accountId NOT IN (SELECT id FROM accounts WHERE currency <> 'PLN')
              AND ((:allAccounts = 1 AND accountId NOT IN (SELECT id FROM accounts WHERE excludedFromSummary = 1))
                   OR accountId IN (:accountIds))"""
     )
@@ -551,13 +605,12 @@ interface MonyxDao {
                   COALESCE(p.name, c.name) AS name,
                   COALESCE(p.color, c.color) AS color,
                   COALESCE(p.icon, c.icon)   AS icon,
-                  SUM(t.amountMinor)       AS spentMinor
-           FROM transactions t
+                  SUM(t.plnMinor)          AS spentMinor
+           FROM ledger_pln t
            JOIN categories c ON c.id = t.categoryId
            LEFT JOIN categories p ON p.id = c.parentId
            WHERE t.deleted = 0 AND t.kind = 'expense'
              AND substr(t.occurredOn, 1, 7) = :period
-             AND t.accountId NOT IN (SELECT id FROM accounts WHERE currency <> 'PLN')
              AND ((:allAccounts = 1 AND t.accountId NOT IN (SELECT id FROM accounts WHERE excludedFromSummary = 1))
                   OR t.accountId IN (:accountIds))
            GROUP BY COALESCE(p.id, c.id)
@@ -577,13 +630,12 @@ interface MonyxDao {
                   COALESCE(p.id, c.id)        AS categoryId,
                   COALESCE(p.name, c.name)    AS name,
                   COALESCE(p.color, c.color)  AS color,
-                  SUM(t.amountMinor)          AS spentMinor
-           FROM transactions t
+                  SUM(t.plnMinor)             AS spentMinor
+           FROM ledger_pln t
            JOIN categories c ON c.id = t.categoryId
            LEFT JOIN categories p ON p.id = c.parentId
            WHERE t.deleted = 0 AND t.kind = 'expense'
              AND t.occurredOn >= :fromDay AND t.occurredOn <= :toDay
-             AND t.accountId NOT IN (SELECT id FROM accounts WHERE currency <> 'PLN')
              AND ((:allAccounts = 1 AND t.accountId NOT IN (SELECT id FROM accounts WHERE excludedFromSummary = 1))
                   OR t.accountId IN (:accountIds))
            GROUP BY t.occurredOn, COALESCE(p.id, c.id)
@@ -614,14 +666,13 @@ interface MonyxDao {
                   COALESCE(p.id, c.id)        AS categoryId,
                   COALESCE(p.name, c.name)    AS name,
                   COALESCE(p.color, c.color)  AS color,
-                  SUM(t.amountMinor)          AS spentMinor
-           FROM transactions t
+                  SUM(t.plnMinor)             AS spentMinor
+           FROM ledger_pln t
            JOIN categories c ON c.id = t.categoryId
            LEFT JOIN categories p ON p.id = c.parentId
            WHERE t.deleted = 0 AND t.kind = 'expense'
              AND substr(t.occurredOn, 1, 7) >= :fromPeriod
              AND substr(t.occurredOn, 1, 7) <= :toPeriod
-             AND t.accountId NOT IN (SELECT id FROM accounts WHERE currency <> 'PLN')
              AND ((:allAccounts = 1 AND t.accountId NOT IN (SELECT id FROM accounts WHERE excludedFromSummary = 1))
                   OR t.accountId IN (:accountIds))
            GROUP BY period, COALESCE(p.id, c.id)
@@ -645,11 +696,10 @@ interface MonyxDao {
      */
     @Query(
         """SELECT occurredOn AS day,
-             COALESCE(SUM(CASE WHEN kind = 'income'  THEN amountMinor ELSE 0 END), 0) AS incomeMinor,
-             COALESCE(SUM(CASE WHEN kind = 'expense' THEN amountMinor ELSE 0 END), 0) AS expenseMinor
-           FROM transactions
+             COALESCE(SUM(CASE WHEN kind = 'income'  THEN plnMinor ELSE 0 END), 0) AS incomeMinor,
+             COALESCE(SUM(CASE WHEN kind = 'expense' THEN plnMinor ELSE 0 END), 0) AS expenseMinor
+           FROM ledger_pln
            WHERE deleted = 0 AND occurredOn >= :fromDay AND occurredOn <= :toDay
-             AND accountId NOT IN (SELECT id FROM accounts WHERE currency <> 'PLN')
              AND ((:allAccounts = 1 AND accountId NOT IN (SELECT id FROM accounts WHERE excludedFromSummary = 1))
                   OR accountId IN (:accountIds))
            GROUP BY occurredOn
@@ -684,19 +734,17 @@ interface MonyxDao {
     @Query(
         """SELECT day, SUM(deltaMinor) AS deltaMinor FROM (
              SELECT occurredOn AS day,
-                    CASE WHEN kind = 'income' THEN amountMinor ELSE -amountMinor END AS deltaMinor
-               FROM transactions
+                    CASE WHEN kind = 'income' THEN plnMinor ELSE -plnMinor END AS deltaMinor
+               FROM ledger_pln
               WHERE deleted = 0 AND occurredOn >= :fromDay AND occurredOn <= :toDay
-                AND accountId NOT IN (SELECT id FROM accounts WHERE currency <> 'PLN')
                 AND ((:allAccounts = 1 AND accountId IN
                         (SELECT id FROM accounts WHERE deleted = 0 AND excludedFromSummary = 0))
                      OR accountId IN (:accountIds))
              UNION ALL
-             SELECT occurredOn AS day, amountMinor AS deltaMinor
-               FROM transactions
+             SELECT occurredOn AS day, transferPlnMinor AS deltaMinor
+               FROM ledger_pln
               WHERE deleted = 0 AND kind = 'transfer' AND transferAccountId IS NOT NULL
                 AND occurredOn >= :fromDay AND occurredOn <= :toDay
-                AND transferAccountId NOT IN (SELECT id FROM accounts WHERE currency <> 'PLN')
                 AND ((:allAccounts = 1 AND transferAccountId IN
                         (SELECT id FROM accounts WHERE deleted = 0 AND excludedFromSummary = 0))
                      OR transferAccountId IN (:accountIds))
@@ -728,13 +776,12 @@ interface MonyxDao {
         """SELECT b.categoryId AS categoryId, c.name AS name, c.color AS color, c.icon AS icon,
                   c.parentId AS parentId, pc.color AS parentColor,
                   b.limitMinor AS limitMinor,
-                  COALESCE((SELECT SUM(t.amountMinor) FROM transactions t
+                  COALESCE((SELECT SUM(t.plnMinor) FROM ledger_pln t
                             WHERE t.deleted = 0 AND t.kind = 'expense'
                               AND substr(t.occurredOn, 1, 7) = :period
                               AND ((:allAccounts = 1
                                     AND t.accountId NOT IN (SELECT id FROM accounts WHERE excludedFromSummary = 1))
                                    OR t.accountId IN (:accountIds))
-                                  AND t.accountId NOT IN (SELECT id FROM accounts WHERE currency <> 'PLN')
                               AND (t.categoryId = b.categoryId
                                    OR t.categoryId IN (SELECT sc.id FROM categories sc
                                                        WHERE sc.parentId = b.categoryId
@@ -855,10 +902,9 @@ interface MonyxDao {
      * money that actually arrived.
      */
     @Query(
-        """SELECT COALESCE(SUM(amountMinor), 0) FROM transactions
+        """SELECT COALESCE(SUM(plnMinor), 0) FROM ledger_pln
            WHERE deleted = 0 AND kind = 'income'
              AND substr(occurredOn, 1, 7) = :period
-             AND accountId NOT IN (SELECT id FROM accounts WHERE currency <> 'PLN')
              AND accountId NOT IN (SELECT id FROM accounts WHERE excludedFromSummary = 1)"""
     )
     suspend fun incomeMinorIn(period: String): Long
