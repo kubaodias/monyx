@@ -61,6 +61,7 @@ import com.monyx.R
 import com.monyx.data.AccountEntity
 import com.monyx.data.accountsInListOrder
 import com.monyx.data.CategoryEntity
+import com.monyx.data.Currency
 import com.monyx.data.Money
 import com.monyx.ui.JumpToToday
 import com.monyx.ui.theme.Palette
@@ -104,6 +105,16 @@ internal fun AmountDisplay(
     amount: AmountInput,
     onClick: () -> Unit,
     action: (@Composable () -> Unit)? = null,
+    /**
+     * The unit the figure being typed is IN — the chosen account's currency.
+     *
+     * Defaults to the reporting currency, which is right for the budget keypad:
+     * a limit is a figure in złoty whatever account the spending comes from. On
+     * the add screen and the edit sheet it follows the account, because 50 typed
+     * against a euro account is fifty euro and a "zł" beside it is the app
+     * telling the user the wrong thing about what they just entered.
+     */
+    currency: Currency = Currency.PLN,
 ) {
     Row(
         modifier = Modifier
@@ -117,12 +128,16 @@ internal fun AmountDisplay(
         // line that does not mean "type the amount" does not have to be outside
         // the line to say so.
         action?.let { Box(modifier = Modifier.padding(bottom = 10.dp)) { it() } }
-        AmountFigure(amount = amount, modifier = Modifier.weight(1f))
+        AmountFigure(amount = amount, currency = currency, modifier = Modifier.weight(1f))
     }
 }
 
 @Composable
-private fun AmountFigure(amount: AmountInput, modifier: Modifier = Modifier) {
+private fun AmountFigure(
+    amount: AmountInput,
+    currency: Currency,
+    modifier: Modifier = Modifier,
+) {
     Column(
         modifier = modifier,
         horizontalAlignment = Alignment.End,
@@ -149,7 +164,10 @@ private fun AmountFigure(amount: AmountInput, modifier: Modifier = Modifier) {
             )
             Spacer(Modifier.width(6.dp))
             Text(
-                text = stringResource(R.string.currency_suffix),
+                // Not R.string.currency_suffix: that one is the reporting
+                // currency and is deliberately not translated, which is a
+                // different question from which unit THIS figure is in.
+                text = currency.suffix,
                 fontSize = 20.sp,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(bottom = 8.dp),

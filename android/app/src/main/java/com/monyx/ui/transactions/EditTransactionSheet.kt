@@ -54,6 +54,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.monyx.R
 import com.monyx.data.AccountEntity
+import com.monyx.data.Currency
 import com.monyx.data.CategoryEntity
 import com.monyx.data.Dates
 import com.monyx.data.TransactionEntity
@@ -342,7 +343,13 @@ fun EditTransactionSheet(
                 )
             }
 
-            AmountDisplay(amount = amount, onClick = { editAmount() })
+            // [account] is already resolved above for the picker; the figure
+            // and the account chip beside it must agree about the unit.
+            AmountDisplay(
+                amount = amount,
+                onClick = { editAmount() },
+                currency = Currency.of(account?.currency),
+            )
 
             // The note is laid out as on the add screen: last in the grid,
             // below any subcategories, scrolling with them and covered only by

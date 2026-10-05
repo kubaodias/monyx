@@ -375,15 +375,13 @@ class OverviewViewModel(
                     breakdown = breakdown,
                     // An archived account is not offered as a chip, but its
                     // transactions are still in every unfiltered figure above.
-                    // Non-PLN accounts get no chip. Every figure the chips
-                    // filter is a total, and a foreign account is held out of
-                    // all of them — so a chip for one would be a control that
-                    // visibly does nothing, which reads as a bug rather than as
-                    // the deliberate interim it is. The account is still on
-                    // Settings, still bookable, still shows its own balance.
-                    accounts = accounts.filter {
-                        it.archived == 0 && Currency.of(it.currency).isReporting
-                    },
+                    // Foreign accounts included. Filtering them out here also
+                    // took them off the strip, and the strip IS how the
+                    // Overview shows a per-account balance — so the account
+                    // disappeared from the tab rather than merely sitting
+                    // outside the totals. AccountChip shows it as not-counted
+                    // instead; the sums are guarded by [counted] below.
+                    accounts = accounts.filter { it.archived == 0 },
                     archivedIds = accounts
                         .filter { it.archived == 1 && it.excludedFromSummary == 0 }
                         .map { it.id }

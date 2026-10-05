@@ -54,6 +54,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.monyx.R
 import com.monyx.data.AccountEntity
+import com.monyx.data.Currency
 import com.monyx.data.CategoryEntity
 import com.monyx.data.Dates
 import com.monyx.ui.settings.RecurringEditor
@@ -216,7 +217,13 @@ fun AddScreen(
 
         KindSelector(selected = state.kind, onSelect = viewModel::setKind)
 
-        AmountDisplay(amount = state.amount, onClick = { editAmount() })
+        // The unit follows the chosen account, so typing 50 against a euro
+        // account reads "50,00 €" rather than claiming złoty.
+        AmountDisplay(
+            amount = state.amount,
+            onClick = { editAmount() },
+            currency = Currency.of(accounts.firstOrNull { it.id == state.accountId }?.currency),
+        )
 
         CategoryGrid(
             categories = selectable,

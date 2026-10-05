@@ -3,6 +3,7 @@ package com.monyx
 import com.monyx.data.AccountBalance
 import com.monyx.data.Currency
 import com.monyx.data.Money
+import com.monyx.ui.settings.currencyLabel
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -80,6 +81,16 @@ class CurrencyTest {
         // the reporting currency and must not be reachable with another one.
         assertEquals("${Money.format(124_000)} z\u0142", Money.formatWithCurrency(124_000))
         assertEquals(Money.formatIn(124_000, Currency.PLN), Money.formatWithCurrency(124_000))
+    }
+
+    @Test
+    fun `the dropdown label does not repeat a code that is its own suffix`() {
+        // "EUR \u2014 \u20ac" tells you which symbol will appear on the account row.
+        assertEquals("EUR \u2014 \u20ac", currencyLabel(Currency.EUR))
+        assertEquals("PLN \u2014 z\u0142", currencyLabel(Currency.PLN))
+        // "CHF \u2014 CHF" would be the same word twice.
+        assertEquals("CHF", currencyLabel(Currency.CHF))
+        assertEquals("SEK", currencyLabel(Currency.SEK))
     }
 
     // ------------------------------------------- what the summary counts
