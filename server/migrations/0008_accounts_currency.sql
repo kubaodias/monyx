@@ -1,0 +1,18 @@
+-- What currency an account holds.
+--
+-- A household banks in złoty and keeps some money elsewhere: a Revolut balance
+-- in euro, a card left over from a trip, savings held abroad. Those accounts
+-- were previously forced to pretend their balance was in złoty, which made the
+-- number on screen wrong by whatever the rate happened to be.
+--
+-- The REPORTING currency is still PLN and is not configurable. Every total the
+-- app prints is in złoty; this column says what the rows of one account are
+-- denominated in, and fx_rates (see 0009) says what that is worth. An account
+-- in PLN needs no rate and no conversion, which is every account that exists
+-- today.
+--
+-- Old clients neither send nor understand this column. The DEFAULT is what lets
+-- them keep pushing accounts rows through an INSERT that now names it — and it
+-- is 'PLN' rather than NULL so that "no answer" and "złoty" are the same
+-- answer, since for every account written before today they are.
+ALTER TABLE accounts ADD COLUMN currency TEXT NOT NULL DEFAULT 'PLN';

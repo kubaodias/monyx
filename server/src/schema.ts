@@ -5,6 +5,7 @@
 // failures reject with a plain Error — no typed class, no error codes. A single
 // malformed row reaching SQL would roll back the entire push, and classifying
 // why would mean matching on message substrings.
+import { isCurrency } from "./rates.ts";
 
 export type TableName =
   | "members"
@@ -50,7 +51,8 @@ export const COLUMNS: Record<TableName, readonly string[]> = {
   members: ["id", "household_id", "name", "created_at", "seq", "deleted"],
   accounts: [
     "id", "household_id", "name", "icon", "color",
-    "initial_balance_minor", "sort_order", "archived", "excluded_from_summary", "seq", "deleted",
+    "initial_balance_minor", "sort_order", "archived", "excluded_from_summary",
+    "currency", "seq", "deleted",
   ],
   categories: [
     "id", "household_id", "parent_id", "name", "icon", "color",
@@ -193,6 +195,14 @@ export function validateChange(raw: unknown): ValidationResult {
       // Same bargain: absent means 0, counted in the summary.
       if (row["excluded_from_summary"] !== undefined && !flag(row["excluded_from_summary"])) {
         return reject("bad_excluded_from_summary");
+      }
+      // Same bargain again: absent means PLN. Unlike the flags above, an
+      // unrecognised value is REJECTED rather than defaulted — a currency the
+      // server has no rates for would convert to nothing and silently drop the
+      // account out of every total, which is worse than refusing the row and
+      // telling the client so.
+      if (row["currency"] !== undefined && !isCurrency(row["currency"])) {
+        return reject("bad_currency");
       }
       break;
     }

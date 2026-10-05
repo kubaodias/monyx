@@ -14,7 +14,8 @@ import {
   undeliveredAlerts,
   type PendingAlert,
 } from "./budgets.ts";
-import { allHouseholds, forHousehold, releaseByCode, releasesAfter, type HouseholdDb } from "./db.ts";
+import { allHouseholds, forHousehold, releaseByCode, releasesAfter, sharedDb, type HouseholdDb } from "./db.ts";
+import { datesBetween, latestStoredDate, refreshRates } from "./rates.ts";
 import { sendBudgetAlert, type DeviceToken } from "./fcm.ts";
 import { parseNoteInput, suggestNote } from "./note.ts";
 import { describeUpdate, parseVersionCode, presign } from "./releases.ts";
@@ -284,7 +285,42 @@ async function handleCron(req: Request, nowMs: number): Promise<Response> {
     delivered += all.length;
   }
 
-  return json({ ok: true, households: households.length, alerts: delivered, period });
+  // Rates last, and never allowed to fail the run. The alerts above are the
+  // job this route exists for; rates are a day's worth of arithmetic that can
+  // be caught up tomorrow, and a 500 here would make the whole cron look broken
+  // and leave the alerts unreported.
+  const rates = await refreshRatesForCron(nowMs);
+
+  return json({ ok: true, households: households.length, alerts: delivered, period, rates });
+}
+
+/**
+ * Bring fx_rates up to today, starting from the last date stored.
+ *
+ * Backfills rather than fetching only today: a function that has been down for
+ * a week would otherwise leave a hole, and a transaction inside that hole would
+ * convert at whatever older rate the lookup walked back to. Capped at 30 days
+ * so one long outage cannot turn a cron run into a hundred sequential fetches.
+ *
+ * The first run ever has nothing stored and starts 7 days back, which is enough
+ * to cover a weekend plus a holiday either side of it.
+ */
+async function refreshRatesForCron(nowMs: number): Promise<Record<string, unknown>> {
+  try {
+    const db = sharedDb();
+    const today = new Date(nowMs).toISOString().slice(0, 10);
+    const latest = await latestStoredDate(db);
+    const startMs = latest
+      ? Math.max(Date.parse(`${latest}T00:00:00Z`) + 86_400_000, nowMs - 30 * 86_400_000)
+      : nowMs - 7 * 86_400_000;
+    if (startMs > Date.parse(`${today}T00:00:00Z`)) return { ok: true, skipped: "already_current" };
+
+    const from = new Date(startMs).toISOString().slice(0, 10);
+    const result = await refreshRates(db, datesBetween(from, today), nowMs);
+    return { ok: true, from, to: today, ...result };
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : "unknown" };
+  }
 }
 
 // ---------------------------------------------------------------- voice
