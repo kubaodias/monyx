@@ -113,6 +113,73 @@ object Money {
     }
 
     /**
+     * One amount printed in two units: the figure to read, and the same money
+     * in the other unit beside it.
+     *
+     * Which unit leads is the screen's question and not this type's — see the
+     * two functions below, which disagree on purpose. [aside] is null when there
+     * is only one unit to print, which is every figure in a household that
+     * holds złoty only.
+     */
+    data class Figure(val main: String, val aside: String?)
+
+    /**
+     * An account on the Overview strip: złoty first, its own money in brackets
+     * after it, on ONE line.
+     *
+     * Złoty leads because the strip is what Bilans is the sum of — a row of euro
+     * figures above a złoty total is a screen whose arithmetic does not visibly
+     * work. The account's own figure stays, because "how many euro have I got"
+     * is a real question, but it shares the line rather than taking a second
+     * one: a strip where only the foreign tile is two lines tall is a strip of
+     * unequal tiles, and the ragged one would be the odd account rather than an
+     * important one.
+     */
+    fun accountStripFigure(balanceMinor: Long, currency: Currency, plnMinor: Long?): Figure =
+        if (currency.isReporting) {
+            Figure(formatWithCurrency(balanceMinor), null)
+        } else {
+            Figure(
+                // No rate synced yet: an em dash, not the euro figure dressed up
+                // as złoty. The account's own balance is beside it either way,
+                // so nothing is hidden.
+                plnMinor?.let { formatWithCurrency(it) } ?: "—",
+                "(${formatIn(balanceMinor, currency)})",
+            )
+        }
+
+    /**
+     * A ledger row: the amount as it was entered, with its złoty value under it.
+     *
+     * The other way round from [accountStripFigure], deliberately. A row is an
+     * event — 15 euro left the account, and that is the figure somebody
+     * recognises from the receipt. A tile is a position being summed into a
+     * złoty total. Each screen leads with the figure it is about, and the other
+     * unit is always there rather than left to be worked out.
+     *
+     * A złoty row gets no unit and no aside. Marking the exception is what makes
+     * the exception visible; "zł" on five hundred rows to disambiguate three is
+     * the opposite, and the month total above them already says which unit it is
+     * in.
+     */
+    fun ledgerRowFigure(
+        amountMinor: Long,
+        kind: String,
+        currency: Currency,
+        plnMinor: Long?,
+    ): Figure = if (currency.isReporting) {
+        Figure(formatSigned(amountMinor, kind), null)
+    } else {
+        Figure(
+            "${formatSigned(amountMinor, kind)} ${currency.suffix}",
+            // Null, not "—": the amount that happened is already on the line
+            // above in the unit it happened in, so a missing rate costs the
+            // reader nothing here. On the strip it is the headline figure.
+            plnMinor?.let { "${formatSigned(it, kind)} $CURRENCY" },
+        )
+    }
+
+    /**
      * Parse a typed amount into minor units.
      *
      * The keypad cannot produce a surprise here, but the account-balance and

@@ -170,3 +170,33 @@ account's currency and a stale override is expensive to not notice.
 account's, which is exactly what every row did before this change, so nothing
 regressed — but a euro subscription paid from a złoty card is wrong until
 `recurring_rules` gets the same column.
+
+## Addendum, 2026-10-05: both units, on every figure that has two
+
+Three reports, one rule.
+
+**Each screen leads with the figure it is about, and prints the other unit
+beside it.** The Overview strip is what Bilans is the sum of, so a tile leads
+with złoty and carries the account's own money in brackets: `-65,78 zł
+(-15,00 €)`. A ledger row is an event, so it leads with the amount as it was
+entered — the figure on the receipt — and puts the złoty value underneath. The
+two orders disagree on purpose; what they share is that neither leaves the
+reader to work the other figure out.
+
+**A tile keeps it to one line.** The account's own balance used to take a second
+line, which made exactly one tile in a strip of equal tiles taller than the
+rest, and the ragged one was the odd account rather than an important one.
+
+**Both rules live in `Money.accountStripFigure` and `Money.ledgerRowFigure`.**
+Written out at the call sites, the ledger half of this silently never shipped:
+0.22.1 claimed a foreign row carried its symbol, the test asserted a copy of the
+rule rather than calling it, and the production change was missing from
+`TransactionsScreen` for two releases with nothing failing. A formatting rule
+stated in a composable is a rule no test can reach.
+
+**The currency is changed where it is shown**: the symbol beside the amount, on
+the keypad and in the edit sheet. It was a chip up beside the account, which put
+the control two inches from the figure it describes and a question-and-answer
+apart. A missing rate still shows an em dash on the tile, where the converted
+figure is the headline, and shows nothing on a row, where the amount that
+happened is already on the line above in the unit it happened in.

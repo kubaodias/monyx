@@ -12,6 +12,7 @@ import com.monyx.ui.transactions.TransactionsViewModel
 import com.monyx.ui.settings.currencyLabel
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -238,14 +239,60 @@ class CurrencyTest {
 
     @Test
     fun `a foreign row carries its unit and a zloty row does not`() {
-        // The rule the ledger row applies: mark the exception, leave the rest
-        // bare. Two identical-looking "-15,00" rows for different money was
-        // the complaint.
-        fun suffixFor(code: String) =
-            Currency.of(code).let { if (it.isReporting) "" else " ${it.suffix}" }
-        assertEquals(" €", suffixFor("EUR"))
-        assertEquals(" SEK", suffixFor("SEK"))
-        assertEquals("", suffixFor("PLN"))
+        // Money.ledgerRowFigure, not a copy of the rule. The previous version
+        // of this test reimplemented the suffix inline and asserted its own
+        // arithmetic — so it passed while the production change it was written
+        // for never landed in TransactionsScreen at all, and every euro row
+        // shipped for two releases looking exactly like a złoty one.
+        val euro = Money.ledgerRowFigure(15_00, "expense", Currency.EUR, 65_78)
+        assertEquals("${Money.formatSigned(15_00, "expense")} €", euro.main)
+        assertEquals("${Money.formatSigned(65_78, "expense")} zł", euro.aside)
+
+        val zloty = Money.ledgerRowFigure(89_99, "expense", Currency.PLN, 89_99)
+        assertEquals(Money.formatSigned(89_99, "expense"), zloty.main)
+        assertNull("a złoty row has nothing to convert to", zloty.aside)
+    }
+
+    @Test
+    fun `a row with no rate still shows what was entered`() {
+        // The amount that happened is known; only its złoty value is not. So
+        // the row keeps its figure and simply says nothing it cannot say.
+        val row = Money.ledgerRowFigure(15_00, "expense", Currency.EUR, null)
+        assertEquals("${Money.formatSigned(15_00, "expense")} €", row.main)
+        assertNull(row.aside)
+    }
+
+    @Test
+    fun `an income row keeps its sign in both units`() {
+        // Both halves go through formatSigned, so a credit cannot print as
+        // "+15,00 €" over "-65,78 zł".
+        val row = Money.ledgerRowFigure(15_00, "income", Currency.EUR, 65_78)
+        assertTrue(row.main.startsWith("+"))
+        assertTrue(row.aside!!.startsWith("+"))
+    }
+
+    @Test
+    fun `an account tile leads with zloty and keeps its own money beside it`() {
+        // One line, złoty first: the strip is what Bilans is the sum of. The
+        // brackets are what let the second figure share the line instead of
+        // making exactly one tile in the strip taller than its neighbours.
+        val euro = Money.accountStripFigure(15_00, Currency.EUR, 65_78)
+        assertEquals(Money.formatWithCurrency(65_78), euro.main)
+        assertEquals("(${Money.formatIn(15_00, Currency.EUR)})", euro.aside)
+
+        val zloty = Money.accountStripFigure(100_00, Currency.PLN, 100_00)
+        assertEquals(Money.formatWithCurrency(100_00), zloty.main)
+        assertNull("złoty twice would be noise on every other tile", zloty.aside)
+    }
+
+    @Test
+    fun `an account with no rate shows an em dash and not a disguised figure`() {
+        // Here the converted figure IS the headline, so its absence has to be
+        // visible — printing 15,00 with "zł" after it would assert something
+        // false about how much money there is.
+        val tile = Money.accountStripFigure(15_00, Currency.EUR, null)
+        assertEquals("—", tile.main)
+        assertEquals("(${Money.formatIn(15_00, Currency.EUR)})", tile.aside)
     }
 
     // ------------------------------------------- one entry's own currency
