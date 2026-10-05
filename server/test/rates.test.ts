@@ -12,6 +12,9 @@ import { forHousehold } from "../src/db.ts";
 import {
   BASE,
   CURRENCIES,
+  NBP_RANGE_DAYS,
+  rangeWindows,
+  ratesSince,
   convertMinor,
   datesBetween,
   fetchNbpTable,
@@ -24,23 +27,31 @@ import {
 
 const NOW = 1_791_000_000_000;
 
-/** A fetch that answers from a table of dates, and 404s for anything else. */
+/**
+ * A fetch that answers NBP's RANGE endpoint from a table of dates.
+ *
+ * 404s when no date in the requested window has a publication, which is what
+ * NBP really does for a closed weekend.
+ */
 function fakeNbp(byDate: Record<string, Record<string, number>>, seen?: string[]) {
   return async (input: string | URL | Request): Promise<Response> => {
     const url = String(input);
-    const date = url.match(/tables\/A\/(\d{4}-\d{2}-\d{2})/)?.[1] ?? "";
-    seen?.push(date);
-    const rates = byDate[date];
-    if (!rates) return new Response("not found", { status: 404 });
-    const body = [
-      {
+    const m = url.match(/tables\/A\/(\d{4}-\d{2}-\d{2})\/(\d{4}-\d{2}-\d{2})/);
+    if (!m) return new Response("bad url", { status: 400 });
+    const from = m[1]!;
+    const to = m[2]!;
+    seen?.push(`${from}..${to}`);
+    const tables = Object.keys(byDate)
+      .filter((d) => d >= from && d <= to)
+      .sort()
+      .map((date) => ({
         table: "A",
         no: "1/A/NBP/2026",
         effectiveDate: date,
-        rates: Object.entries(rates).map(([code, mid]) => ({ currency: code, code, mid })),
-      },
-    ];
-    return new Response(JSON.stringify(body), { status: 200 });
+        rates: Object.entries(byDate[date]!).map(([code, mid]) => ({ currency: code, code, mid })),
+      }));
+    if (tables.length === 0) return new Response("not found", { status: 404 });
+    return new Response(JSON.stringify(tables), { status: 200 });
   };
 }
 
@@ -69,12 +80,7 @@ test("a closed day carries the last publication forward", async () => {
   // Friday publishes; Saturday and Sunday 404, as NBP really does.
   const fetchImpl = fakeNbp({ "2026-10-02": { EUR: 4.3745, USD: 3.8881 } });
 
-  const result = await refreshRates(
-    fake,
-    datesBetween("2026-10-02", "2026-10-04"),
-    NOW,
-    fetchImpl,
-  );
+  const result = await refreshRates(fake, "2026-10-02", "2026-10-04", NOW, fetchImpl);
   assert.equal(result.carried, 2, "Saturday and Sunday are carried");
   assert.deepEqual(result.missing, []);
 
@@ -90,12 +96,7 @@ test("a closed day carries the last publication forward", async () => {
 test("a range starting on a closed day reports what it could not fill", async () => {
   const fake = new FakeDb();
   // Sunday first, with nothing earlier stored and nothing to carry.
-  const result = await refreshRates(
-    fake,
-    datesBetween("2026-10-04", "2026-10-05"),
-    NOW,
-    fakeNbp({}),
-  );
+  const result = await refreshRates(fake, "2026-10-04", "2026-10-05", NOW, fakeNbp({}));
   // Guessing a rate here would be inventing one. The caller widens the range.
   assert.deepEqual(result.missing, ["2026-10-04", "2026-10-05"]);
   assert.equal(result.written, 0);
@@ -105,8 +106,8 @@ test("a range starting on a closed day reports what it could not fill", async ()
 test("re-running a refresh is idempotent", async () => {
   const fake = new FakeDb();
   const fetchImpl = fakeNbp({ "2026-10-02": { EUR: 4.3745 } });
-  await refreshRates(fake, ["2026-10-02"], NOW, fetchImpl);
-  await refreshRates(fake, ["2026-10-02"], NOW + 86_400_000, fetchImpl);
+  await refreshRates(fake, "2026-10-02", "2026-10-02", NOW, fetchImpl);
+  await refreshRates(fake, "2026-10-02", "2026-10-02", NOW + 86_400_000, fetchImpl);
 
   const { results } = await fake
     .prepare(`SELECT COUNT(*) AS n FROM fx_rates WHERE currency='EUR' AND effective_on='2026-10-02'`)
@@ -117,8 +118,8 @@ test("re-running a refresh is idempotent", async () => {
 
 test("a rate lookup walks back to the newest date not after the one asked for", async () => {
   const fake = new FakeDb();
-  await refreshRates(fake, ["2026-10-02"], NOW, fakeNbp({ "2026-10-02": { EUR: 4.3745 } }));
-  await refreshRates(fake, ["2026-10-05"], NOW, fakeNbp({ "2026-10-05": { EUR: 4.4012 } }));
+  await refreshRates(fake, "2026-10-02", "2026-10-02", NOW, fakeNbp({ "2026-10-02": { EUR: 4.3745 } }));
+  await refreshRates(fake, "2026-10-05", "2026-10-05", NOW, fakeNbp({ "2026-10-05": { EUR: 4.4012 } }));
 
   // A transaction dated between the two converts at the earlier rate, not the
   // later one: the money moved before the newer rate existed.
@@ -132,7 +133,8 @@ test("the refresh skips currencies the app does not offer", async () => {
   const fake = new FakeDb();
   await refreshRates(
     fake,
-    ["2026-10-02"],
+    "2026-10-02",
+    "2026-10-02",
     NOW,
     fakeNbp({ "2026-10-02": { EUR: 4.3745, THB: 0.1159, JPY: 0.024677 } }),
   );
@@ -157,7 +159,7 @@ test("a table carrying none of our currencies fails rather than writing an empty
 test("latestStoredDate is what the backfill starts from", async () => {
   const fake = new FakeDb();
   assert.equal(await latestStoredDate(fake), null, "empty table has no latest");
-  await refreshRates(fake, ["2026-10-02"], NOW, fakeNbp({ "2026-10-02": { EUR: 4.3745 } }));
+  await refreshRates(fake, "2026-10-02", "2026-10-02", NOW, fakeNbp({ "2026-10-02": { EUR: 4.3745 } }));
   assert.equal(await latestStoredDate(fake), "2026-10-02");
 });
 
@@ -172,6 +174,64 @@ test("every offered currency is two-decimal and PLN is among them", () => {
   }
   // Croatia adopted the euro in January 2023; the kuna is not a currency.
   assert.equal(isCurrency("HRK"), false);
+});
+
+test("a long backfill is split into windows NBP will answer", () => {
+  // The single-date endpoint would be 365 requests for a year. This is why the
+  // range endpoint is used at all.
+  const windows = rangeWindows("2025-01-01", "2026-12-31");
+  assert.ok(windows.length <= 9, `two years is ${windows.length} requests, not 730`);
+  for (const [from, to] of windows) {
+    const days = (Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86_400_000 + 1;
+    assert.ok(days <= NBP_RANGE_DAYS, `${from}..${to} is ${days} days, over NBP's cap`);
+  }
+  // Contiguous and complete: a gap between windows is a gap in the rates.
+  assert.equal(windows[0]?.[0], "2025-01-01");
+  assert.equal(windows[windows.length - 1]?.[1], "2026-12-31");
+  for (let i = 1; i < windows.length; i += 1) {
+    const prevEnd = Date.parse(`${windows[i - 1]![1]}T00:00:00Z`);
+    const thisStart = Date.parse(`${windows[i]![0]}T00:00:00Z`);
+    assert.equal(thisStart - prevEnd, 86_400_000, "windows must abut exactly");
+  }
+});
+
+test("a range beginning on a closed day is seeded from before it", async () => {
+  const fake = new FakeDb();
+  // Asking for "just Sunday" used to write nothing: the window held no
+  // publication and there was nothing stored to carry. The seed lookback is
+  // what makes a Sunday-only refresh work.
+  const seen: string[] = [];
+  const result = await refreshRates(
+    fake,
+    "2026-10-04",
+    "2026-10-04",
+    NOW,
+    fakeNbp({ "2026-10-02": { EUR: 4.3745 } }, seen),
+  );
+  assert.deepEqual(result.missing, [], "Sunday is filled from Friday");
+  assert.equal((await rateFor(fake, "EUR", "2026-10-04"))?.published_on, "2026-10-02");
+  // And it really did look back rather than asking only for the one day.
+  assert.ok(seen.some((w) => w.startsWith("2026-09-24")), `looked back: ${seen.join()}`);
+});
+
+test("ratesSince gives the phone what it does not have", async () => {
+  const fake = new FakeDb();
+  await refreshRates(fake, "2026-10-01", "2026-10-05", NOW, fakeNbp({
+    "2026-10-01": { EUR: 4.3770 },
+    "2026-10-02": { EUR: 4.3745 },
+    "2026-10-05": { EUR: 4.4012 },
+  }));
+
+  const since = await ratesSince(fake, "2026-10-04");
+  // Only what was asked for, so a phone that already has history re-downloads
+  // nothing. The 4th is a Sunday carrying Friday the 2nd's rate; the 5th has
+  // its own. Rates for the 1st to the 3rd exist and are deliberately not here.
+  assert.deepEqual(
+    since.map((r) => `${r.effective_on}:${r.rate_micro}`),
+    ["2026-10-04:4374500", "2026-10-05:4401200"],
+  );
+  // Nothing before the cutoff leaks in.
+  assert.ok(since.every((r) => r.effective_on >= "2026-10-04"));
 });
 
 test("a push may set an account's currency, and omitting it means zloty", async () => {

@@ -68,29 +68,80 @@ export async function fetchNbpTable(
   date: string,
   fetchImpl: typeof fetch = fetch,
 ): Promise<Map<Currency, number> | null> {
-  const url = `https://api.nbp.pl/api/exchangerates/tables/A/${date}/?format=json`;
-  const response = await fetchImpl(url, { headers: { accept: "application/json" } });
-  if (response.status === 404) return null;
-  if (!response.ok) throw new Error(`nbp_http_${response.status}`);
+  const byDate = await fetchNbpRange(date, date, fetchImpl);
+  return byDate.get(date) ?? null;
+}
 
-  const body = (await response.json()) as unknown;
-  if (!Array.isArray(body) || body.length === 0) throw new Error("nbp_empty");
-  const rates = (body[0] as Record<string, unknown>)["rates"];
-  if (!Array.isArray(rates)) throw new Error("nbp_malformed");
+/** NBP publishes at most this many days per request. */
+export const NBP_RANGE_DAYS = 93;
 
-  const out = new Map<Currency, number>();
-  for (const entry of rates) {
-    const row = entry as Record<string, unknown>;
-    const code = row["code"];
-    const mid = row["mid"];
-    if (!isCurrency(code) || typeof mid !== "number" || !Number.isFinite(mid) || mid <= 0) continue;
-    out.set(code, Math.round(mid * RATE_SCALE));
+/**
+ * Every published table between [from] and [to], in ONE request per window.
+ *
+ * The single-date endpoint would mean 365 requests to backfill a year, which is
+ * why the first cut of this could not realistically backfill at all and left
+ * history unconvertible. The range endpoint caps at 93 days, so a year is four
+ * requests and a decade is forty.
+ *
+ * An empty map is a legitimate answer: a range covering only a holiday weekend
+ * has no publications in it, and NBP answers 404 for that exactly as it does
+ * for one closed day.
+ */
+export async function fetchNbpRange(
+  from: string,
+  to: string,
+  fetchImpl: typeof fetch = fetch,
+): Promise<Map<string, Map<Currency, number>>> {
+  const out = new Map<string, Map<Currency, number>>();
+
+  for (const [start, end] of rangeWindows(from, to)) {
+    const url =
+      `https://api.nbp.pl/api/exchangerates/tables/A/${start}/${end}/?format=json`;
+    const response = await fetchImpl(url, { headers: { accept: "application/json" } });
+    if (response.status === 404) continue;
+    if (!response.ok) throw new Error(`nbp_http_${response.status}`);
+
+    const body = (await response.json()) as unknown;
+    if (!Array.isArray(body)) throw new Error("nbp_malformed");
+
+    for (const table of body) {
+      const row = table as Record<string, unknown>;
+      const date = row["effectiveDate"];
+      const rates = row["rates"];
+      if (typeof date !== "string" || !Array.isArray(rates)) throw new Error("nbp_malformed");
+
+      const parsed = new Map<Currency, number>();
+      for (const entry of rates) {
+        const r = entry as Record<string, unknown>;
+        const code = r["code"];
+        const mid = r["mid"];
+        if (!isCurrency(code) || typeof mid !== "number" || !Number.isFinite(mid) || mid <= 0) continue;
+        parsed.set(code, Math.round(mid * RATE_SCALE));
+      }
+      // A table that parsed but carries none of our currencies means the shape
+      // changed under us. Better to fail the refresh and keep the rates we have
+      // than to write a day that conversion will find empty.
+      if (parsed.size === 0) throw new Error("nbp_no_known_currencies");
+      out.set(date, parsed);
+    }
   }
-  // A table that parsed but carries none of our currencies means the shape
-  // changed under us. Better to fail the refresh and keep yesterday's rates
-  // than to write an empty day and have conversion silently find nothing.
-  if (out.size === 0) throw new Error("nbp_no_known_currencies");
   return out;
+}
+
+/** [from, to] split into windows NBP will actually answer. */
+export function rangeWindows(from: string, to: string): [string, string][] {
+  const windows: [string, string][] = [];
+  const endMs = Date.parse(`${to}T00:00:00Z`);
+  let startMs = Date.parse(`${from}T00:00:00Z`);
+  while (startMs <= endMs) {
+    const windowEnd = Math.min(startMs + (NBP_RANGE_DAYS - 1) * 86_400_000, endMs);
+    windows.push([
+      new Date(startMs).toISOString().slice(0, 10),
+      new Date(windowEnd).toISOString().slice(0, 10),
+    ]);
+    startMs = windowEnd + 86_400_000;
+  }
+  return windows;
 }
 
 /** Every date from [from] to [to] inclusive, as YYYY-MM-DD. */
@@ -103,40 +154,58 @@ export function datesBetween(from: string, to: string): string[] {
   return out;
 }
 
+/** How far back to look for a rate to carry into the first requested date. */
+const SEED_DAYS = 10;
+
 /**
- * Write the rates for [dates], carrying the last publication across gaps.
+ * Store a rate for every date from [from] to [to], carrying publications across
+ * closed days.
  *
- * Idempotent: re-running for a date that already has rows replaces them with
- * the same values. That matters because the daily cron will re-ask for dates it
- * has already stored whenever a run is retried.
+ * Idempotent: re-running for dates already stored replaces them with the same
+ * values, which matters because the refresh re-asks for dates it holds whenever
+ * a run is retried.
  *
- * The carry-forward is the whole point of storing published_on. A Sunday gets
- * Friday's numbers with Friday's published_on, so a conversion on a Sunday is a
- * single indexed lookup that returns a row, rather than a query that has to
- * walk backwards looking for one — and the row itself says which day's rate it
- * actually is, which is what anyone reconciling against a statement needs.
+ * The fetch window reaches [SEED_DAYS] before [from] so that a range beginning
+ * on a Sunday still has Friday's publication to carry in. Ten days covers a
+ * weekend with public holidays either side of it; without the seed, asking for
+ * "just today" on a Sunday wrote nothing at all.
  */
 export async function refreshRates(
   db: SqlDatabase,
-  dates: string[],
+  from: string,
+  to: string,
   nowMs: number,
   fetchImpl: typeof fetch = fetch,
 ): Promise<{ written: number; carried: number; missing: string[] }> {
+  const seedFrom = new Date(Date.parse(`${from}T00:00:00Z`) - SEED_DAYS * 86_400_000)
+    .toISOString()
+    .slice(0, 10);
+  const published = await fetchNbpRange(seedFrom, to, fetchImpl);
+
+  // The seed: the newest publication strictly before [from], if there is one.
   let carrying: Map<Currency, number> | null = null;
   let carryingFrom = "";
+  for (const date of datesBetween(seedFrom, from).slice(0, -1)) {
+    const table = published.get(date);
+    if (table) {
+      carrying = table;
+      carryingFrom = date;
+    }
+  }
+
   const statements: SqlPreparedStatement[] = [];
   let written = 0;
   let carried = 0;
   const missing: string[] = [];
 
-  for (const date of dates) {
-    const table = await fetchNbpTable(date, fetchImpl);
+  for (const date of datesBetween(from, to)) {
+    const table = published.get(date);
     if (table) {
       carrying = table;
       carryingFrom = date;
     } else if (!carrying) {
-      // No table for this date and nothing earlier to carry: the range starts
-      // on a weekend. The caller widens the range rather than guessing.
+      // Nothing published on or before this date within reach. Guessing a rate
+      // would be inventing one.
       missing.push(date);
       continue;
     } else {
@@ -162,6 +231,29 @@ export async function refreshRates(
 
   if (statements.length > 0) await db.batch(statements);
   return { written, carried, missing };
+}
+
+/**
+ * Every rate stored on or after [since], for the phone to keep its own copy.
+ *
+ * The phone computes every figure locally — there is no endpoint that returns a
+ * total — so conversion happens in Room, which means the rates have to be ON
+ * the device. This is what it syncs.
+ */
+export async function ratesSince(
+  db: SqlDatabase,
+  since: string,
+): Promise<Rate[]> {
+  const { results } = await db
+    .prepare(
+      `SELECT currency, effective_on, published_on, rate_micro
+         FROM fx_rates
+        WHERE effective_on >= ?1
+        ORDER BY effective_on, currency`,
+    )
+    .bind(since)
+    .all<Rate>();
+  return results;
 }
 
 /**
