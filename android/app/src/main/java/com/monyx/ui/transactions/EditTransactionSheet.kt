@@ -418,6 +418,7 @@ fun EditTransactionSheet(
                 blocker = null,
                 enabled = amountMinor > 0 && (isTransfer || categoryId != null),
                 amountMinor = amountMinor,
+                currency = Currency.of(account?.currency),
                 onSave = {
                     val edit = TransactionEdit(
                         amountMinor = amountMinor,

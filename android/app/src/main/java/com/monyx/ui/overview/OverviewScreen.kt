@@ -934,6 +934,7 @@ private fun AccountChip(
         name = account.name,
         balanceMinor = account.balanceMinor,
         currency = Currency.of(account.currency),
+        plnMinor = account.plnMinor,
         icon = Palette.icon(account.icon),
         color = Palette.colorFor(account.color, account.id),
         // Empty is the default query, which covers every account not
@@ -964,6 +965,8 @@ private fun AccountButton(
     name: String,
     balanceMinor: Long,
     currency: Currency,
+    /** [balanceMinor] in złoty, or null when no rate is known. */
+    plnMinor: Long?,
     icon: ImageVector,
     color: Color,
     selected: Boolean,
@@ -1048,19 +1051,37 @@ private fun AccountButton(
             }
         }
         Spacer(modifier = Modifier.height(2.dp))
+        // Złoty first, because these chips are what Bilans is the sum OF: a
+        // strip of euro figures above a złoty total is a screen whose own
+        // arithmetic does not visibly work, and nothing on it says why.
+        //
+        // The account's own figure stays, smaller and dimmer underneath — "how
+        // many euro have I got" is a real question and Settings is two taps
+        // away. Only for a foreign account: a second line repeating the same
+        // number in the same unit would be noise on every other chip.
+        val shown = if (currency.isReporting) balanceMinor else plnMinor
         Text(
-            // The account's own unit. This chip is the only place on the
-            // Overview a per-account balance appears, so printing "zł" under a
-            // euro account would misstate it on the one screen that shows it.
-            text = Money.formatIn(balanceMinor, currency),
+            text = shown?.let { Money.formatWithCurrency(it) }
+                // No rate yet. An em dash rather than the euro figure dressed
+                // up as złoty, and the account's own balance is on the line
+                // below either way, so nothing is hidden.
+                ?: "—",
             style = MaterialTheme.typography.bodyMedium.copy(fontFeatureSettings = "tnum"),
             maxLines = 1,
-            color = if (balanceMinor < 0) {
+            color = if ((shown ?: 0) < 0) {
                 MaterialTheme.colorScheme.error
             } else {
                 MaterialTheme.colorScheme.onSurfaceVariant
             },
         )
+        if (!currency.isReporting) {
+            Text(
+                text = Money.formatIn(balanceMinor, currency),
+                style = MaterialTheme.typography.labelSmall.copy(fontFeatureSettings = "tnum"),
+                maxLines = 1,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+            )
+        }
     }
 }
 
