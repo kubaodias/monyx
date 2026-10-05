@@ -115,7 +115,7 @@ monyx/
 ```sh
 cd server
 npm install
-npm test          # 103 tests: sync, auth, budgets, voice, notes, releases
+npm test          # 126 tests: sync, auth, budgets, voice, notes, releases, rates
 npm run typecheck
 telnyx-edge ship  # deploy
 ```
@@ -132,6 +132,28 @@ never an edit to an old one.
 ```sh
 telnyx-edge storage sqldb migrations apply monyx --remote --migrations-dir server/migrations
 ```
+
+### Currencies and exchange rates
+
+Złoty is the reporting currency and is not configurable: every total the app
+prints is in złoty. An account may hold another currency — nine are offered
+(PLN, EUR, USD, GBP, CHF, CZK, SEK, NOK, DKK) — and `fx_rates` says what one
+unit of it was worth on a date. See
+[ADR 0022](docs/decisions/0022-zloty-is-the-reporting-currency-and-a-rate-has-a-date.md).
+
+Rates come from **NBP table A** (`api.nbp.pl`), the Polish central bank's own
+mid rates: PLN-base, free, no key. A transaction converts at the rate on **its
+own date**, a balance at today's, so a closed month's total does not move.
+
+NBP publishes nothing on weekends or holidays — the API answers 404 — so each
+closed day stores the previous publication carried forward, with `published_on`
+recording which day's rate it actually is.
+
+All nine are two-decimal currencies in ISO 4217. That is what lets
+`amount_minor` keep meaning "hundredths of the unit" everywhere with no
+per-currency minor-unit handling, so **a currency does not go on the list
+without checking it** — a rate table carrying JPY is refused rather than
+stored. There is no kuna: Croatia adopted the euro in January 2023.
 
 ### Creating a household
 
@@ -270,10 +292,13 @@ on. This is why `MainActivity` is an `AppCompatActivity` and the XML theme
 parent is an AppCompat one — a plain `ComponentActivity` would store the
 preference and then ignore it.
 
-**Money and dates follow the interface language; the currency and the timezone
-do not.** Polish prints `5 127,00 zł` (non-breaking space, comma decimal),
-English `5,127.00 zł`. But złoty is złoty in both, and `Dates.ZONE` stays
-`Europe/Warsaw` because that is where the household lives, not what it reads.
+**Money and dates follow the interface language; the reporting currency and the
+timezone do not.** Polish prints `5 127,00 zł` (non-breaking space, comma
+decimal), English `5,127.00 zł`. But złoty is złoty in both, and `Dates.ZONE`
+stays `Europe/Warsaw` because that is where the household lives, not what it
+reads. An individual account may be denominated in another currency, which is a
+property of that account and not of the language — see **Currencies and
+exchange rates**.
 The formatters in `Money.kt` are cached against the locale that built them
 rather than held in a `val`: switching language does not restart the process,
 and a formatter built at class-init would keep printing the old language.
@@ -285,6 +310,17 @@ guarded by the `CRON_SECRET` secret; it sweeps the budget alerts the push path
 cannot see — a month boundary, a limit revised downward, a delivery that failed
 while a phone was offline. Something outside the function has to call it, and
 today nothing does.
+
+The same route then refreshes the exchange rates, backfilling from the last date
+stored so an outage leaves no gap for a transaction to convert inside. It is
+capped at 30 days and runs inside a `try`: rates are a day of arithmetic that
+catches up tomorrow, and a failure there must not make the run look broken or
+leave the alert sweep unreported. The response reports each part separately.
+
+**Nothing calling `/cron/daily` means no rates.** Conversion of a
+foreign-currency account depends on a rate having been fetched for the date in
+question, so until something drives this route on a schedule, a non-PLN account
+has nothing to convert at.
 
 Backups are manual for a harder reason: `sqldb export` is CLI-only, with no REST
 equivalent, so the function cannot dump its own database.
@@ -464,5 +500,10 @@ cursors exist, and the 4 MiB ceiling only appears at real size.
 
 ## What is deliberately not here
 
-No multiple currencies, no debts or savings goals, no bank integration, no
-Excel export, no iOS, no web.
+No debts or savings goals, no bank integration, no Excel export, no iOS, no
+web.
+
+"No multiple currencies" was on this list until 2026-10-05. It was removed
+deliberately rather than quietly: an account may now hold one of nine
+currencies, while the currency the app *reports* in is still złoty and still
+not configurable. ADR 0022 records what was decided and what it costs.
