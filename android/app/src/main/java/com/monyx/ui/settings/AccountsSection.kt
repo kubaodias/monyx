@@ -55,12 +55,12 @@ import com.monyx.data.AccountEntity
 import com.monyx.data.Money
 import com.monyx.ui.theme.Palette
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
-import androidx.compose.material3.FilterChip
 import com.monyx.data.Currency
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
+import androidx.compose.material3.MenuAnchorType
+import androidx.compose.material3.ExperimentalMaterial3Api
 
 /**
  * Accounts: list, add, edit, archive, restore and delete. Editing offers name,
@@ -545,12 +545,7 @@ private fun AccountEditDialog(
                 Spacer(Modifier.height(6.dp))
                 ColorSwatchRow(selected = color, onSelect = { color = it })
                 SectionRule()
-                Text(
-                    stringResource(R.string.settings_account_currency),
-                    style = MaterialTheme.typography.labelMedium,
-                )
-                Spacer(Modifier.height(6.dp))
-                CurrencyRow(selected = currency, onSelect = { currency = it })
+                CurrencyField(selected = currency, onSelect = { currency = it })
                 // What picking a foreign currency costs, said on the screen
                 // that does the picking rather than discovered on the Overview.
                 if (!currency.isReporting) {
@@ -601,28 +596,49 @@ private fun AccountEditDialog(
 }
 
 /**
- * The nine currencies, as chips.
+ * The nine currencies, as a dropdown.
  *
- * Chips rather than a dropdown: nine is few enough to see at once, and the one
- * that is selected being visible without opening anything is what stops an
- * account quietly holding the wrong unit. The code is the label even where a
- * symbol exists, because "PLN" beside "EUR" compares and "zł" beside "€" does
- * not — the symbol's job is on the rows, not here.
+ * A grid of chips was the first attempt and it was wrong for this dialog: the
+ * dialog is already eight controls tall and scrolls, and two rows of chips put
+ * the in-summary switch below the fold on a short screen. A dropdown is one
+ * line whatever the list length, and it also stops the currency competing for
+ * attention with the icon and colour swatches above it — those are a choice
+ * among equals, and this is a field with one answer.
+ *
+ * The suffix rides along with the code, because "EUR — €" is what makes the
+ * row on the account list recognisable afterwards.
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun CurrencyRow(selected: Currency, onSelect: (Currency) -> Unit) {
-    LazyVerticalGrid(
-        columns = GridCells.Adaptive(minSize = 72.dp),
-        modifier = Modifier.fillMaxWidth().heightIn(max = 132.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+private fun CurrencyField(selected: Currency, onSelect: (Currency) -> Unit) {
+    var expanded by remember { mutableStateOf(false) }
+    ExposedDropdownMenuBox(
+        expanded = expanded,
+        onExpandedChange = { expanded = it },
+        modifier = Modifier.fillMaxWidth(),
     ) {
-        items(Currency.entries.toList(), key = { it.code }) { option ->
-            FilterChip(
-                selected = option == selected,
-                onClick = { onSelect(option) },
-                label = { Text(option.code) },
-            )
+        OutlinedTextField(
+            value = currencyLabel(selected),
+            onValueChange = {},
+            readOnly = true,
+            label = { Text(stringResource(R.string.settings_account_currency)) },
+            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
+            modifier = Modifier.fillMaxWidth().menuAnchor(MenuAnchorType.PrimaryNotEditable),
+        )
+        ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            Currency.entries.forEach { option ->
+                DropdownMenuItem(
+                    text = { Text(currencyLabel(option)) },
+                    onClick = {
+                        onSelect(option)
+                        expanded = false
+                    },
+                )
+            }
         }
     }
 }
+
+/** "EUR — €", or just "CHF" where the code already IS the suffix. */
+internal fun currencyLabel(currency: Currency): String =
+    if (currency.suffix == currency.code) currency.code else "${currency.code} — ${currency.suffix}"

@@ -68,6 +68,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.monyx.MonyxApp
 import com.monyx.R
 import com.monyx.data.AccountBalance
+import com.monyx.data.Currency
 import com.monyx.data.CategorySpend
 import com.monyx.data.Dates
 import com.monyx.data.TransactionEntity
@@ -924,21 +925,32 @@ private fun AccountChip(
     all: List<AccountBalance>,
     onToggle: (String, List<AccountBalance>) -> Unit,
 ) {
+    // Not in złoty means not in any total yet, so the chip cannot be switched
+    // on: a lit chip whose money is absent from the figures beside it would be
+    // the chip lying. It is still HERE, with its balance, because this strip is
+    // the only place the Overview shows a per-account balance at all — hiding
+    // it made the account vanish from the tab, which was worse than showing it
+    // as something the totals do not yet include.
+    val convertible = Currency.of(account.currency).isReporting
     AccountButton(
         name = account.name,
         balanceMinor = account.balanceMinor,
+        currency = Currency.of(account.currency),
         icon = Palette.icon(account.icon),
         color = Palette.colorFor(account.color, account.id),
         // Empty is the default query, which covers every account not
         // kept out of the summary — so those buttons are on. See
         // OverviewViewModel.selectedAccounts.
-        selected = if (selected.isEmpty()) {
+        selected = convertible && if (selected.isEmpty()) {
             account.excludedFromSummary == 0
         } else {
             account.id in selected
         },
-        outsideSummary = account.excludedFromSummary == 1,
-        onClick = { onToggle(account.id, all) },
+        // The same dashed, quiet treatment an outside-summary account gets. It
+        // is the app's existing way of saying "a different kind of row", and a
+        // second visual language for the same fact would be one too many.
+        outsideSummary = account.excludedFromSummary == 1 || !convertible,
+        onClick = { if (convertible) onToggle(account.id, all) },
     )
 }
 
@@ -953,6 +965,7 @@ private fun AccountChip(
 private fun AccountButton(
     name: String,
     balanceMinor: Long,
+    currency: Currency,
     icon: ImageVector,
     color: Color,
     selected: Boolean,
@@ -1038,7 +1051,10 @@ private fun AccountButton(
         }
         Spacer(modifier = Modifier.height(2.dp))
         Text(
-            text = Money.formatWithCurrency(balanceMinor),
+            // The account's own unit. This chip is the only place on the
+            // Overview a per-account balance appears, so printing "zł" under a
+            // euro account would misstate it on the one screen that shows it.
+            text = Money.formatIn(balanceMinor, currency),
             style = MaterialTheme.typography.bodyMedium.copy(fontFeatureSettings = "tnum"),
             maxLines = 1,
             color = if (balanceMinor < 0) {
