@@ -337,6 +337,11 @@ fun AddScreen(
                     onFocusChanged = { focused -> if (focused) editing = Editing.Note },
                 )
             },
+            // Anything at the bottom of the screen — the keys, or the note's
+            // own keyboard — leaves the grid too short to show a family below
+            // the roots, so the family takes a window of its own. See
+            // [CategoryGrid.pinFamily].
+            pinFamily = editing != Editing.Nothing,
             state = gridState,
             modifier = Modifier.weight(1f),
         )

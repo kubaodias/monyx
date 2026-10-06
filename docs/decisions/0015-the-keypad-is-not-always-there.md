@@ -73,3 +73,39 @@ next sync.
 - The context chips wrap. Three of them, one of which is a whole phrase in two
   languages, overflow a narrow screen — and a `Row` does not wrap, it squeezes
   the last child until its label breaks between letters.
+
+## Addendum, 2026-10-06: while the keypad IS there, the open family takes the window
+
+The other half of this decision, four releases on. The keypad standing down
+gives the grid room for the roots, the subcategories and the note at once —
+which is why, once an amount has been typed and a family tapped, everything is
+simply on screen and nothing needs arranging.
+
+While the keypad is up the window is about 250dp and the roots alone fill it.
+Opening a family then happens below the fold: the subcategories are appended
+after every root, because a lazy grid has one flat list of items and not a tree.
+Scrolling them into view was the first answer and it put them at the bottom of
+the window with the note under them, which reads as the bottom of a long list
+rather than as the question being asked.
+
+So the family block takes a window of its own. It is one grid item — the rule,
+the subcategories laid out by hand in the same four columns, the note at the far
+end — with a minimum height of one window, and the slack between the children
+and the note is empty space. Scrolled to, it lands at the top: the subcategories
+sit directly under the amount line that now carries their family, the note is
+where it always is at the bottom, and the roots are one scroll up. The owner's
+own description: "no other category is visible and view is scrolled down so that
+list of subcategories stay at the top".
+
+Two things worth stating, because both were wrong first:
+
+- **A minimum height, not an exact one.** `fillParentMaxHeight` is the obvious
+  modifier and it sets an exact height, so a family with three rows of children
+  would be clipped by it rather than scrolling past it. The height comes from a
+  `BoxWithConstraints` around the grid, which is also the only place that knows
+  what a window is.
+- **It is pinned only while something is taking the bottom of the screen** —
+  the keys, or the note's keyboard. The flag comes from the screen, not from
+  measuring: the screen is the thing that decided to give its lower half away.
+  When it takes it back, the block is a block like any other and the space
+  between the children and the note disappears with it.

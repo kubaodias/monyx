@@ -9,6 +9,9 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -66,6 +69,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.isFinite
 import androidx.compose.ui.unit.sp
 import com.monyx.R
 import com.monyx.data.AccountEntity
@@ -249,12 +253,15 @@ internal fun categoryMarkOf(
 @Composable
 private fun SelectedCategoryMark(mark: CategoryMark?, onPick: ((String) -> Unit)?) {
     Box(
-        // 60dp, which is the whole cost of this to the figure beside it: the
-        // name is read at 10sp under the circle rather than beside it, because
-        // the figure is 52sp and ellipsises at about nine glyphs — a name on
-        // this line's own axis would have started truncating four-figure
-        // amounts. Family names are short; "Rachunki" fits twice over.
-        modifier = Modifier.padding(bottom = 6.dp).width(60.dp),
+        // The circle is the grid's own 48dp — this is a cell lifted out of the
+        // grid, so it is the size of one. The column is 56dp, which is the
+        // whole cost of this to the figure beside it: the name is read under
+        // the circle rather than beside it, because the figure is 52sp and
+        // ellipsises at about nine glyphs — a name on this line's own axis
+        // would have taken 100dp and started truncating four-figure amounts.
+        // Family names are short, and the ones that are not ellipsise here
+        // rather than there.
+        modifier = Modifier.padding(bottom = 6.dp).width(56.dp),
         contentAlignment = Alignment.Center,
     ) {
         AnimatedContent(
@@ -265,10 +272,15 @@ private fun SelectedCategoryMark(mark: CategoryMark?, onPick: ((String) -> Unit)
                 // answer.
                 (slideInVertically { it } + fadeIn()) togetherWith fadeOut()
             },
+            // The FAMILY, not the mark. Picking a subcategory leaves the family
+            // alone but flips [CategoryMark.family], and without this the whole
+            // circle slid up and back for a change that is a 2dp ring: the line
+            // was announcing a decision it had already announced.
+            contentKey = { it?.id },
             label = "categoryMark",
         ) { current ->
             if (current == null) {
-                Box(Modifier.size(36.dp))
+                Box(Modifier.size(48.dp))
             } else {
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
@@ -289,7 +301,7 @@ private fun SelectedCategoryMark(mark: CategoryMark?, onPick: ((String) -> Unit)
                 ) {
                     Box(
                         modifier = Modifier
-                            .size(36.dp)
+                            .size(48.dp)
                             .clip(CircleShape)
                             .background(current.color)
                             // The same ring the grid puts on an open family:
@@ -308,14 +320,14 @@ private fun SelectedCategoryMark(mark: CategoryMark?, onPick: ((String) -> Unit)
                             imageVector = Palette.icon(current.icon),
                             contentDescription = null,
                             tint = Color.White,
-                            modifier = Modifier.size(18.dp),
+                            modifier = Modifier.size(22.dp),
                         )
                     }
                     Spacer(Modifier.height(2.dp))
                     Text(
                         text = current.name,
-                        fontSize = 10.sp,
-                        lineHeight = 12.sp,
+                        fontSize = 11.sp,
+                        lineHeight = 13.sp,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                         textAlign = TextAlign.Center,
@@ -462,6 +474,23 @@ internal fun CategoryGrid(
      * can hide it is the keypad below.
      */
     footer: (@Composable () -> Unit)? = null,
+    /**
+     * Whether the bottom of the screen is giving its height to something else —
+     * the keypad, or the note's keyboard — and the grid is therefore working in
+     * a short window.
+     *
+     * In a short window the roots alone fill it, so opening a family is a thing
+     * that happens below the fold. The family block then takes a window of its
+     * own: the subcategories at the top, directly under the amount line that
+     * now carries their family, the note at the bottom, and the space between
+     * them left empty. The roots are still there — one scroll up.
+     *
+     * False once the keypad stands down, which is what happens the moment an
+     * amount has been typed and a category tapped. The window is then tall
+     * enough for the roots AND the subcategories AND the note, so there is
+     * nothing to pin and no space to leave: everything is simply on screen.
+     */
+    pinFamily: Boolean = false,
     state: LazyGridState = rememberLazyGridState(),
 ) {
     val roots = remember(categories) {
@@ -484,6 +513,15 @@ internal fun CategoryGrid(
     // next, and the family you are inside is no longer that.
     val listed = if (openRootId == null) roots else roots.filterNot { it.id == openRootId }
 
+    val family = openRootId != null && children.isNotEmpty()
+    // One window of its own for the open family, and only when there is not
+    // room for everything anyway. See [pinFamily].
+    val pinned = pinFamily && family
+    val familyIndex = listed.size
+    val lastIndex = familyIndex +
+        (if (family) 1 else 0) +
+        (if (footer != null && !pinned) 1 else 0) - 1
+
     // Opening a family brings it into view.
     //
     // The children are appended after ALL the roots, not under the parent that
@@ -492,38 +530,56 @@ internal fun CategoryGrid(
     // of subcategories below the fold and nothing on screen moved. The grid
     // looked like it had merely dimmed everything.
     //
-    // Scrolling to the LAST item is the whole rule: the children are the last
-    // thing in the grid apart from the footer, so the end of the content is
-    // where they are, and a lazy grid clamps at its own maximum scroll — so
-    // this is "show the bottom" and never an overshoot. Where everything
-    // already fits, which is the common case once the keypad stands down, the
-    // scroll has nowhere to go and does nothing.
+    // Pinned, the target is the family block, which is a window tall: it lands
+    // at the top and there is exactly enough content to hold it there. Not
+    // pinned, the target is the last item, which is the end of the content —
+    // and a lazy grid clamps at its own maximum scroll, so that is "show the
+    // bottom" and never an overshoot. Where everything already fits the scroll
+    // has nowhere to go and does nothing, which is the case the moment the
+    // keypad stands down.
     //
     // Keyed on the family, so choosing between the children it just revealed
-    // does not scroll again. The FIRST composition is skipped deliberately: the
-    // edit sheet opens on a row that may already be filed under a subcategory,
-    // and a sheet that arrives mid-scroll looks like it was left that way.
+    // does not scroll again — and on [pinned], because the keypad standing
+    // down is what un-pins the block and that has to let the roots back. The
+    // FIRST composition is skipped deliberately: the edit sheet opens on a row
+    // that may already be filed under a subcategory, and a sheet that arrives
+    // mid-scroll looks like it was left that way.
     var settled by remember { mutableStateOf(false) }
-    LaunchedEffect(openRootId) {
+    LaunchedEffect(openRootId, pinned) {
         if (!settled) {
             settled = true
             return@LaunchedEffect
         }
-        if (children.isEmpty()) return@LaunchedEffect
-        state.animateScrollToItem(listed.size + children.size + if (footer != null) 1 else 0)
+        if (!family) return@LaunchedEffect
+        state.animateScrollToItem(if (pinned) familyIndex else lastIndex)
     }
 
-    LazyVerticalGrid(
-        state = state,
-        columns = GridCells.Fixed(4),
-        modifier = modifier.fillMaxWidth(),
-        // Tight, because every dp here is a dp of label width: at 12/6 a name
-        // like "Zakupy spożywcze" wrapped on a phone where 8/4 fits it on one
-        // line, and four columns multiply the saving by four.
-        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 10.dp),
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
-        verticalArrangement = if (footer != null) FooterToBottom else Arrangement.spacedBy(10.dp),
-    ) {
+    // BoxWithConstraints, for one number: how tall a window the family block
+    // should fill when it is pinned. `fillParentMaxHeight` would be the obvious
+    // answer and is the wrong one — it sets an exact height, so a family with
+    // three rows of children would be clipped by it rather than scrolling.
+    BoxWithConstraints(modifier = modifier.fillMaxWidth()) {
+        // Minus the grid's own vertical padding, so the block is a window and
+        // not a window plus 20dp. Zero when the grid has been given no height
+        // to speak of, or an unbounded one — neither happens where it is used
+        // today, and both would otherwise end up inside a size modifier.
+        val windowHeight = if (maxHeight.isFinite) {
+            (maxHeight - 20.dp).coerceAtLeast(0.dp)
+        } else {
+            0.dp
+        }
+
+        LazyVerticalGrid(
+            state = state,
+            columns = GridCells.Fixed(4),
+            modifier = Modifier.fillMaxSize(),
+            // Tight, because every dp here is a dp of label width: at 12/6 a
+            // name like "Zakupy spożywcze" wrapped on a phone where 8/4 fits it
+            // on one line, and four columns multiply the saving by four.
+            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 10.dp),
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            verticalArrangement = if (footer != null) FooterToBottom else Arrangement.spacedBy(10.dp),
+        ) {
         items(listed, key = { it.id }) { category ->
             CategoryCell(
                 // Animated, so the chosen family leaving the list reads as the
@@ -544,33 +600,66 @@ internal fun CategoryGrid(
                 onClick = { onSelect(category.id) },
             )
         }
-        if (openRootId != null && children.isNotEmpty()) {
-            item(key = "split", span = { GridItemSpan(maxLineSpan) }) {
-                SubcategorySplit()
-            }
-            items(children, key = { it.id }) { category ->
-                CategoryCell(
-                    category = category,
-                    color = colorOf(category),
-                    selected = category.id == selectedId,
-                    open = false,
-                    // A subcategory only fades once one of its siblings has been
-                    // picked. Until then the parent is the choice and the row
-                    // below it is the open question — fading it would be the
-                    // screen dimming the very thing it is asking about.
-                    dimmed = selectedId != openRootId && category.id != selectedId,
-                    // Tapping the chosen one again keeps it chosen. It used to
-                    // drop back to the parent, so a second tap — a stutter, or
-                    // checking the amount and tapping again — silently undid
-                    // the choice, and the save button went dead for a reason
-                    // nothing on screen gave. Undoing a subcategory is still
-                    // one tap: the parent is right above it, still lit.
-                    onClick = { onSelect(category.id) },
-                )
+        // One item, not one per child, because the family is one block: it
+        // has to be able to take a whole window and hold the note at the far
+        // end of it. Laid out by hand in the same four columns the grid uses,
+        // so a subcategory lines up with the roots above it.
+        if (family) {
+            item(key = "family", span = { GridItemSpan(maxLineSpan) }) {
+                Column(
+                    modifier = if (pinned && windowHeight > 0.dp) {
+                        Modifier.heightIn(min = windowHeight)
+                    } else {
+                        Modifier
+                    },
+                ) {
+                    SubcategorySplit()
+                    children.chunked(4).forEachIndexed { row, line ->
+                        if (row > 0) Spacer(Modifier.height(10.dp))
+                        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                            line.forEach { category ->
+                                CategoryCell(
+                                    modifier = Modifier.weight(1f),
+                                    category = category,
+                                    color = colorOf(category),
+                                    selected = category.id == selectedId,
+                                    open = false,
+                                    // A subcategory only fades once one of its
+                                    // siblings has been picked. Until then the
+                                    // family is the choice and the row below it
+                                    // is the open question — fading it would be
+                                    // the screen dimming the very thing it is
+                                    // asking about.
+                                    dimmed = selectedId != openRootId && category.id != selectedId,
+                                    // Tapping the chosen one again keeps it
+                                    // chosen. It used to drop back to the
+                                    // family, so a second tap — a stutter, or
+                                    // checking the amount and tapping again —
+                                    // silently undid the choice. Undoing one is
+                                    // a tap on the family beside the amount.
+                                    onClick = { onSelect(category.id) },
+                                )
+                            }
+                            // The last line keeps the column width of a full
+                            // one: three children centred across the screen
+                            // would not line up with anything.
+                            repeat(4 - line.size) { Spacer(Modifier.weight(1f)) }
+                        }
+                    }
+                    if (pinned) {
+                        // The empty half of the window. The subcategories are
+                        // what the screen is asking about and they are at the
+                        // top of it; the note is where it always is, at the
+                        // bottom, above the keys.
+                        Spacer(Modifier.weight(1f))
+                        footer?.invoke()
+                    }
+                }
             }
         }
-        footer?.let { content ->
-            item(key = "footer", span = { GridItemSpan(maxLineSpan) }) { content() }
+        if (footer != null && !pinned) {
+            item(key = "footer", span = { GridItemSpan(maxLineSpan) }) { footer() }
+        }
         }
     }
 }

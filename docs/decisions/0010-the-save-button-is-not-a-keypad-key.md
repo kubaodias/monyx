@@ -129,10 +129,17 @@ which category has left the list.
 
 Three details that are not arbitrary:
 
-- **The name is under the circle, at 10sp, in a 60dp column.** Beside it, on the
-  line's own axis, it would have taken 100dp from a figure that is 52sp and
-  ellipsises at about nine glyphs — four-figure amounts would have started
-  truncating. Family names are short; "Rachunki" fits twice over.
+- **The circle is the grid's own 48dp**, because this is a cell lifted out of
+  the grid and should be the size of one.
+- **The name is under the circle, in a 56dp column.** Beside it, on the line's
+  own axis, it would have taken 100dp from a figure that is 52sp and ellipsises
+  at about nine glyphs — four-figure amounts would have started truncating.
+  Family names fit the column; the ones that do not ellipsise here rather than
+  there.
+- **It re-animates for the family, not for the mark.** Picking a subcategory
+  leaves the family alone but flips the ring, and the circle used to slide up
+  and back for a change that is 2dp of border — the line announcing a decision
+  it had already announced. `contentKey` is the family's id.
 - **The slot is reserved whether or not anything is in it.** The figure is the
   thing being typed and must not jump sideways when a category is picked. It is
   end-aligned, so an empty slot shows nothing.
