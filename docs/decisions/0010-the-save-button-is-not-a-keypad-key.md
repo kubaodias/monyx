@@ -72,19 +72,30 @@ wrong for this app: `Check` is already the selection mark in three places — th
 chosen account in the picker, the chosen member in Settings, an active filter
 chip — so it would have meant "this one is chosen" there and "commit this" here.
 Which is a smaller version of the two-meanings problem this decision was written
-about. A row joining a list is what the tap does. `AddSaveSlot` is the handover — the nav owns it, the keypad fills it in
-and withdraws it on the way out, because the question "can this be saved yet"
+about. A row joining a list is what the tap does.
+
+`AddSaveSlot` is the handover — the nav owns it, the keypad fills it in and
+withdraws it on the way out, because the question "can this be saved yet"
 belongs to the screen that knows what is missing.
 
-What this decision's reasoning keeps:
+**It is green whether or not the entry is finished**, and that overrules this
+decision's own rule about greying. Greying does not survive the move: the bar's
+middle item is the one coloured thing in a row of five, so a grey slab sitting
+there for as long as it takes to type an amount reads as a broken tab rather
+than as a button waiting. The owner put it as "Zapisz button should have green
+background and be rounded like Dodaj" — which it is, because it is the same
+button, changing what it says rather than sharing a slot with a second one.
 
-- **Greyed, not absent, and legible.** Still "unfinished" rather than
-  "unavailable", still a hand-set colour rather than Material's 38%.
-- **The blocker that nothing else explains still gets said.** A household with
-  no account yet gets one line of text where the bar used to be. The other two
-  blockers were always on screen — the amount is the largest thing on it, the
-  categories fill the middle — and a bar narrating them cost 62dp to describe
-  what you are looking at.
+What the rule was actually protecting is kept:
+
+- **A refused tap says what is missing.** One line of text above the bar, naming
+  the first gap in the order it is asked for: the account, the amount, the
+  category. A household with no account yet gets that line without asking,
+  because nothing else on the screen would explain a button that will not act;
+  the other two are visible as emptiness — the amount is the largest thing here
+  and the categories fill the middle — so they are named only once somebody has
+  tapped and been refused. The old bar narrated all three from the first frame,
+  which cost 62dp to describe what you are looking at.
 - **The keypad still cannot save.** `=` is still only `=`.
 
 What it gives up is the figure on the label. "Zapisz · 47,50 zł" was there to
@@ -93,3 +104,21 @@ the largest thing on the screen directly above the button, which is the next
 best place for the last thing read before money is written down — and the edit
 sheet, which has no navigation bar to borrow anything from, keeps the full bar
 and its figure unchanged.
+
+## Addendum, 2026-10-06: the chosen category sits beside the figure
+
+A consequence of the grid being a grid: the children of a family are appended
+after every root, the note follows them, and a household with thirty categories
+scrolls the chosen circle off the top of its own window. The screen then shows a
+figure and no answer to "on what".
+
+So the chosen category rises into a 40dp slot at the left of the amount line and
+stays there — the same circle the grid draws it with, in the same colour, with a
+subcategory in its parent's hue exactly as the cell has it. The slot is reserved
+whether or not anything is in it, because the figure is the thing being typed
+and must not jump sideways when a category is picked; the figure is end-aligned,
+so an empty slot shows nothing.
+
+No name beside it. The circle and its colour are how this app has said "which
+category" since the grid was built, and a label there would take width from the
+one figure on the screen that must never be squeezed.
