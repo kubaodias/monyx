@@ -292,12 +292,12 @@ fun AddScreen(
                 Currency.of(accounts.firstOrNull { it.id == state.accountId }?.currency),
             ),
             onPickCurrency = { showCurrencyPicker = true },
-            // The chosen category, beside the figure, where the grid cannot
-            // scroll it away. See [SelectedCategoryMark].
-            categoryMark = remember(state.categoryId, categories) {
-                categories.firstOrNull { it.id == state.categoryId }
-                    ?.let { CategoryMark(it.id, it.icon, colorOf(it)) }
+            // The chosen family, beside the figure, where the grid cannot
+            // scroll it away — and where the grid no longer lists it.
+            categoryMark = remember(state.categoryId, categories, colorOf) {
+                categoryMarkOf(categories, state.categoryId, colorOf)
             },
+            onPickCategory = viewModel::selectCategory,
         )
 
         CategoryGrid(

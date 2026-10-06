@@ -5,7 +5,9 @@ import com.monyx.data.AccountEntity
 import com.monyx.data.MonyxRepository
 import com.monyx.sync.Rejection
 import com.monyx.sync.SyncEngine
+import com.monyx.data.CategoryEntity
 import com.monyx.ui.add.AddSaveSlot
+import com.monyx.ui.add.categoryMarkOf
 import com.monyx.ui.budget.PlanState
 import com.monyx.ui.overview.OverviewViewModel
 import com.monyx.ui.overview.PieSlice
@@ -460,6 +462,63 @@ class VisibleSelectionTest {
     @Test
     fun `the default empty selection is left alone`() {
         assertEquals(emptySet<String>(), OverviewViewModel.visibleSelection(emptySet(), accounts))
+    }
+
+    // ------------------------------------------- the category on the amount line
+
+    private val rachunki = CategoryEntity(id = "c-bills", name = "Rachunki", kind = "expense")
+    private val prad = CategoryEntity(
+        id = "c-power",
+        parentId = "c-bills",
+        name = "Prąd",
+        kind = "expense",
+    )
+    private val dom = CategoryEntity(id = "c-home", name = "Dom", kind = "expense")
+    private val family = listOf(rachunki, prad, dom)
+
+    /** The hue a subcategory is drawn in belongs to its parent, so the mark's
+     *  colour has to come out of the root and not out of the child. */
+    private val hue: (CategoryEntity) -> Color = { c ->
+        if (c.id == rachunki.id) Color.Red else Color.Blue
+    }
+
+    @Test
+    fun `a chosen family is its own mark`() {
+        val mark = categoryMarkOf(family, rachunki.id, hue)
+        assertEquals("Rachunki", mark?.name)
+        assertEquals(rachunki.id, mark?.id)
+        assertEquals(Color.Red, mark?.color)
+        assertEquals("filled, not ringed: this IS the answer", false, mark?.family)
+    }
+
+    /**
+     * The rule the owner asked for in as many words: picking a subcategory does
+     * not change what the amount line says. It is the family either way, which
+     * is also the category the grid has stopped listing — the two read the same
+     * function so they cannot disagree.
+     */
+    @Test
+    fun `a chosen subcategory still shows its family`() {
+        val mark = categoryMarkOf(family, prad.id, hue)
+        assertEquals("Rachunki", mark?.name)
+        assertEquals(rachunki.id, mark?.id)
+        assertEquals(Color.Red, mark?.color)
+        assertEquals("ringed: the answer came from in here", true, mark?.family)
+    }
+
+    @Test
+    fun `nothing chosen is no mark at all`() {
+        assertNull(categoryMarkOf(family, null, hue))
+        assertNull(categoryMarkOf(family, "c-gone", hue))
+    }
+
+    /** A household can delete a parent and keep its children. The child is then
+     *  the best answer there is, rather than no answer. */
+    @Test
+    fun `a subcategory whose parent is gone stands for itself`() {
+        val mark = categoryMarkOf(listOf(prad), prad.id, hue)
+        assertEquals("Prąd", mark?.name)
+        assertEquals(false, mark?.family)
     }
 
     // ---------------------------------------------- the bar's middle button

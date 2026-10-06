@@ -105,20 +105,39 @@ best place for the last thing read before money is written down — and the edit
 sheet, which has no navigation bar to borrow anything from, keeps the full bar
 and its figure unchanged.
 
-## Addendum, 2026-10-06: the chosen category sits beside the figure
+## Addendum, 2026-10-06: the chosen family sits beside the figure, and leaves the grid
 
 A consequence of the grid being a grid: the children of a family are appended
 after every root, the note follows them, and a household with thirty categories
-scrolls the chosen circle off the top of its own window. The screen then shows a
-figure and no answer to "on what".
+scrolls the chosen circle off the top of its own window. The screen is then a
+figure with no answer to "on what".
 
-So the chosen category rises into a 40dp slot at the left of the amount line and
-stays there — the same circle the grid draws it with, in the same colour, with a
-subcategory in its parent's hue exactly as the cell has it. The slot is reserved
-whether or not anything is in it, because the figure is the thing being typed
-and must not jump sideways when a category is picked; the figure is end-aligned,
-so an empty slot shows nothing.
+So the chosen category moves onto the amount line — the same circle the grid
+draws it with, in the same colour, with its name under it — and **leaves the
+grid**. Two copies of the one answer a thumb apart, with the grid's copy
+scrolling away under the one that does not, is the grid answering a question the
+line above has already settled. What is left in the list is what might be
+chosen next, which the family you are standing inside is not.
 
-No name beside it. The circle and its colour are how this app has said "which
-category" since the grid was built, and a label there would take width from the
-one figure on the screen that must never be squeezed.
+**It is always the family, never the subcategory.** Picking "Prąd" does not
+change the line to "Prąd": the line says what the spending is about, which is
+"Rachunki" either way, and the grid immediately below is already showing which
+of the family it is filed under. It also stops the line changing twice for what
+is one decision taken in two taps. `categoryMarkOf` is the rule, and the grid
+hides exactly what that function returns, so the two cannot disagree about
+which category has left the list.
+
+Three details that are not arbitrary:
+
+- **The name is under the circle, at 10sp, in a 60dp column.** Beside it, on the
+  line's own axis, it would have taken 100dp from a figure that is 52sp and
+  ellipsises at about nine glyphs — four-figure amounts would have started
+  truncating. Family names are short; "Rachunki" fits twice over.
+- **The slot is reserved whether or not anything is in it.** The figure is the
+  thing being typed and must not jump sideways when a category is picked. It is
+  end-aligned, so an empty slot shows nothing.
+- **A ring, and a tap, when a subcategory is chosen.** The grid's own language:
+  filled is "this is the answer", ringed is "the answer came from in here".
+  Tapping it files the row on the family itself, which is how a subcategory is
+  undone now that the parent's cell is not in the grid to tap — the affordance
+  the parent cell used to provide, moved with it.

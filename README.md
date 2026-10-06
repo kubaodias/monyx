@@ -57,8 +57,10 @@ cannot answer says what is still missing instead — see
   hidden on that phone alone, across launches.
 - **Add** — a keypad that is also a calculator, a note, any date including the
   future, and *Make it repeat* to turn the row being typed into a repeating rule.
-  The category you pick rises into the slot beside the amount and stays there,
-  so the pair reads as the row being written however far the grid is scrolled.
+  The family you pick rises into the slot beside the amount — circle and name —
+  and leaves the grid, so the pair reads as the row being written however far
+  the categories are scrolled. Picking a subcategory does not change it: the
+  line says "Rachunki" and the grid below says which of them.
 - **History** — the month, searchable, filtered by account, category and then
   subcategory, with any row that is not on the household's default account — the
   first one on the list — carrying that account's name in its own colour; pick a category and the rows are totalled above them, so "how much
