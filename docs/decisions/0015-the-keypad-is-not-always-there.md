@@ -109,3 +109,10 @@ Two things worth stating, because both were wrong first:
   measuring: the screen is the thing that decided to give its lower half away.
   When it takes it back, the block is a block like any other and the space
   between the children and the note disappears with it.
+- **Nothing animates its way there.** The scroll is instant and the roots do not
+  animate out of the gap the chosen family leaves. One tap used to move three
+  things at once — the cells closing over the gap, the grid scrolling, the mark
+  rising — with the scroll chasing a target the reflow was still moving. One
+  thing moves now, and it is the mark; the grid is simply where it belongs on
+  the next frame. The one scroll that IS animated is the one a tap asks for
+  directly, on the mark, where there is nothing else moving to race.

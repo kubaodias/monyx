@@ -167,8 +167,6 @@ fun EditTransactionSheet(
     var confirmDelete by remember { mutableStateOf(false) }
     var explainPending by remember { mutableStateOf(false) }
 
-    val focusManager = LocalFocusManager.current
-    val keyboard = LocalSoftwareKeyboardController.current
     val scope = rememberCoroutineScope()
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
@@ -183,16 +181,6 @@ fun EditTransactionSheet(
      */
     fun closeThen(action: () -> Unit) {
         scope.launch { sheetState.hide() }.invokeOnCompletion { action() }
-    }
-
-    // Bringing the keypad up has to take the system keyboard down with it, and
-    // the only way to do that is to drop the note field's focus — a keyboard
-    // hidden while its field is still focused comes straight back on the next
-    // recomposition. Same dance as the add screen, for the same reason.
-    fun editAmount() {
-        focusManager.clearFocus()
-        keyboard?.hide()
-        keypadUp = true
     }
 
     // Only the list matching this row's kind; an expense cannot be filed under a
@@ -253,6 +241,31 @@ fun EditTransactionSheet(
         // come out either overlapped or double-padded.
         contentWindowInsets = { WindowInsets(0, 0, 0, 0) },
     ) {
+        /*
+         * Both of these are read INSIDE the sheet, and that is the whole fix
+         * for a keyboard that would not go down.
+         *
+         * A ModalBottomSheet is its own window with its own composition, so the
+         * focus owner out there does not own the note field in here: asking it
+         * to clear the focus cleared nothing, the field kept it, and the
+         * keyboard stayed up over the category that had just been tapped. Same
+         * mistake, in the same file, as the IME inset below — a window boundary
+         * that does not announce itself.
+         */
+        val focusManager = LocalFocusManager.current
+        val keyboard = LocalSoftwareKeyboardController.current
+
+        // Bringing the keypad up has to take the system keyboard down with it,
+        // and the only way to do that is to drop the note field's focus — a
+        // keyboard hidden while its field still has it comes straight back on
+        // the next recomposition. force, because a focused field is entitled
+        // to refuse. Same dance as the add screen, for the same reason.
+        fun editAmount() {
+            focusManager.clearFocus(force = true)
+            keyboard?.hide()
+            keypadUp = true
+        }
+
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -393,7 +406,13 @@ fun EditTransactionSheet(
                 categoryMark = remember(categoryId, selectable, colorOf) {
                     categoryMarkOf(selectable, categoryId, colorOf)
                 },
-                onPickCategory = { categoryId = it },
+                // Back to the families, as on the add screen, keyboard and
+                // all.
+                onMarkClick = {
+                    focusManager.clearFocus(force = true)
+                    keyboard?.hide()
+                    scope.launch { gridState.animateScrollToItem(0) }
+                },
             )
 
             // The note is laid out as on the add screen: last in the grid,
@@ -442,7 +461,7 @@ fun EditTransactionSheet(
                         // the same bargain the add screen makes: with an amount
                         // already there the grid is what the screen is for.
                         if (amountMinor > 0) {
-                            focusManager.clearFocus()
+                            focusManager.clearFocus(force = true)
                             keyboard?.hide()
                             keypadUp = false
                         } else {
