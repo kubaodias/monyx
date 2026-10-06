@@ -178,6 +178,19 @@ balance, the one in force on the as-of day for a past one. A month's spending is
 converted row by row at the rate on each row's own date. Both are right and they
 are not the same arithmetic; see `AccountBalance.plnMinor`.
 
+**An account's balance is the one sum in the app that is not in złoty**, and it
+is built by converting each row INTO the account's currency (`accountMinor`)
+before adding. Summing the raw `amountMinor` is what made a euro account read
+`-100,00 €` for a 100 zł purchase and then `-438,55 zł` beside it — four times
+the money. A cross-currency transfer's two legs carry different figures
+(`accountMinor` and `transferAccountMinor`) because 100 zł leaving a euro card
+arrives in a dollar account as neither 100 nor the euro amount.
+
+Because the account balance is then valued in złoty at **one** rate, it can sit a
+grosz off the per-row sum: 100 zł spent from a euro card is 22,80 € in the
+account and 99,99 zł valued back. That is the cost of a position being worth what
+it is worth today rather than what each row cost on its day.
+
 **A missing rate is null, never zero.** `SUM` skips nulls, so a currency whose
 rates have not synced yet degrades to the account simply not being counted —
 the behaviour before conversion existed. It still shows its own balance on the

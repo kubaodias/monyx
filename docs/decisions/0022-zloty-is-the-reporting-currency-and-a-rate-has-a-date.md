@@ -235,3 +235,41 @@ The view grew a `LEFT JOIN accounts` to get there, which is the first time
 occurrence will be written in when the rule fires. Without it the one bare figure
 in a list of euro rows would have been the repeating one — the gap below made
 visible in a new place rather than fixed.
+
+## Addendum, 2026-10-06: an account's balance is in the account's currency, and that is a sum
+
+The bug this addendum exists for: a euro account showed `-100,00 €` and
+`-438,55 zł` for a single 100 zł purchase, four times the money that was spent.
+
+`accountBalances` summed the raw `amount_minor` of every row on the account and
+then multiplied the total by the account's rate. That was correct while a row was
+necessarily in its account's currency, and became wrong the moment a transaction
+carried its own — which is the change made two addenda above. The feature that
+made a złoty row possible on a euro account is the feature that broke the
+balance, and nothing failed in between.
+
+**An account's balance is in the account's currency, so every row has to be
+converted INTO that currency before being added.** That is `ledger_pln`'s
+`accountMinor`, and the balance is the one sum in this app that deliberately is
+not in złoty. The opening balance is already in that currency and is not
+converted, which is what makes the two addable.
+
+**A transfer's two legs now carry different figures.** `transferAccountMinor` is
+the amount in the DESTINATION account's currency. The addendum that removed
+`transferPlnMinor` argued that one amount means one converted figure; that is
+true in złoty and false in the units of two accounts, because 100 zł leaving a
+euro card arrives in a dollar account as neither of those numbers.
+
+**The złoty value of a balance is still taken at one rate**, so it can differ by
+a grosz from the same rows converted individually: 100 zł from a euro card is
+22,80 € in the account and 99,99 zł valued back at today's rate. Summing each
+row's own złoty figure instead would report what the position COST rather than
+what it is worth, and a euro savings account funded three years ago would be
+valued at a 2023 rate forever. The grosz is the cheaper error.
+
+**Two conversion bugs have now shipped because the rule lived in SQL where no
+test could reach it** — the ledger row that never carried its unit, and this. So
+`LedgerViewTest` takes the view out of the exported Room schema and the balance
+query out of its own `@Query` annotation, and runs both through the `sqlite3`
+binary. It fails rather than skips when sqlite3 is missing: there is no CI here,
+and a test that quietly stops running is the failure mode that produced both bugs.

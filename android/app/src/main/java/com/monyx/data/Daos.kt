@@ -489,18 +489,33 @@ interface MonyxDao {
     /**
      * An account balance is its opening balance plus income, minus expenses,
      * plus or minus transfers.
+     *
+     * **In the account's own currency, so every row is converted INTO it** —
+     * `accountMinor` from the view, not the raw `amountMinor` this query summed
+     * until 0.23.2. A euro card can pay 100 zł, and adding that 100 to a euro
+     * balance made the account read "-100,00 €" and, converted, "-438,55 zł"
+     * for money that was 100 zł. The opening balance is already in the
+     * account's currency, which is what makes the two addable.
+     *
+     * A row whose rate is unknown contributes NOTHING rather than its face
+     * value, which is the same degradation every other figure here has: SUM
+     * skips nulls. It understates by that row instead of counting euro as
+     * grosze.
      */
     @Query(
         """WITH b AS (
              SELECT a.id AS id, a.name AS name, a.icon AS icon, a.color AS color,
                     a.initialBalanceMinor
                     + COALESCE((SELECT SUM(CASE
-                          WHEN t.kind = 'income'   THEN  t.amountMinor
-                          WHEN t.kind = 'expense'  THEN -t.amountMinor
-                          WHEN t.kind = 'transfer' THEN -t.amountMinor
-                       END) FROM transactions t
+                          WHEN t.kind = 'income'   THEN  t.accountMinor
+                          WHEN t.kind = 'expense'  THEN -t.accountMinor
+                          WHEN t.kind = 'transfer' THEN -t.accountMinor
+                       END) FROM ledger_pln t
                        WHERE t.accountId = a.id AND t.deleted = 0), 0)
-                    + COALESCE((SELECT SUM(t.amountMinor) FROM transactions t
+                    -- The far leg of a transfer, in THIS account's money: the
+                    -- amount that left the other one is not the amount that
+                    -- arrives here once the two are in different currencies.
+                    + COALESCE((SELECT SUM(t.transferAccountMinor) FROM ledger_pln t
                        WHERE t.transferAccountId = a.id AND t.kind = 'transfer'
                          AND t.deleted = 0), 0) AS balanceMinor,
                     a.archived AS archived, a.excludedFromSummary AS excludedFromSummary,
@@ -548,14 +563,16 @@ interface MonyxDao {
         """WITH b AS (
              SELECT a.id AS id, a.name AS name, a.icon AS icon, a.color AS color,
                     a.initialBalanceMinor
+                    -- In the account's own currency, per row. See the
+                    -- query above.
                     + COALESCE((SELECT SUM(CASE
-                          WHEN t.kind = 'income'   THEN  t.amountMinor
-                          WHEN t.kind = 'expense'  THEN -t.amountMinor
-                          WHEN t.kind = 'transfer' THEN -t.amountMinor
-                       END) FROM transactions t
+                          WHEN t.kind = 'income'   THEN  t.accountMinor
+                          WHEN t.kind = 'expense'  THEN -t.accountMinor
+                          WHEN t.kind = 'transfer' THEN -t.accountMinor
+                       END) FROM ledger_pln t
                        WHERE t.accountId = a.id AND t.deleted = 0
                          AND t.occurredOn <= :through), 0)
-                    + COALESCE((SELECT SUM(t.amountMinor) FROM transactions t
+                    + COALESCE((SELECT SUM(t.transferAccountMinor) FROM ledger_pln t
                        WHERE t.transferAccountId = a.id AND t.kind = 'transfer'
                          AND t.deleted = 0 AND t.occurredOn <= :through), 0) AS balanceMinor,
                     a.archived AS archived, a.excludedFromSummary AS excludedFromSummary,

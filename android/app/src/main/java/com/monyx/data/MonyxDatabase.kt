@@ -18,7 +18,7 @@ import androidx.room.RoomDatabase
         FxRateEntity::class,
     ],
     views = [LedgerPln::class],
-    version = 10,
+    version = 11,
     exportSchema = true,
 )
 abstract class MonyxDatabase : RoomDatabase() {
