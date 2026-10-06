@@ -130,6 +130,13 @@ object Planned {
             categoryColorKey = rule.categoryColorKey,
             accountName = rule.accountName,
             transferAccountName = null,
+            // A rule has no currency of its own, so its occurrence will be
+            // written in the account's — see MonyxRepository.materializeRecurring.
+            // Both fields get it, which makes the projected row print as a
+            // plain amount in that unit rather than as a conversion between
+            // two: there is nothing to convert, the row simply IS in it.
+            currency = rule.accountCurrency,
+            accountCurrency = rule.accountCurrency,
             recurringRuleId = rule.id,
             // Neither. A row that was never written cannot be waiting to sync
             // and cannot have been refused; showing the cloud badge on one would

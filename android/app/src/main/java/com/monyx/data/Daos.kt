@@ -203,6 +203,14 @@ data class TransactionListItem(
     val currency: String = Currency.PLN.code,
     /** [amountMinor] in grosze, or null when no rate is known. See [LedgerPln]. */
     val plnMinor: Long? = null,
+    /**
+     * The currency of the account the row is listed under, which may differ from
+     * [currency] — 100 zł paid from a euro card is a złoty row on a euro
+     * account. See [LedgerPln.accountCurrency].
+     */
+    val accountCurrency: String = Currency.PLN.code,
+    /** [amountMinor] in [accountCurrency], or null when no rate is known. */
+    val accountMinor: Long? = null,
     /** Non-null when a repeating rule wrote this row rather than a person. */
     val recurringRuleId: String?,
     val pending: Int,
@@ -241,6 +249,16 @@ data class RecurringRuleListItem(
      */
     val categoryColorKey: String?,
     val accountName: String?,
+    /**
+     * The currency of the account the rule fires on.
+     *
+     * A rule has no currency of its own, so its occurrences are written in this
+     * — see [MonyxDao.accountCurrencies] and the note above it. Carried here so
+     * the PROJECTED row in the ledger is shown in the unit the real row will
+     * actually be written in, instead of being the one bare figure in a list of
+     * euro rows.
+     */
+    val accountCurrency: String = Currency.PLN.code,
     val generatedCount: Int,
     /** Where the household dragged it. See [RecurringRuleEntity.sortOrder]. */
     val sortOrder: Int,
@@ -945,8 +963,11 @@ interface MonyxDao {
                   t.recurringRuleId, t.pending, t.rejected,
                   -- The row prints amountMinor in its own currency; the month's
                   -- total adds up plnMinor. Reading the view rather than the
-                  -- table is what makes both available from one query.
-                  t.currency AS currency, t.plnMinor AS plnMinor
+                  -- table is what makes both available from one query — and
+                  -- accountCurrency/accountMinor with them, for the row whose
+                  -- currency is not the one its account is kept in.
+                  t.currency AS currency, t.plnMinor AS plnMinor,
+                  t.accountCurrency AS accountCurrency, t.accountMinor AS accountMinor
            FROM ledger_pln t
            LEFT JOIN categories c ON c.id = t.categoryId
            LEFT JOIN categories pc ON pc.id = c.parentId
@@ -997,8 +1018,11 @@ interface MonyxDao {
                   t.recurringRuleId, t.pending, t.rejected,
                   -- The row prints amountMinor in its own currency; the month's
                   -- total adds up plnMinor. Reading the view rather than the
-                  -- table is what makes both available from one query.
-                  t.currency AS currency, t.plnMinor AS plnMinor
+                  -- table is what makes both available from one query — and
+                  -- accountCurrency/accountMinor with them, for the row whose
+                  -- currency is not the one its account is kept in.
+                  t.currency AS currency, t.plnMinor AS plnMinor,
+                  t.accountCurrency AS accountCurrency, t.accountMinor AS accountMinor
            FROM ledger_pln t
            LEFT JOIN categories c ON c.id = t.categoryId
            LEFT JOIN categories pc ON pc.id = c.parentId
@@ -1024,7 +1048,7 @@ interface MonyxDao {
                   c.name AS categoryName, c.icon AS categoryIcon,
                   COALESCE(c.color, pc.color) AS categoryColor,
                   COALESCE(c.parentId, c.id) AS categoryColorKey,
-                  a.name AS accountName,
+                  a.name AS accountName, COALESCE(a.currency, 'PLN') AS accountCurrency,
                   (SELECT COUNT(*) FROM transactions t
                     WHERE t.recurringRuleId = r.id AND t.deleted = 0) AS generatedCount,
                   r.sortOrder, r.pending, r.rejected

@@ -272,13 +272,15 @@ class CurrencyTest {
     }
 
     @Test
-    fun `an account tile leads with zloty and keeps its own money beside it`() {
-        // One line, złoty first: the strip is what Bilans is the sum of. The
-        // brackets are what let the second figure share the line instead of
-        // making exactly one tile in the strip taller than its neighbours.
+    fun `an account tile leads with its own money and keeps zloty beside it`() {
+        // One line, the account's own currency first: a tile is that one
+        // account's position, and "how many euro have I got" is what the strip
+        // is opened to answer. The brackets are what let the złoty figure share
+        // the line instead of making exactly one tile taller than its
+        // neighbours. 0.23.1 had these the other way round.
         val euro = Money.accountStripFigure(15_00, Currency.EUR, 65_78)
-        assertEquals(Money.formatWithCurrency(65_78), euro.main)
-        assertEquals("(${Money.formatIn(15_00, Currency.EUR)})", euro.aside)
+        assertEquals(Money.formatIn(15_00, Currency.EUR), euro.main)
+        assertEquals("(${Money.formatWithCurrency(65_78)})", euro.aside)
 
         val zloty = Money.accountStripFigure(100_00, Currency.PLN, 100_00)
         assertEquals(Money.formatWithCurrency(100_00), zloty.main)
@@ -286,13 +288,65 @@ class CurrencyTest {
     }
 
     @Test
-    fun `an account with no rate shows an em dash and not a disguised figure`() {
-        // Here the converted figure IS the headline, so its absence has to be
-        // visible — printing 15,00 with "zł" after it would assert something
-        // false about how much money there is.
+    fun `an account with no rate still shows its own balance`() {
+        // The money is not hidden — it is the headline figure now. What is
+        // missing is the conversion, and that is said with an em dash inside the
+        // brackets rather than by dropping them, or the tile would look like a
+        // złoty account.
         val tile = Money.accountStripFigure(15_00, Currency.EUR, null)
-        assertEquals("—", tile.main)
-        assertEquals("(${Money.formatIn(15_00, Currency.EUR)})", tile.aside)
+        assertEquals(Money.formatIn(15_00, Currency.EUR), tile.main)
+        assertEquals("(—)", tile.aside)
+    }
+
+    @Test
+    fun `a zloty row on a foreign account shows both, zloty leading`() {
+        // The report this came from: 100 zł paid from a euro card sat in a list
+        // of euro rows as a bare "100,00", which reads as euro. Złoty leads
+        // because złoty is what happened; the euro figure is what the account's
+        // other rows are in.
+        val row = Money.ledgerRowFigure(
+            amountMinor = 100_00,
+            kind = "expense",
+            currency = Currency.PLN,
+            plnMinor = 100_00,
+            accountCurrency = Currency.EUR,
+            accountMinor = 22_80,
+        )
+        assertEquals("${Money.formatSigned(100_00, "expense")} zł", row.main)
+        assertEquals("${Money.formatSigned(22_80, "expense")} €", row.aside)
+    }
+
+    @Test
+    fun `a zloty row on a foreign account with no rate still says zloty`() {
+        // The unit of the figure is known even when the conversion is not, and
+        // it is the half that matters: without it the row reads as euro.
+        val row = Money.ledgerRowFigure(
+            amountMinor = 100_00,
+            kind = "expense",
+            currency = Currency.PLN,
+            plnMinor = 100_00,
+            accountCurrency = Currency.EUR,
+            accountMinor = null,
+        )
+        assertEquals("${Money.formatSigned(100_00, "expense")} zł", row.main)
+        assertNull(row.aside)
+    }
+
+    @Test
+    fun `the row's own currency wins over its account's`() {
+        // A euro row on a euro account converts to złoty, not to itself. The
+        // account's currency decides the SECOND figure only, and only for a row
+        // that is already in złoty.
+        val row = Money.ledgerRowFigure(
+            amountMinor = 15_00,
+            kind = "expense",
+            currency = Currency.EUR,
+            plnMinor = 65_78,
+            accountCurrency = Currency.EUR,
+            accountMinor = 15_00,
+        )
+        assertEquals("${Money.formatSigned(15_00, "expense")} €", row.main)
+        assertEquals("${Money.formatSigned(65_78, "expense")} zł", row.aside)
     }
 
     // ------------------------------------------- one entry's own currency

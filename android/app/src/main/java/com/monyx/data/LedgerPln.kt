@@ -53,6 +53,43 @@ import androidx.room.DatabaseView
 @DatabaseView(
     viewName = "ledger_pln",
     value = """
+        SELECT x.id AS id,
+               x.kind AS kind,
+               x.amountMinor AS amountMinor,
+               x.accountId AS accountId,
+               x.transferAccountId AS transferAccountId,
+               x.categoryId AS categoryId,
+               x.note AS note,
+               x.occurredAt AS occurredAt,
+               x.occurredOn AS occurredOn,
+               x.createdBy AS createdBy,
+               x.source AS source,
+               x.recurringRuleId AS recurringRuleId,
+               x.deleted AS deleted,
+               x.pending AS pending,
+               x.rejected AS rejected,
+               x.currency AS currency,
+               x.plnMinor AS plnMinor,
+               COALESCE(a.currency, 'PLN') AS accountCurrency,
+               CASE
+                   -- The ordinary row: it is already in its account's money.
+                   WHEN COALESCE(a.currency, 'PLN') = x.currency THEN x.amountMinor
+                   -- A foreign row on a złoty account: the złoty figure IS the
+                   -- account's figure, already computed.
+                   WHEN COALESCE(a.currency, 'PLN') = 'PLN' THEN x.plnMinor
+                   -- A złoty (or third-currency) row on a foreign account, which
+                   -- is the case this column exists for: back OUT of złoty at
+                   -- the account's own rate on the row's date. Multiplying
+                   -- before dividing keeps it in integers; 1e9 grosze times 1e6
+                   -- is 1e15, well inside Int64.
+                   ELSE (x.plnMinor * 1000000) / (
+                           SELECT r.rateMicro FROM fx_rates r
+                            WHERE r.currency = a.currency
+                              AND r.effectiveOn <= x.occurredOn
+                            ORDER BY r.effectiveOn DESC LIMIT 1
+                       )
+               END AS accountMinor
+          FROM (
         SELECT t.id AS id,
                t.kind AS kind,
                t.amountMinor AS amountMinor,
@@ -78,6 +115,8 @@ import androidx.room.DatabaseView
                          )) / 1000000
                END AS plnMinor
           FROM transactions t
+          ) x
+          LEFT JOIN accounts a ON a.id = x.accountId
     """,
 )
 data class LedgerPln(
@@ -101,4 +140,22 @@ data class LedgerPln(
     val currency: String,
     /** [amountMinor] in grosze, or null when the rate is unknown. */
     val plnMinor: Long?,
+    /**
+     * The currency of the account the row sits on, which is NOT [currency] — see
+     * the class comment. Carried so a row can be shown in both the unit it was
+     * entered in and the unit of the account it is listed under.
+     */
+    val accountCurrency: String,
+    /**
+     * [amountMinor] expressed in [accountCurrency], or null when the rate is
+     * unknown. Equal to [amountMinor] for the ordinary row whose currency is its
+     * account's, and to [plnMinor] on a złoty account.
+     *
+     * Converted THROUGH złoty, because złoty is the only currency fx_rates is
+     * keyed on: 100 zł on a euro account is 100 zł divided by the euro rate. A
+     * cross-rate between two foreign currencies therefore carries both roundings
+     * and is not expected to reconcile to the grosz with a bank's own figure.
+     * Nothing sums this column — it exists to be printed on one row.
+     */
+    val accountMinor: Long?,
 )

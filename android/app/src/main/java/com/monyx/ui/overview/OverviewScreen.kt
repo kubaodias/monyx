@@ -1051,15 +1051,9 @@ private fun AccountButton(
             }
         }
         Spacer(modifier = Modifier.height(2.dp))
-        // "-65,78 zł (-15,00 €)" — one line, złoty leading. See
-        // Money.accountStripFigure for why that order and why one line: a
-        // foreign account used to take a second line here, which made exactly
-        // one tile in the strip taller than its neighbours.
+        // "-15,00 € (-65,78 zł)" — one line, the account's own money leading.
+        // See Money.accountStripFigure for why that order and why one line.
         val figure = Money.accountStripFigure(balanceMinor, currency, plnMinor)
-        // Red follows the figure actually printed, which for a foreign account
-        // is the converted one — and is nothing at all when no rate is known,
-        // so an em dash is not drawn as though it were a debt.
-        val printedMinor = (if (currency.isReporting) balanceMinor else plnMinor) ?: 0L
         Row(
             verticalAlignment = Alignment.Bottom,
             horizontalArrangement = Arrangement.spacedBy(4.dp),
@@ -1068,7 +1062,11 @@ private fun AccountButton(
                 text = figure.main,
                 style = MaterialTheme.typography.bodyMedium.copy(fontFeatureSettings = "tnum"),
                 maxLines = 1,
-                color = if (printedMinor < 0) {
+                // The headline figure is the account's own balance now, in
+                // every case, so red follows it directly — no rate is involved
+                // and an unconverted account is not drawn as though it were a
+                // debt.
+                color = if (balanceMinor < 0) {
                     MaterialTheme.colorScheme.error
                 } else {
                     MaterialTheme.colorScheme.onSurfaceVariant

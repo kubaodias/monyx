@@ -200,3 +200,38 @@ the control two inches from the figure it describes and a question-and-answer
 apart. A missing rate still shows an em dash on the tile, where the converted
 figure is the headline, and shows nothing on a row, where the amount that
 happened is already on the line above in the unit it happened in.
+
+## Addendum, 2026-10-06: a tile leads with its own money, and złoty is not always the second figure
+
+Two corrections to the addendum above, both from use.
+
+**The Overview tile now leads with the account's own currency**:
+`-15,00 € (-65,78 zł)`. The previous order was argued from the total — the strip
+is what Bilans is the sum of — which is true of the total and not of the tile. A
+tile is one account's position, and the question it is opened to answer is how
+much is in that account. The złoty figure stays in brackets, so the strip is
+still visibly what the total adds up to. A missing rate is now an em dash
+*inside* the brackets rather than in place of the headline: the money is no
+longer the thing that goes missing.
+
+**A złoty row on a foreign account shows both units too, with złoty leading.**
+This was the real gap: conversion was only ever offered in one direction, so
+100 zł paid from a euro card sat in a list of euro rows as a bare "100,00" and
+read as euro. The row now prints `-100,00 zł` over `-22,80 €` — złoty first,
+because złoty is what happened.
+
+That second figure is `ledger_pln.accountMinor`, and it is converted **through
+złoty**, because złoty is the only base `fx_rates` is keyed on: the amount goes
+to grosze at its own currency's rate, then out again at the account's. A euro row
+on a dollar account therefore carries two roundings and is not expected to
+reconcile to the cent against a bank's own cross rate. Nothing sums this column —
+it is printed on one row, next to the figure it is a restatement of.
+
+The view grew a `LEFT JOIN accounts` to get there, which is the first time
+`ledger_pln` has needed anything outside `transactions`. The ten aggregates read
+`plnMinor` and are untouched by it.
+
+**A projected row takes its account's currency**, since that is the unit the
+occurrence will be written in when the rule fires. Without it the one bare figure
+in a list of euro rows would have been the repeating one — the gap below made
+visible in a new place rather than fixed.
