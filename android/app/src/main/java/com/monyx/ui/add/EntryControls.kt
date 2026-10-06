@@ -68,6 +68,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.isFinite
 import androidx.compose.ui.unit.sp
@@ -491,6 +492,13 @@ internal fun CategoryGrid(
      * nothing to pin and no space to leave: everything is simply on screen.
      */
     pinFamily: Boolean = false,
+    /**
+     * How tall [footer] is, which the grid cannot ask it: a lazy item measures
+     * itself and reports nothing back. Only read when [pinFamily] is set, to
+     * decide how much of the window the family block may take and still leave
+     * the footer on screen under it.
+     */
+    footerHeight: Dp = 0.dp,
     state: LazyGridState = rememberLazyGridState(),
 ) {
     val roots = remember(categories) {
@@ -518,9 +526,7 @@ internal fun CategoryGrid(
     // room for everything anyway. See [pinFamily].
     val pinned = pinFamily && family
     val familyIndex = listed.size
-    val lastIndex = familyIndex +
-        (if (family) 1 else 0) +
-        (if (footer != null && !pinned) 1 else 0) - 1
+    val lastIndex = familyIndex + (if (family) 1 else 0) + (if (footer != null) 1 else 0) - 1
 
     // Opening a family brings it into view.
     //
@@ -538,14 +544,19 @@ internal fun CategoryGrid(
     // has nowhere to go and does nothing, which is the case the moment the
     // keypad stands down.
     //
-    // Keyed on the family, so choosing between the children it just revealed
-    // does not scroll again — and on [pinned], because the keypad standing
-    // down is what un-pins the block and that has to let the roots back. The
-    // FIRST composition is skipped deliberately: the edit sheet opens on a row
-    // that may already be filed under a subcategory, and a sheet that arrives
-    // mid-scroll looks like it was left that way.
+    // Keyed on the family and NOTHING else, so nothing but opening a family
+    // ever moves the list. It was keyed on [pinned] as well, to put the roots
+    // back when the keypad stood down — which meant a tap on a subcategory,
+    // which is what makes the keypad stand down, jumped the grid to the top.
+    // Nothing had to: once the block stops being a window tall the content no
+    // longer overflows, and a lazy list clamps its own offset to zero when that
+    // happens. The roots come back because there is room for them.
+    //
+    // The FIRST composition is skipped deliberately: the edit sheet opens on a
+    // row that may already be filed under a subcategory, and a sheet that
+    // arrives mid-scroll looks like it was left that way.
     var settled by remember { mutableStateOf(false) }
-    LaunchedEffect(openRootId, pinned) {
+    LaunchedEffect(openRootId) {
         if (!settled) {
             settled = true
             return@LaunchedEffect
@@ -564,12 +575,16 @@ internal fun CategoryGrid(
     // answer and is the wrong one — it sets an exact height, so a family with
     // three rows of children would be clipped by it rather than scrolling.
     BoxWithConstraints(modifier = modifier.fillMaxWidth()) {
-        // Minus the grid's own vertical padding, so the block is a window and
-        // not a window plus 20dp. Zero when the grid has been given no height
-        // to speak of, or an unbounded one — neither happens where it is used
-        // today, and both would otherwise end up inside a size modifier.
-        val windowHeight = if (maxHeight.isFinite) {
-            (maxHeight - 20.dp).coerceAtLeast(0.dp)
+        // How tall the family block should be when it is pinned: the window,
+        // less the grid's own vertical padding, less the footer and the line
+        // of spacing above it — because the footer stays an item of its own
+        // and the block has to leave room for it rather than contain it.
+        //
+        // Zero when the grid has been given no height to speak of, or an
+        // unbounded one — neither happens where it is used today, and both
+        // would otherwise end up inside a size modifier.
+        val blockHeight = if (maxHeight.isFinite) {
+            (maxHeight - 20.dp - footerHeight - 10.dp).coerceAtLeast(0.dp)
         } else {
             0.dp
         }
@@ -609,8 +624,8 @@ internal fun CategoryGrid(
         if (family) {
             item(key = "family", span = { GridItemSpan(maxLineSpan) }) {
                 Column(
-                    modifier = if (pinned && windowHeight > 0.dp) {
-                        Modifier.heightIn(min = windowHeight)
+                    modifier = if (pinned && blockHeight > 0.dp) {
+                        Modifier.heightIn(min = blockHeight)
                     } else {
                         Modifier
                     },
@@ -651,15 +666,25 @@ internal fun CategoryGrid(
                     if (pinned) {
                         // The empty half of the window. The subcategories are
                         // what the screen is asking about and they are at the
-                        // top of it; the note is where it always is, at the
-                        // bottom, above the keys.
+                        // top of it; below them is the room the footer needs
+                        // and nothing else.
+                        //
+                        // A weight inside a Column with no maximum height
+                        // works because `heightIn` gave it a minimum: Compose
+                        // falls back to the minimum when the maximum is
+                        // unbounded, so the slack is this block's own.
                         Spacer(Modifier.weight(1f))
-                        footer?.invoke()
                     }
                 }
             }
         }
-        if (footer != null && !pinned) {
+        // ALWAYS its own item, pinned or not. It used to move inside the block
+        // when the grid was pinned, which meant the note field was destroyed
+        // and rebuilt at the exact moment the keypad stood down — and a field
+        // rebuilt as it gains focus loses it, so tapping the note did nothing
+        // and took a second tap. Nothing about the note's node changes now; the
+        // block above it is what grows.
+        if (footer != null) {
             item(key = "footer", span = { GridItemSpan(maxLineSpan) }) { footer() }
         }
         }

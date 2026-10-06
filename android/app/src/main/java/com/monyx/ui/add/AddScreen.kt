@@ -173,6 +173,12 @@ fun AddScreen(
     // line off screen with it.
     var refused by remember { mutableStateOf(false) }
 
+    // The family the amount line is carrying, and the one the grid is not
+    // listing. Hoisted because the mark's own tap needs its id.
+    val mark = remember(state.categoryId, categories, colorOf) {
+        categoryMarkOf(categories, state.categoryId, colorOf)
+    }
+
     /**
      * What is still missing, in the order it is asked for.
      *
@@ -300,9 +306,7 @@ fun AddScreen(
             onPickCurrency = { showCurrencyPicker = true },
             // The chosen family, beside the figure, where the grid cannot
             // scroll it away — and where the grid no longer lists it.
-            categoryMark = remember(state.categoryId, categories, colorOf) {
-                categoryMarkOf(categories, state.categoryId, colorOf)
-            },
+            categoryMark = mark,
             // Back to the families. The grid is scrolled past them whenever a
             // family is open, and this is the control that is about the family.
             //
@@ -314,6 +318,11 @@ fun AddScreen(
             onMarkClick = {
                 focusManager.clearFocus(force = true)
                 keyboard?.hide()
+                // Files the row on the family, which drops any subcategory
+                // under it: the family is what the mark says, so a tap on it
+                // is "this one, not one of its children". Harmless when the
+                // family is already the choice — the same id goes back in.
+                mark?.id?.let(viewModel::selectCategory)
                 scope.launch { gridState.animateScrollToItem(0) }
             },
         )
@@ -360,6 +369,7 @@ fun AddScreen(
             // the roots, so the family takes a window of its own. See
             // [CategoryGrid.pinFamily].
             pinFamily = editing != Editing.Nothing,
+            footerHeight = NoteFieldHeight,
             state = gridState,
             modifier = Modifier.weight(1f),
         )
@@ -523,6 +533,16 @@ private fun ContextRow(
         )
     }
 }
+
+/**
+ * How tall [NoteField] is: its own 44dp plus the 4dp it is padded by, twice.
+ *
+ * Stated rather than measured because [CategoryGrid] has to leave room for it
+ * in a window it is dividing up, and a lazy grid cannot ask an item its height
+ * before it has one. The field's height is fixed, so this is a fact and not an
+ * estimate — but it is a fact in two places, so they are named together.
+ */
+internal val NoteFieldHeight = 52.dp
 
 /**
  * The note, at 44dp rather than a text field's usual 56.
