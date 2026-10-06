@@ -16,10 +16,12 @@ import androidx.room.DatabaseView
  * happened is what it was entered as. The account's currency is only the unit of
  * its opening balance and the default a new entry starts in.
  *
- * Both legs of a transfer use the one amount and so the one converted figure:
- * a transfer is a single row with a single amount, and this app has never
- * modelled "100 zł left and 23 € arrived" as two figures. [transferPlnMinor] is
- * gone with the account-based conversion that justified it.
+ * Both legs of a transfer use the one amount and so the one ZŁOTY figure: a
+ * transfer is a single row with a single amount, and this app has never modelled
+ * "100 zł left and 23 € arrived" as two figures. In the units of the two
+ * ACCOUNTS they do differ — 100 zł leaving a euro card arrives in a dollar
+ * account as neither of those — which is what [accountMinor] and
+ * [transferAccountMinor] are for.
  *
  * **Converted at the rate on the transaction's own date**, not today's. A
  * transaction is an event that happened on a day; the rate that day is a fact.
@@ -42,7 +44,14 @@ import androidx.room.DatabaseView
  * It carries every column of `transactions` plus the converted amounts, so a
  * query can read this in place of the table and lose nothing — which is what the
  * ledger list does, to show each row in the unit it was entered in and still
- * total the month in złoty.
+ * total the month in złoty, and what [MonyxDao.accountBalances] does to add up
+ * one account's position in that account's own money.
+ *
+ * That last one is why the view joins `accounts` at all, and it is the only
+ * sum in the app that is deliberately not in złoty: an account's balance is in
+ * the account's currency, so every row on it has to be converted INTO that
+ * currency before being added. Summing raw `amountMinor` there is what made a
+ * euro account read "-100,00 €" for a 100 zł purchase.
  *
  * Integer division by 1000000 matches `convertMinor` on the server, which
  * rounds half away from zero. SQLite's integer division truncates toward zero
@@ -88,7 +97,18 @@ import androidx.room.DatabaseView
                               AND r.effectiveOn <= x.occurredOn
                             ORDER BY r.effectiveOn DESC LIMIT 1
                        )
-               END AS accountMinor
+               END AS accountMinor,
+               CASE
+                   WHEN x.transferAccountId IS NULL THEN NULL
+                   WHEN COALESCE(tb.currency, 'PLN') = x.currency THEN x.amountMinor
+                   WHEN COALESCE(tb.currency, 'PLN') = 'PLN' THEN x.plnMinor
+                   ELSE (x.plnMinor * 1000000) / (
+                           SELECT r.rateMicro FROM fx_rates r
+                            WHERE r.currency = tb.currency
+                              AND r.effectiveOn <= x.occurredOn
+                            ORDER BY r.effectiveOn DESC LIMIT 1
+                       )
+               END AS transferAccountMinor
           FROM (
         SELECT t.id AS id,
                t.kind AS kind,
@@ -117,12 +137,14 @@ import androidx.room.DatabaseView
           FROM transactions t
           ) x
           LEFT JOIN accounts a ON a.id = x.accountId
+          LEFT JOIN accounts tb ON tb.id = x.transferAccountId
     """,
 )
 data class LedgerPln(
     val id: String,
     val kind: String,
-    /** The amount as entered, in the account's own currency. */
+    /** The amount as entered, in [currency] — which is the ROW's, not its
+     *  account's. */
     val amountMinor: Long,
     val accountId: String,
     val transferAccountId: String?,
@@ -155,7 +177,21 @@ data class LedgerPln(
      * keyed on: 100 zł on a euro account is 100 zł divided by the euro rate. A
      * cross-rate between two foreign currencies therefore carries both roundings
      * and is not expected to reconcile to the grosz with a bank's own figure.
-     * Nothing sums this column — it exists to be printed on one row.
+     * Nothing sums this column — it exists to be printed on one row, and to add
+     * up one account's own balance in [MonyxDao.accountBalances], which is the
+     * one sum that is legitimately not in złoty.
      */
     val accountMinor: Long?,
+    /**
+     * [amountMinor] in the currency of the account money is transferred INTO, or
+     * null when the row is not a transfer or the rate is unknown.
+     *
+     * The two legs of a transfer need different figures as soon as the accounts
+     * are in different currencies — 100 zł leaving a euro card arrives in a
+     * dollar account as neither 100 nor the euro amount. #62 removed a
+     * `transferPlnMinor` on the grounds that a transfer has one amount and so
+     * one converted figure, which is true in złoty and false in the units of the
+     * two accounts.
+     */
+    val transferAccountMinor: Long?,
 )
