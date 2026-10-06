@@ -450,6 +450,10 @@ fun EditTransactionSheet(
                         }
                     },
                     footer = noteField,
+                    // As on the add screen: with the keys or the keyboard up
+                    // there is no room for a family under the roots, so it
+                    // takes a window of its own.
+                    pinFamily = keypadUp || noteFocused,
                     state = gridState,
                     modifier = Modifier.weight(1f),
                 )
