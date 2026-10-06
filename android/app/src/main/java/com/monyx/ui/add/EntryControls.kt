@@ -43,8 +43,11 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -300,6 +303,35 @@ internal fun CategoryGrid(
     val selected = categories.firstOrNull { it.id == selectedId }
     val openRootId = selected?.let { it.parentId ?: it.id }
     val children = openRootId?.let { childrenOf[it] }.orEmpty()
+
+    // Opening a family brings it into view.
+    //
+    // The children are appended after ALL the roots, not under the parent that
+    // was tapped — a lazy grid has one flat list of items — so on a household
+    // with enough categories to fill the window, picking "Dom" revealed a row
+    // of subcategories below the fold and nothing on screen moved. The grid
+    // looked like it had merely dimmed everything.
+    //
+    // Scrolling to the LAST item is the whole rule: the children are the last
+    // thing in the grid apart from the footer, so the end of the content is
+    // where they are, and a lazy grid clamps at its own maximum scroll — so
+    // this is "show the bottom" and never an overshoot. Where everything
+    // already fits, which is the common case once the keypad stands down, the
+    // scroll has nowhere to go and does nothing.
+    //
+    // Keyed on the family, so choosing between the children it just revealed
+    // does not scroll again. The FIRST composition is skipped deliberately: the
+    // edit sheet opens on a row that may already be filed under a subcategory,
+    // and a sheet that arrives mid-scroll looks like it was left that way.
+    var settled by remember { mutableStateOf(false) }
+    LaunchedEffect(openRootId) {
+        if (!settled) {
+            settled = true
+            return@LaunchedEffect
+        }
+        if (children.isEmpty()) return@LaunchedEffect
+        state.animateScrollToItem(roots.size + children.size + if (footer != null) 1 else 0)
+    }
 
     LazyVerticalGrid(
         state = state,

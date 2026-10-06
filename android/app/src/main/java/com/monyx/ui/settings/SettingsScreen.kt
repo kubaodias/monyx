@@ -168,6 +168,45 @@ fun SettingsScreen(onOpenAccountTransactions: (accountId: String, period: String
     // nullable rule, because "add" and "edit rule X" are both open states and
     // only one of them has a rule behind it.
     var editor by remember { mutableStateOf<RuleSeed?>(null) }
+    // And while the account editor is. Same shape, and for the same reason it
+    // is not a dialog any more: eight controls and a save button do not fit in
+    // a box a third of the screen tall. See [AccountEditor].
+    var accountEditor by remember { mutableStateOf<AccountSeed?>(null) }
+
+    accountEditor?.let { seed ->
+        // As below: the editor REPLACES the settings content, so without this
+        // the back gesture would go past it to the tab before Settings.
+        BackHandler { accountEditor = null }
+        AccountEditor(
+            seed = seed,
+            onDismiss = { accountEditor = null },
+            onSave = { name, balanceMinor, icon, color, inSummary, currency ->
+                val id = seed.accountId
+                if (id == null) {
+                    // A brand new account has no transactions, so the balance
+                    // typed IS the opening balance.
+                    viewModel.addAccount(name, balanceMinor, icon, color, inSummary, currency)
+                } else {
+                    // Balance = opening + movements, so a typed balance decides
+                    // the opening one and not the other way round.
+                    accounts.firstOrNull { it.entity.id == id }?.let { row ->
+                        viewModel.updateAccount(
+                            row.entity.copy(
+                                name = name,
+                                initialBalanceMinor = balanceMinor - seed.movementsMinor,
+                                icon = icon,
+                                color = color,
+                                excludedFromSummary = if (inSummary) 0 else 1,
+                                currency = currency.code,
+                            ),
+                        )
+                    }
+                }
+                accountEditor = null
+            },
+        )
+        return
+    }
 
     editor?.let { seed ->
         // Back closes the editor and lands on Settings, which is where it was
@@ -230,8 +269,7 @@ fun SettingsScreen(onOpenAccountTransactions: (accountId: String, period: String
                     item {
                         AccountsSection(
                             accounts = accounts,
-                            onAdd = viewModel::addAccount,
-                            onUpdate = viewModel::updateAccount,
+                            onOpenEditor = { accountEditor = it },
                             onArchive = viewModel::setAccountArchived,
                             onDelete = viewModel::deleteAccount,
                             onReorder = viewModel::reorderAccounts,

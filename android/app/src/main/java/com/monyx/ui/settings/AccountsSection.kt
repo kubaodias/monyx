@@ -9,6 +9,8 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -22,20 +24,24 @@ import androidx.compose.material.icons.automirrored.filled.ReceiptLong
 import androidx.compose.material.icons.filled.AccountBalanceWallet
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Archive
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.RemoveCircleOutline
 import androidx.compose.material.icons.filled.Unarchive
-import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -63,8 +69,47 @@ import androidx.compose.material3.MenuAnchorType
 import androidx.compose.material3.ExperimentalMaterial3Api
 
 /**
- * Accounts: list, add, edit, archive, restore and delete. Editing offers name,
- * balance, icon and colour.
+ * What [AccountEditor] opens on: a new account, or the one being edited.
+ *
+ * A seed rather than a nullable row, for the reason [RuleSeed] is one — "add"
+ * and "edit this account" are both open states and only one of them has a row
+ * behind it. [accountId] is what tells them apart, and the editor itself never
+ * touches an entity: it hands six values back and Settings decides whether that
+ * is an insert or a copy.
+ */
+data class AccountSeed(
+    val accountId: String? = null,
+    val name: String = "",
+    /** What the account holds NOW. See [AccountEditor]. */
+    val balanceMinor: Long = 0,
+    /**
+     * Everything the transactions have added and taken away since it opened,
+     * so the editor can work the opening balance backwards from a typed one.
+     * Zero for a new account, which has no transactions yet.
+     */
+    val movementsMinor: Long = 0,
+    val icon: String? = null,
+    val color: String? = null,
+    val inSummary: Boolean = true,
+    val currency: Currency = Currency.PLN,
+) {
+    companion object {
+        fun of(row: AccountRow): AccountSeed = AccountSeed(
+            accountId = row.entity.id,
+            name = row.entity.name,
+            balanceMinor = row.balanceMinor,
+            movementsMinor = row.balanceMinor - row.entity.initialBalanceMinor,
+            icon = row.entity.icon,
+            color = row.entity.color,
+            inSummary = row.entity.excludedFromSummary == 0,
+            currency = Currency.of(row.entity.currency),
+        )
+    }
+}
+
+/**
+ * Accounts: list, add, edit, archive, restore and delete. Editing is
+ * [AccountEditor], a screen of its own that Settings swaps itself for.
  *
  * Archived accounts sit in their own section below the open ones rather than
  * behind a screen of their own — the whole point of an archive is that it is
@@ -73,22 +118,14 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 @Composable
 fun AccountsSection(
     accounts: List<AccountRow>,
-    onAdd: (
-        name: String,
-        initialBalanceMinor: Long,
-        icon: String?,
-        color: String?,
-        inSummary: Boolean,
-        currency: Currency,
-    ) -> Unit,
-    onUpdate: (AccountEntity) -> Unit,
+    /** A new account with no seed, or one of the rows below. Settings owns the
+     *  open state, because the editor replaces the whole settings screen. */
+    onOpenEditor: (AccountSeed) -> Unit,
     onArchive: (AccountEntity, Boolean) -> Unit,
     onDelete: (AccountEntity) -> Unit,
     onReorder: (List<AccountEntity>) -> Unit,
     onOpenTransactions: (accountId: String, period: String?) -> Unit,
 ) {
-    var showAdd by remember { mutableStateOf(false) }
-    var editing by remember { mutableStateOf<AccountRow?>(null) }
     var deleting by remember { mutableStateOf<AccountEntity?>(null) }
     var archiving by remember { mutableStateOf<AccountEntity?>(null) }
 
@@ -107,7 +144,7 @@ fun AccountsSection(
         title = stringResource(R.string.settings_accounts),
         icon = Icons.Filled.AccountBalanceWallet,
         trailing = {
-            IconButton(onClick = { showAdd = true }) {
+            IconButton(onClick = { onOpenEditor(AccountSeed()) }) {
                 Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.settings_add_account))
             }
         },
@@ -132,7 +169,7 @@ fun AccountsSection(
                     dragging = dragging,
                     muted = false,
                     onOpenTransactions = onOpenTransactions,
-                    onEdit = { editing = row },
+                    onEdit = { onOpenEditor(AccountSeed.of(row)) },
                     onArchive = { archiving = row.entity },
                     onRestore = null,
                     onDelete = { deleting = row.entity },
@@ -148,7 +185,7 @@ fun AccountsSection(
                     dragging = false,
                     muted = true,
                     onOpenTransactions = onOpenTransactions,
-                    onEdit = { editing = row },
+                    onEdit = { onOpenEditor(AccountSeed.of(row)) },
                     onArchive = { archiving = row.entity },
                     onRestore = null,
                     onDelete = { deleting = row.entity },
@@ -171,7 +208,7 @@ fun AccountsSection(
                         dragging = false,
                         muted = true,
                         onOpenTransactions = onOpenTransactions,
-                        onEdit = { editing = row },
+                        onEdit = { onOpenEditor(AccountSeed.of(row)) },
                         onArchive = null,
                         // Restoring is not destructive and is the whole reason the
                         // row is still here, so it needs no confirmation.
@@ -193,58 +230,6 @@ fun AccountsSection(
                 archiving = null
             },
             onDismiss = { archiving = null },
-        )
-    }
-
-    if (showAdd) {
-        AccountEditDialog(
-            title = stringResource(R.string.settings_add_account),
-            initialName = "",
-            balanceMinor = 0,
-            // A brand new account has no transactions, so the balance being
-            // typed IS the opening balance.
-            movementsMinor = 0,
-            initialIcon = null,
-            initialColor = null,
-            initialInSummary = true,
-            initialCurrency = Currency.PLN,
-            onDismiss = { showAdd = false },
-            onSave = { name, balanceMinor, icon, color, inSummary, currency ->
-                onAdd(name, balanceMinor, icon, color, inSummary, currency)
-                showAdd = false
-            },
-        )
-    }
-
-    editing?.let { row ->
-        val entity = row.entity
-        // Everything the transactions have done to this account since it was
-        // opened. Balance = opening + movements, so a typed balance decides the
-        // opening one and not the other way round.
-        val movements = row.balanceMinor - entity.initialBalanceMinor
-        AccountEditDialog(
-            title = stringResource(R.string.settings_edit_account),
-            initialName = entity.name,
-            balanceMinor = row.balanceMinor,
-            movementsMinor = movements,
-            initialIcon = entity.icon,
-            initialColor = entity.color,
-            initialInSummary = entity.excludedFromSummary == 0,
-            initialCurrency = Currency.of(entity.currency),
-            onDismiss = { editing = null },
-            onSave = { name, balanceMinor, icon, color, inSummary, currency ->
-                onUpdate(
-                    entity.copy(
-                        name = name,
-                        initialBalanceMinor = balanceMinor - movements,
-                        icon = icon,
-                        color = color,
-                        excludedFromSummary = if (inSummary) 0 else 1,
-                        currency = currency.code,
-                    ),
-                )
-                editing = null
-            },
         )
     }
 
@@ -423,9 +408,9 @@ private fun AccountRowItem(
 }
 
 /**
- * A hairline between two parts of the account dialog.
+ * A hairline between two parts of the account editor.
  *
- * The dialog asks four unrelated things — what it is called and what is in it,
+ * The form asks four unrelated things — what it is called and what is in it,
  * what it looks like, what colour, and whether it counts — and as one unbroken
  * column of controls the eye could not tell where one question ended and the
  * next began. Thin and faint: it is punctuation, not a border.
@@ -439,6 +424,20 @@ private fun SectionRule() {
 }
 
 /**
+ * Adding or editing an account, full screen.
+ *
+ * It was an `AlertDialog`, and it was the same mistake the rule editor made
+ * before ADR 0014: eight controls, two swatch rows and a dropdown inside a box
+ * a third of the screen tall, with the body scrolling and the Save button
+ * pinned outside that scroll — so the field being filled in and the button
+ * being aimed for were never both on screen. A form this long is a screen.
+ *
+ * It REPLACES the settings content rather than floating over it, for the reason
+ * [RecurringEditor] does: a full-screen `Dialog` has to be told how tall the
+ * screen is and gets it wrong, placing its window below the status bar while
+ * measuring its content against the whole display — which puts the save button
+ * a status bar's worth below the bottom edge.
+ *
  * The balance field is the balance the account has NOW, not the one it opened
  * with.
  *
@@ -451,19 +450,13 @@ private fun SectionRule() {
  * field holding a months-old opening figure moved the account by the difference
  * twice over.
  *
- * @param movementsMinor everything the transactions have added and taken away
- *   since. Zero for a new account, which is why the same dialog does both jobs.
+ * @param seed what the form opens on; [AccountSeed.movementsMinor] is zero for
+ *   a new account, which is why the same form does both jobs.
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun AccountEditDialog(
-    title: String,
-    initialName: String,
-    balanceMinor: Long,
-    movementsMinor: Long,
-    initialIcon: String?,
-    initialColor: String?,
-    initialInSummary: Boolean,
-    initialCurrency: Currency,
+fun AccountEditor(
+    seed: AccountSeed,
     onDismiss: () -> Unit,
     onSave: (
         name: String,
@@ -474,134 +467,190 @@ private fun AccountEditDialog(
         currency: Currency,
     ) -> Unit,
 ) {
-    var name by remember { mutableStateOf(initialName) }
-    var balanceText by remember { mutableStateOf(if (balanceMinor == 0L) "" else Money.format(balanceMinor)) }
-    var icon by remember { mutableStateOf(initialIcon) }
-    var color by remember { mutableStateOf(initialColor) }
-    var inSummary by remember { mutableStateOf(initialInSummary) }
-    var currency by remember { mutableStateOf(initialCurrency) }
+    var name by remember { mutableStateOf(seed.name) }
+    var balanceText by remember {
+        mutableStateOf(if (seed.balanceMinor == 0L) "" else Money.format(seed.balanceMinor))
+    }
+    var icon by remember { mutableStateOf(seed.icon) }
+    var color by remember { mutableStateOf(seed.color) }
+    var inSummary by remember { mutableStateOf(seed.inSummary) }
+    var currency by remember { mutableStateOf(seed.currency) }
 
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(title) },
-        text = {
-            // Scrollable, because this dialog is eight controls tall and the
-            // last of them is a switch with an explanation under it: on a short
-            // screen, or with the font scaled up, AlertDialog simply cuts the
-            // bottom off rather than letting it move.
-            Column(Modifier.verticalScroll(rememberScrollState())) {
-                OutlinedTextField(
-                    value = name,
-                    onValueChange = { name = it },
-                    label = { Text(stringResource(R.string.settings_account_name)) },
-                    singleLine = true,
-                    // Same hint the category field carries: Sentences, because
-                    // the seeded names alongside it read "Konto osobiste", not
-                    // "Konto Osobiste".
-                    keyboardOptions = KeyboardOptions(
-                        capitalization = KeyboardCapitalization.Sentences,
-                    ),
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                Spacer(Modifier.height(12.dp))
-                OutlinedTextField(
-                    value = balanceText,
-                    onValueChange = { balanceText = it },
-                    // The unit rides on the label, because this field is the
-                    // one place a wrong currency is silently expensive: typing
-                    // a euro balance under a label saying "zł" is a mistake
-                    // nothing downstream can detect.
-                    label = {
-                        Text(
-                            stringResource(R.string.settings_account_balance) +
-                                " (" + currency.suffix + ")",
-                        )
-                    },
-                    singleLine = true,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                // The arithmetic, shown rather than explained, and only when
-                // there is any: an account with no transactions has an opening
-                // balance identical to the field above it, and repeating the
-                // number would just look like a mistake.
-                if (movementsMinor != 0L) {
-                    Spacer(Modifier.height(4.dp))
+    Scaffold(
+        // Zero, because the navigation Scaffold this screen lives in has
+        // already applied them — the same arrangement RecurringEditor needs,
+        // for the same reason.
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
+        containerColor = MaterialTheme.colorScheme.background,
+        topBar = {
+            TopAppBar(
+                title = {
                     Text(
                         stringResource(
-                            R.string.settings_account_opening,
-                            Money.formatIn(Money.parseToMinor(balanceText) - movementsMinor, currency),
+                            if (seed.accountId == null) R.string.settings_add_account
+                            else R.string.settings_edit_account,
                         ),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
                     )
-                }
-                SectionRule()
-                Text(stringResource(R.string.settings_icon), style = MaterialTheme.typography.labelMedium)
-                Spacer(Modifier.height(6.dp))
-                IconSwatchRow(selected = icon, onSelect = { icon = it })
-                SectionRule()
-                Text(stringResource(R.string.settings_color), style = MaterialTheme.typography.labelMedium)
-                Spacer(Modifier.height(6.dp))
-                ColorSwatchRow(selected = color, onSelect = { color = it })
-                SectionRule()
-                CurrencyField(selected = currency, onSelect = { currency = it })
-                // What picking a foreign currency costs, said on the screen
-                // that does the picking rather than discovered on the Overview.
-                if (!currency.isReporting) {
-                    Spacer(Modifier.height(6.dp))
-                    Text(
-                        stringResource(R.string.settings_account_currency_hint),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                SectionRule()
-                // Savings held somewhere else: still an account you can book
-                // on, just not money to add to what is there to spend.
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .toggleable(value = inSummary, role = Role.Switch, onValueChange = { inSummary = it }),
-                ) {
-                    Column(Modifier.weight(1f)) {
-                        Text(
-                            stringResource(R.string.settings_account_in_summary),
-                            style = MaterialTheme.typography.bodyLarge,
-                        )
-                        Text(
-                            stringResource(R.string.settings_account_in_summary_hint),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                },
+                navigationIcon = {
+                    IconButton(onClick = onDismiss) {
+                        Icon(
+                            Icons.Filled.Close,
+                            contentDescription = stringResource(R.string.settings_cancel),
                         )
                     }
-                    Spacer(Modifier.width(12.dp))
-                    Switch(checked = inSummary, onCheckedChange = null)
+                },
+                windowInsets = WindowInsets(0, 0, 0, 0),
+            )
+        },
+        bottomBar = {
+            // Pinned, like the rule editor's and the keypad's. In the dialog
+            // this button was outside the scroll, which meant the field being
+            // filled in and the button being aimed for were never both on
+            // screen — the same complaint that made the rule editor a screen.
+            Surface(color = MaterialTheme.colorScheme.background) {
+                Button(
+                    onClick = {
+                        onSave(name.trim(), Money.parseToMinor(balanceText), icon, color, inSummary, currency)
+                    },
+                    enabled = name.isNotBlank(),
+                    shape = RoundedCornerShape(18.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                        disabledContentColor = MaterialTheme.colorScheme.primary,
+                    ),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 10.dp)
+                        .height(52.dp),
+                ) {
+                    // Named rather than left dead, the bargain every save
+                    // button in this app keeps: a control that refuses to act
+                    // and refuses to explain is the bug, not the guard. A
+                    // nameless account is the only thing this form will not
+                    // take — everything else has a default.
+                    Text(
+                        stringResource(
+                            if (name.isBlank()) R.string.settings_account_needs_name
+                            else R.string.settings_save,
+                        ),
+                    )
                 }
             }
         },
-        confirmButton = {
-            TextButton(
-                onClick = {
-                    onSave(name.trim(), Money.parseToMinor(balanceText), icon, color, inSummary, currency)
+    ) { padding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 16.dp),
+        ) {
+            Spacer(Modifier.height(8.dp))
+            OutlinedTextField(
+                value = name,
+                onValueChange = { name = it },
+                label = { Text(stringResource(R.string.settings_account_name)) },
+                singleLine = true,
+                // Same hint the category field carries: Sentences, because
+                // the seeded names alongside it read "Konto osobiste", not
+                // "Konto Osobiste".
+                keyboardOptions = KeyboardOptions(
+                    capitalization = KeyboardCapitalization.Sentences,
+                ),
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Spacer(Modifier.height(12.dp))
+            OutlinedTextField(
+                value = balanceText,
+                onValueChange = { balanceText = it },
+                // The unit rides on the label, because this field is the
+                // one place a wrong currency is silently expensive: typing
+                // a euro balance under a label saying "zł" is a mistake
+                // nothing downstream can detect.
+                label = {
+                    Text(
+                        stringResource(R.string.settings_account_balance) +
+                            " (" + currency.suffix + ")",
+                    )
                 },
-                enabled = name.isNotBlank(),
-            ) { Text(stringResource(R.string.settings_save)) }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) { Text(stringResource(R.string.settings_cancel)) }
-        },
-    )
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                modifier = Modifier.fillMaxWidth(),
+            )
+            // The arithmetic, shown rather than explained, and only when
+            // there is any: an account with no transactions has an opening
+            // balance identical to the field above it, and repeating the
+            // number would just look like a mistake.
+        if (seed.movementsMinor != 0L) {
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    stringResource(
+                        R.string.settings_account_opening,
+                        Money.formatIn(Money.parseToMinor(balanceText) - seed.movementsMinor, currency),
+                    ),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            SectionRule()
+            Text(stringResource(R.string.settings_icon), style = MaterialTheme.typography.labelMedium)
+            Spacer(Modifier.height(6.dp))
+            IconSwatchRow(selected = icon, onSelect = { icon = it })
+            SectionRule()
+            Text(stringResource(R.string.settings_color), style = MaterialTheme.typography.labelMedium)
+            Spacer(Modifier.height(6.dp))
+            ColorSwatchRow(selected = color, onSelect = { color = it })
+            SectionRule()
+            CurrencyField(selected = currency, onSelect = { currency = it })
+            // What picking a foreign currency costs, said on the screen
+            // that does the picking rather than discovered on the Overview.
+            if (!currency.isReporting) {
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    stringResource(R.string.settings_account_currency_hint),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            SectionRule()
+            // Savings held somewhere else: still an account you can book
+            // on, just not money to add to what is there to spend.
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .toggleable(value = inSummary, role = Role.Switch, onValueChange = { inSummary = it }),
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        stringResource(R.string.settings_account_in_summary),
+                        style = MaterialTheme.typography.bodyLarge,
+                    )
+                    Text(
+                        stringResource(R.string.settings_account_in_summary_hint),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Spacer(Modifier.width(12.dp))
+                Switch(checked = inSummary, onCheckedChange = null)
+            }
+            // Room under the switch's own explanation, so the last control is
+            // not flush against the save bar.
+            Spacer(Modifier.height(16.dp))
+        }
+    }
 }
 
 /**
  * The nine currencies, as a dropdown.
  *
- * A grid of chips was the first attempt and it was wrong for this dialog: the
- * dialog is already eight controls tall and scrolls, and two rows of chips put
- * the in-summary switch below the fold on a short screen. A dropdown is one
- * line whatever the list length, and it also stops the currency competing for
+ * A grid of chips was the first attempt and it was wrong for this form: it is
+ * already eight controls tall and scrolls, and two rows of chips pushed the
+ * in-summary switch that much further down. A dropdown is one line whatever
+ * the list length, and it also stops the currency competing for
  * attention with the icon and colour swatches above it — those are a choice
  * among equals, and this is a field with one answer.
  *

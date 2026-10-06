@@ -20,8 +20,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.List
+import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.DonutLarge
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Icon
@@ -660,13 +660,22 @@ private fun RowScope.AddTabItem(
  * "Dodaj" on the labels' line. The green is what sets it apart, not a different
  * baseline. 4dp of bar shows above and below it.
  *
- * On the keypad it is a tick and "Zapisz", and that is the same button doing the
- * screen's one job rather than a second one added beside it. What it loses is
- * the amount: the save bar said "Zapisz · 47,50 zł" and ADR 0010 put the figure
- * there deliberately, to catch a mis-tap the verb alone would not. 76dp of bar
- * cannot hold it. The figure is still the largest thing on the screen directly
- * above, which is the next best place for the last thing read before money is
- * written down.
+ * On the keypad it is "Zapisz" over a list with a line being added to it, and
+ * that is the same button doing the screen's one job rather than a second one
+ * added beside it.
+ *
+ * A list rather than a tick, which was the first choice and is the obvious one.
+ * `Icons.Filled.Check` is already the app's SELECTION mark — the chosen account
+ * in the picker, the chosen member in Settings, an active filter chip — so a
+ * tick here would be the same glyph meaning "this one is chosen" in three
+ * places and "commit this" in a fourth. A row joining a list is what the tap
+ * actually does. AutoMirrored, so it flips with the layout direction.
+ *
+ * What it loses is the amount: the save bar said "Zapisz · 47,50 zł" and ADR
+ * 0010 put the figure there deliberately, to catch a mis-tap the verb alone
+ * would not. 76dp of bar cannot hold it. The figure is still the largest thing
+ * on the screen directly above, which is the next best place for the last thing
+ * read before money is written down.
  *
  * Greyed while the entry is unfinished, with the label kept legible rather than
  * dropped to Material's 38%: disabled here means "unfinished", not
@@ -696,7 +705,7 @@ private fun AddIcon(
     ) {
         Box(modifier = Modifier.height(32.dp), contentAlignment = Alignment.Center) {
             Icon(
-                if (saving) Icons.Filled.Check else Icons.Filled.Add,
+                if (saving) Icons.AutoMirrored.Filled.PlaylistAdd else Icons.Filled.Add,
                 contentDescription = null,
                 tint = onAccent,
                 modifier = Modifier.size(28.dp),

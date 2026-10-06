@@ -297,8 +297,10 @@ fun AddScreen(
                     // The keys and the note are both bottom-of-screen inputs and
                     // only one of them can be the one being answered. Tapping the
                     // amount comes back the other way, and editAmount() drops
-                    // this field's focus first so the system keyboard goes with it.
-                    onFocused = { editing = Editing.Note },
+                    // this field's focus first so the system keyboard goes with it
+                    // — which is also what takes [Editing.Note] off, so the blur
+                    // is not acted on here.
+                    onFocusChanged = { focused -> if (focused) editing = Editing.Note },
                 )
             },
             state = gridState,
@@ -477,7 +479,16 @@ private fun ContextRow(
 internal fun NoteField(
     value: String,
     onValueChange: (String) -> Unit,
-    onFocused: () -> Unit,
+    /**
+     * Both edges, not just the gain.
+     *
+     * The caller has to lift this field above the keyboard, and the keyboard is
+     * only there while the field has the focus — so a callback that fires on
+     * focus and stays silent on blur leaves the caller holding a flag it cannot
+     * clear. The edit sheet inferred the blur from the IME inset instead, and
+     * got it wrong in a way that cost the whole behaviour; see its comment.
+     */
+    onFocusChanged: (Boolean) -> Unit,
 ) {
     val interaction = remember { MutableInteractionSource() }
     val colors = OutlinedTextFieldDefaults.colors()
@@ -495,7 +506,7 @@ internal fun NoteField(
             .fillMaxWidth()
             .padding(horizontal = 4.dp, vertical = 4.dp)
             .height(44.dp)
-            .onFocusChanged { if (it.isFocused) onFocused() },
+            .onFocusChanged { onFocusChanged(it.isFocused) },
     ) { inner ->
         OutlinedTextFieldDefaults.DecorationBox(
             value = value,

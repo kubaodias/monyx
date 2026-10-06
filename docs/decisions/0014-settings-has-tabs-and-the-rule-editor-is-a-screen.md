@@ -75,3 +75,31 @@ actually matters.
   month-end note from the dialog it replaces. None of that was the problem.
 
 [0004]: 0004-language-moves-currency-and-timezone-do-not.md
+
+## Addendum, 2026-10-06: the account editor is a screen too
+
+Same form, same reasons, two releases later. Adding or editing an account asked
+eight things — name, balance, a row of icons, a row of colours, a currency
+dropdown, and a switch with an explanation under it — inside an `AlertDialog`
+whose body scrolled and whose Save button sat outside that scroll. So the field
+being filled in and the button being aimed for were never both on screen, which
+is the complaint in the Context section above, written about the rule editor.
+
+It is now `AccountEditor`: a `Scaffold` with the title and a Close in the top
+bar, the controls in one scrolling column, and the save button pinned to the
+bottom — swapped in for the settings content rather than floating over it, with
+a `BackHandler` so the gesture closes the form and lands back on Settings.
+
+Two things came out of the move rather than going in with it:
+
+- **The open state moved up.** `AccountsSection` is drawn inside a `LazyColumn`
+  item, and a full-screen `Scaffold` cannot live in one, so Settings holds the
+  open editor and the section only reports that one was asked for. `AccountSeed`
+  is what it reports — the same shape as `RuleSeed`, for the same reason: "add"
+  and "edit this one" are both open states and only one has a row behind it.
+- **The save button says what is missing**, like every other save button in the
+  app. A nameless account is the one thing the form will not take, and the
+  button now says so instead of greying out in silence.
+
+The confirmations that live beside it — archive, delete — stay dialogs. A
+question with two answers is what a dialog is for.
