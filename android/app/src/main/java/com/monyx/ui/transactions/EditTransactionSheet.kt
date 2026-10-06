@@ -63,6 +63,7 @@ import com.monyx.ui.add.AmountDisplay
 import com.monyx.ui.add.CurrencyPickerDialog
 import com.monyx.ui.add.AmountInput
 import com.monyx.ui.add.NoteField
+import com.monyx.ui.add.NoteFieldHeight
 import com.monyx.ui.add.press
 import com.monyx.ui.add.CategoryGrid
 import com.monyx.ui.add.categoryMarkOf
@@ -392,6 +393,12 @@ fun EditTransactionSheet(
                 )
             }
 
+            // The family the amount line is carrying, hoisted because the
+            // mark's own tap needs its id.
+            val mark = remember(categoryId, selectable, colorOf) {
+                categoryMarkOf(selectable, categoryId, colorOf)
+            }
+
             AmountDisplay(
                 amount = amount,
                 onClick = { editAmount() },
@@ -403,14 +410,15 @@ fun EditTransactionSheet(
                 // As on the add screen: the grid below scrolls, this does not.
                 // A transfer has no category and keeps an empty slot, which
                 // shows nothing — the figure is end-aligned.
-                categoryMark = remember(categoryId, selectable, colorOf) {
-                    categoryMarkOf(selectable, categoryId, colorOf)
-                },
+                categoryMark = mark,
                 // Back to the families, as on the add screen, keyboard and
                 // all.
                 onMarkClick = {
                     focusManager.clearFocus(force = true)
                     keyboard?.hide()
+                    // The family, not one of its children — as on the add
+                    // screen. Same id back in when it is already the choice.
+                    mark?.id?.let { categoryId = it }
                     scope.launch { gridState.animateScrollToItem(0) }
                 },
             )
@@ -473,6 +481,7 @@ fun EditTransactionSheet(
                     // there is no room for a family under the roots, so it
                     // takes a window of its own.
                     pinFamily = keypadUp || noteFocused,
+                    footerHeight = NoteFieldHeight,
                     state = gridState,
                     modifier = Modifier.weight(1f),
                 )

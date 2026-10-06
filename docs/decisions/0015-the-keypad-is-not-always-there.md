@@ -89,13 +89,27 @@ the window with the note under them, which reads as the bottom of a long list
 rather than as the question being asked.
 
 So the family block takes a window of its own. It is one grid item — the rule,
-the subcategories laid out by hand in the same four columns, the note at the far
-end — with a minimum height of one window, and the slack between the children
-and the note is empty space. Scrolled to, it lands at the top: the subcategories
-sit directly under the amount line that now carries their family, the note is
-where it always is at the bottom, and the roots are one scroll up. The owner's
-own description: "no other category is visible and view is scrolled down so that
-list of subcategories stay at the top".
+the subcategories laid out by hand in the same four columns, and empty space
+after them — with a minimum height of one window less the note, which stays the
+item after it.
+
+The note stays its own item for a reason worth writing down: it was inside the
+block at first, and so it was destroyed and rebuilt every time the block stopped
+being a window tall — which is exactly when the keypad stands down, which is
+exactly when somebody reaches for the note. A field rebuilt as it gains focus
+loses it, so the first tap on the note did nothing and it took a second one.
+Nothing about the note's node changes now; the block above it is what grows. Scrolled to, the block lands at the top: the subcategories sit directly under
+the amount line that now carries their family, the note is where it always is at
+the bottom, and the roots are one scroll up. The owner's own description: "no
+other category is visible and view is scrolled down so that list of
+subcategories stay at the top".
+
+Opening a family is the only thing that scrolls it. Un-pinning does not: the
+block stops being a window tall, the content stops overflowing, and a lazy list
+clamps its own offset to zero when that happens — so the roots come back because
+there is room for them rather than because something jumped. Scrolling there too
+meant that tapping a subcategory, which is what takes the keypad down, threw the
+grid back to the top of the list.
 
 Two things worth stating, because both were wrong first:
 
