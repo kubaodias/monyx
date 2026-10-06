@@ -49,7 +49,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.disabled
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.res.stringResource
@@ -607,7 +606,6 @@ private fun RowScope.AddTabItem(
     // you are already standing on — which is a button that does nothing — and
     // becomes the one control that commits the transaction. See AddSaveSlot.
     val saving = selected && save.active
-    val ready = save.enabled
     Box(
         modifier = Modifier
             .weight(1f)
@@ -628,26 +626,21 @@ private fun RowScope.AddTabItem(
                 },
                 // Saving, or going to the keypad — never both. The tab is
                 // already selected whenever this is a save button, so there is
-                // no navigation left to lose. Still clickable while the entry
-                // is unfinished, because disabling it here would take the long
-                // press to talk with it; the tap lands on nothing and the grey
-                // is what says so.
-                onClick = { if (saving) save.save() else onClick() },
+                // no navigation left to lose. An unfinished entry is not a
+                // disabled button: the tap is answered on the screen with what
+                // is still missing. See AddSaveSlot.
+                onClick = { if (saving) save.tap() else onClick() },
             )
             .semantics {
-                if (saving) {
-                    // "Zapisz, niedostępne" rather than a tab that silently
-                    // refuses: the one thing TalkBack can say about a button
-                    // waiting for an amount and a category.
-                    if (!ready) disabled()
-                } else {
-                    this.selected = selected
-                }
+                // Not `disabled()` when the entry is unfinished: the button
+                // does answer a tap, and TalkBack announcing it as unavailable
+                // would be the one description of it that is false.
+                if (!saving) this.selected = selected
                 contentDescription = if (saving) saveLabel else addLabel
             },
         contentAlignment = Alignment.Center,
     ) {
-        AddIcon(saving = saving, ready = ready)
+        AddIcon(saving = saving)
     }
 }
 
@@ -677,26 +670,24 @@ private fun RowScope.AddTabItem(
  * on the screen directly above, which is the next best place for the last thing
  * read before money is written down.
  *
- * Greyed while the entry is unfinished, with the label kept legible rather than
- * dropped to Material's 38%: disabled here means "unfinished", not
- * "unavailable", which is ADR 0010's rule for this button and is why the colours
- * are set by hand.
+ * Green either way, and the same green: this is one button that changes what it
+ * says, not two buttons sharing a slot. It greyed out while the entry was
+ * unfinished at first — which is what the save bar below it used to do — and in
+ * the navigation bar that reads as a broken tab rather than as a button
+ * waiting, because the bar's middle item is the one coloured thing in it. The
+ * explaining moved to the screen instead; see AddSaveSlot.
  */
 @Composable
 private fun AddIcon(
     saving: Boolean,
-    ready: Boolean,
     modifier: Modifier = Modifier,
 ) {
-    val waiting = saving && !ready
-    val accent = if (waiting) MaterialTheme.colorScheme.surfaceVariant else ADD_ACCENT
-    val onAccent = if (waiting) MaterialTheme.colorScheme.primary else ADD_ON_ACCENT
     Column(
         modifier = modifier
             .width(76.dp)
             .height(NavigationBarHeight - 8.dp)
             .clip(RoundedCornerShape(16.dp))
-            .background(accent)
+            .background(ADD_ACCENT)
             // Material's items sit their block 2dp above true centre; measured
             // on a device, without this the plus and the word ride 2dp low.
             .padding(bottom = 4.dp),
@@ -707,14 +698,14 @@ private fun AddIcon(
             Icon(
                 if (saving) Icons.AutoMirrored.Filled.PlaylistAdd else Icons.Filled.Add,
                 contentDescription = null,
-                tint = onAccent,
+                tint = ADD_ON_ACCENT,
                 modifier = Modifier.size(28.dp),
             )
         }
         Spacer(Modifier.height(4.dp))
         Text(
             text = stringResource(if (saving) R.string.nav_save else R.string.nav_add),
-            color = onAccent,
+            color = ADD_ON_ACCENT,
             style = MaterialTheme.typography.labelMedium,
             fontWeight = FontWeight.SemiBold,
             maxLines = 1,

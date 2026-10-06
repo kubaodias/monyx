@@ -166,6 +166,28 @@ fun AddScreen(
     }
     var seed by remember { mutableStateOf<RuleSeed?>(null) }
 
+    // Set by a tap on a save button that could not save, and never cleared by
+    // hand: [blocker] goes null the moment the gap is filled, which takes the
+    // line off screen with it.
+    var refused by remember { mutableStateOf(false) }
+
+    /**
+     * What is still missing, in the order it is asked for.
+     *
+     * A missing account comes first and is the one case shown without being
+     * asked for — a household with no account yet has nothing else on screen to
+     * explain a button that will not act. The other two are both visible as
+     * emptiness (the amount is the largest thing here, the categories fill the
+     * middle), so they are named only once somebody has tapped and been
+     * refused.
+     */
+    val blocker = when {
+        state.accountId == null -> R.string.add_needs_account
+        state.amountMinor <= 0 -> R.string.add_needs_amount
+        state.categoryId == null -> R.string.add_needs_category
+        else -> null
+    }
+
     val focusManager = LocalFocusManager.current
     val keyboard = LocalSoftwareKeyboardController.current
 
@@ -183,9 +205,8 @@ fun AddScreen(
     //
     // Saving needs an amount, an account AND a category, and it needs a member
     // to credit the row to — no member id means enrolment has not landed and
-    // saving would write an orphan. The button is drawn greyed until all four
-    // are in, exactly as the save bar it replaced was, because an arriving
-    // button in the navigation bar would shift the whole bar's layout.
+    // saving would write an orphan. The button is green throughout (see
+    // [AddSaveSlot]); what changes is which of the two answers a tap gets.
     //
     // Withdrawn while the rule editor is open: it covers this screen with a
     // save button of its own, and the bar's would commit the transaction behind
@@ -193,12 +214,19 @@ fun AddScreen(
     // bar is composed by somebody else.
     SideEffect {
         if (seed == null) {
-            saveSlot.offer(enabled = memberId != null && state.canSave) {
-                memberId?.let {
-                    viewModel.save(it, onSaved)
-                    editAmount()
-                }
-            }
+            saveSlot.offer(
+                enabled = memberId != null && state.canSave,
+                onSave = {
+                    memberId?.let {
+                        viewModel.save(it, onSaved)
+                        editAmount()
+                        refused = false
+                    }
+                },
+                // The bar has nowhere to put a sentence, so the refusal is
+                // answered down here. See [blocker].
+                onRefused = { refused = true },
+            )
         } else {
             saveSlot.withdraw()
         }
@@ -264,6 +292,12 @@ fun AddScreen(
                 Currency.of(accounts.firstOrNull { it.id == state.accountId }?.currency),
             ),
             onPickCurrency = { showCurrencyPicker = true },
+            // The chosen category, beside the figure, where the grid cannot
+            // scroll it away. See [SelectedCategoryMark].
+            categoryMark = remember(state.categoryId, categories) {
+                categories.firstOrNull { it.id == state.categoryId }
+                    ?.let { CategoryMark(it.id, it.icon, colorOf(it)) }
+            },
         )
 
         CategoryGrid(
@@ -315,15 +349,13 @@ fun AddScreen(
             )
         }
 
-        // The one blocker with nothing else on screen to show it. Everything
-        // else the save button waits for is visible — the amount is the largest
-        // thing here and the categories fill the middle — but a household with
-        // no account yet would be looking at a dead button in the bar below and
-        // no reason for it. A line of text rather than a bar: it costs nothing
-        // in the state that is not a bug report.
-        if (state.accountId == null) {
+        // One line, and only when it has something to say: a tap went
+        // unanswered, or there is no account to file anything to. A line of
+        // text rather than the 62dp bar this replaced, which stood there
+        // narrating an empty screen from the first frame.
+        if (blocker != null && (refused || state.accountId == null)) {
             Text(
-                text = stringResource(R.string.add_needs_account),
+                text = stringResource(blocker),
                 style = MaterialTheme.typography.labelLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier

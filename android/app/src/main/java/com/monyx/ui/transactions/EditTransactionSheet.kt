@@ -65,6 +65,7 @@ import com.monyx.ui.add.AmountInput
 import com.monyx.ui.add.NoteField
 import com.monyx.ui.add.press
 import com.monyx.ui.add.CategoryGrid
+import com.monyx.ui.add.CategoryMark
 import com.monyx.ui.add.ContextChip
 import com.monyx.ui.add.DayPickerDialog
 import com.monyx.ui.add.Keypad
@@ -386,6 +387,13 @@ fun EditTransactionSheet(
                 // figure. [account] is resolved above for the picker's "this is
                 // the account's own" mark.
                 onPickCurrency = { showCurrencyPicker = true },
+                // As on the add screen: the grid below scrolls, this does not.
+                // A transfer has no category and keeps an empty slot, which
+                // shows nothing — the figure is end-aligned.
+                categoryMark = remember(categoryId, selectable) {
+                    selectable.firstOrNull { it.id == categoryId }
+                        ?.let { CategoryMark(it.id, it.icon, colorOf(it)) }
+                },
             )
 
             // The note is laid out as on the add screen: last in the grid,

@@ -36,8 +36,9 @@
 The app opens on the summary. Add is in the middle of the bottom bar, or one
 long-press on the launcher icon from the home screen; saving lands on the ledger
 with the new row on screen. That same middle button is what saves: while the
-keypad is up it is a tick and **Zapisz**, so the screen carries one button
-rather than its own bar stacked above the bar — see
+keypad is up it reads **Zapisz**, so the screen carries one button rather than
+its own bar stacked above the bar. It stays green throughout, and a tap it
+cannot answer says what is still missing instead — see
 [ADR 0010](docs/decisions/0010-the-save-button-is-not-a-keypad-key.md).
 
 - **Summary** — what the chosen month earned, spent, and the difference between
@@ -56,6 +57,8 @@ rather than its own bar stacked above the bar — see
   hidden on that phone alone, across launches.
 - **Add** — a keypad that is also a calculator, a note, any date including the
   future, and *Make it repeat* to turn the row being typed into a repeating rule.
+  The category you pick rises into the slot beside the amount and stays there,
+  so the pair reads as the row being written however far the grid is scrolled.
 - **History** — the month, searchable, filtered by account, category and then
   subcategory, with any row that is not on the household's default account — the
   first one on the list — carrying that account's name in its own colour; pick a category and the rows are totalled above them, so "how much

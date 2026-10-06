@@ -467,48 +467,53 @@ class VisibleSelectionTest {
     /**
      * The keypad's save button lives in the navigation bar now, which means the
      * button and the screen it commits are composed in different places. What
-     * is decidable here is the handover itself: an inactive slot must not save,
-     * and neither must an active one that is still waiting for an amount.
+     * is decidable here is the handover itself: which of the two answers a tap
+     * gets, and that an inactive slot gives neither.
      *
      * Worth pinning because the failure is a wrong row rather than a wrong
-     * pixel — the bar reads two states and then runs a lambda between them.
+     * pixel — the bar reads one state and then runs a lambda between frames.
      */
     @Test
-    fun `the bar's button does nothing until the keypad offers it something`() {
+    fun `a tap on an unfinished entry is refused, not saved`() {
         val slot = AddSaveSlot()
         var saves = 0
+        var refusals = 0
 
         assertEquals(false, slot.active)
-        slot.save()
-        assertEquals(0, saves)
+        slot.tap()
+        assertEquals("an inactive slot answers nothing", 0, saves + refusals)
 
-        slot.offer(enabled = false) { saves++ }
+        slot.offer(enabled = false, onSave = { saves++ }, onRefused = { refusals++ })
         assertEquals(true, slot.active)
-        slot.save()
-        assertEquals("an unfinished entry is not saved by a tap", 0, saves)
+        slot.tap()
+        assertEquals(0, saves)
+        assertEquals("the screen is asked to say what is missing", 1, refusals)
 
-        slot.offer(enabled = true) { saves++ }
-        slot.save()
+        slot.offer(enabled = true, onSave = { saves++ }, onRefused = { refusals++ })
+        slot.tap()
         assertEquals(1, saves)
+        assertEquals(1, refusals)
     }
 
     /**
      * Leaving the keypad — a different tab, or the rule editor opening over it
-     * — takes the button back. The lambda goes with it: it closes over the
+     * — takes the button back. Both lambdas go with it: they close over the
      * screen that has gone, and a tap arriving afterwards would commit a draft
      * nobody is looking at.
      */
     @Test
-    fun `withdrawing the offer drops the action with it`() {
+    fun `withdrawing the offer drops both answers with it`() {
         val slot = AddSaveSlot()
         var saves = 0
-        slot.offer(enabled = true) { saves++ }
+        var refusals = 0
+        slot.offer(enabled = true, onSave = { saves++ }, onRefused = { refusals++ })
 
         slot.withdraw()
 
         assertEquals(false, slot.active)
         assertEquals(false, slot.enabled)
-        slot.save()
+        slot.tap()
         assertEquals(0, saves)
+        assertEquals(0, refusals)
     }
 }

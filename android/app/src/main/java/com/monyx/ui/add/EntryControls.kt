@@ -42,6 +42,11 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberDatePickerState
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -132,6 +137,13 @@ internal fun AmountDisplay(
      * being asked.
      */
     onPickCurrency: (() -> Unit)? = null,
+    /**
+     * The chosen category, kept on this line so it survives the grid scrolling.
+     *
+     * Null where there is no category to speak of — the budget keypad types a
+     * limit for one that is already named by the screen it is on.
+     */
+    categoryMark: CategoryMark? = null,
 ) {
     Row(
         modifier = Modifier
@@ -145,12 +157,81 @@ internal fun AmountDisplay(
         // line that does not mean "type the amount" does not have to be outside
         // the line to say so.
         action?.let { Box(modifier = Modifier.padding(bottom = 10.dp)) { it() } }
+        SelectedCategoryMark(mark = categoryMark)
         AmountFigure(
             amount = amount,
             currency = currency,
             onPickCurrency = onPickCurrency,
             modifier = Modifier.weight(1f),
         )
+    }
+}
+
+/**
+ * What the amount line shows about the chosen category: the same circle the
+ * grid draws it with, in the same colour.
+ *
+ * Not the [CategoryEntity] itself. The colour is resolved by the screen —
+ * a subcategory is drawn in its parent's hue, which is a rule that lives in
+ * [com.monyx.ui.theme.Palette] and not in a cell — and passing the resolved one
+ * keeps this line from having to know it.
+ */
+data class CategoryMark(val id: String, val icon: String?, val color: Color)
+
+/**
+ * The chosen category, pinned beside the figure.
+ *
+ * The grid answers "which category" perfectly until it is scrolled, and it is
+ * scrolled constantly: the children of a family sit below all the roots, the
+ * note is below them, and a household with thirty categories pushes the chosen
+ * circle off the top of its own window. This is the one place on the screen
+ * that never moves, directly beside the figure it belongs to, so the pair reads
+ * as the row being written: 47,50 zł, on Zakupy.
+ *
+ * It rises into place, from the direction of the grid it came from. The 40dp
+ * slot is reserved whether or not anything is in it — the figure is the thing
+ * being typed and must not jump sideways when a category is picked, and the
+ * figure is end-aligned so an empty slot on the left shows nothing at all.
+ *
+ * No name beside it. The circle and its colour are how this app has always said
+ * which category — the grid is four columns of them — and a label here would be
+ * taking width from the one figure on the screen that must never be squeezed.
+ */
+@Composable
+private fun SelectedCategoryMark(mark: CategoryMark?) {
+    Box(
+        modifier = Modifier.padding(bottom = 8.dp).size(40.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        AnimatedContent(
+            targetState = mark,
+            transitionSpec = {
+                // In from below, out on the spot: two circles sliding past each
+                // other in a 40dp box is a scramble, and the one arriving is
+                // the answer.
+                (slideInVertically { it } + fadeIn()) togetherWith fadeOut()
+            },
+            label = "categoryMark",
+        ) { current ->
+            if (current == null) {
+                Box(Modifier.size(40.dp))
+            } else {
+                Box(
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clip(CircleShape)
+                        .background(current.color),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        imageVector = Palette.icon(current.icon),
+                        contentDescription = null,
+                        tint = Color.White,
+                        modifier = Modifier.size(20.dp),
+                    )
+                }
+            }
+        }
     }
 }
 
