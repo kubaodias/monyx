@@ -49,7 +49,9 @@ class VoiceEntryTest {
 
     private val today = LocalDate.of(2026, 3, 14)
     private val transport = VoiceCategory("c-transport", "Transport", EntryKind.Expense)
-    private val cash = VoiceAccount("a-cash", "Gotówka")
+    /** The household, as a row, because the fake derives both of its account
+     *  lists from one list — see [FakeLedger]. */
+    private val cash = AccountEntity(id = "a-cash", name = "Gotówka")
 
     private class FakeRecogniser : Recogniser {
         val heard = MutableStateFlow<ListenState>(ListenState.Idle)
@@ -83,13 +85,25 @@ class VoiceEntryTest {
      */
     private class FakeLedger(
         override val categories: Flow<List<VoiceCategory>>,
-        override val accounts: Flow<List<VoiceAccount>>,
+        /**
+         * The household's accounts, in the order the DAO returns them:
+         * `sortOrder, name`.
+         *
+         * One list, and both of the interface's account flows are derived from
+         * it. The ViewModel reads the names off one and the household's DEFAULT
+         * off the other, and a fake that let the two disagree could pass a test
+         * about which account a sentence is filed to while the app filed it
+         * somewhere else.
+         */
+        accountRows: List<AccountEntity>,
         /** Flipped mid-test to break everything that writes, so a failure can
          *  be aimed at one path with a row already in the table. */
         var failWrites: Boolean = false,
     ) : VoiceLedger {
+        override val accounts: Flow<List<VoiceAccount>> =
+            flowOf(accountRows.map { VoiceAccount(it.id, it.name) })
         override val editableCategories: Flow<List<CategoryEntity>> = flowOf(emptyList())
-        override val editableAccounts: Flow<List<AccountEntity>> = flowOf(emptyList())
+        override val editableAccounts: Flow<List<AccountEntity>> = flowOf(accountRows)
 
         val rows = mutableMapOf<String, TransactionEntity>()
         val written = mutableListOf<String>()
@@ -138,7 +152,7 @@ class VoiceEntryTest {
 
     private fun ledger(failWrites: Boolean = false) = FakeLedger(
         categories = flowOf(listOf(transport)),
-        accounts = flowOf(listOf(cash)),
+        accountRows = listOf(cash),
         failWrites = failWrites,
     )
 
@@ -188,6 +202,39 @@ class VoiceEntryTest {
         viewModel.startCorrecting("pl-PL")
         recogniser.heard.value = ListenState.Done(sentence, emptyList())
         return viewModel
+    }
+
+    /**
+     * A spoken expense is filed to the household's default account — the one
+     * the keypad opens on — and not to whatever sorts first in the table.
+     *
+     * This household is the owner's own, which is why the names are: `sortOrder`
+     * is 0 on both, so the tie falls to the name, and "Oszczędności" sorts
+     * before "Portfel". It is a savings pot held outside the summary, and it is
+     * the one account a mistyped expense must not land in — DefaultAccountTest
+     * pins that rule, AddViewModel has used it since, and the microphone was
+     * the one caller that never did.
+     */
+    @Test
+    fun `a spoken expense lands on the household's default account`() {
+        val savings = AccountEntity(
+            id = "a-savings",
+            name = "Oszczędności",
+            excludedFromSummary = 1,
+        )
+        val wallet = AccountEntity(id = "a-wallet", name = "Portfel")
+        val ledger = FakeLedger(
+            categories = flowOf(listOf(transport)),
+            accountRows = listOf(savings, wallet),
+        )
+
+        val viewModel = say(ledger, FakeRecogniser(), "dodaj 200 na transport")
+
+        assertEquals(wallet.id, ledger.rows.getValue("t-1").accountId)
+        assertEquals(
+            wallet.id,
+            (viewModel.state.value as VoiceEntryState.Saved).summary.accountId,
+        )
     }
 
     @Test
@@ -274,7 +321,7 @@ class VoiceEntryTest {
     fun `the language the recogniser was asked for is the language that is parsed`() {
         val ledger = FakeLedger(
             categories = flowOf(listOf(VoiceCategory("c-t", "Transport", EntryKind.Expense))),
-            accounts = flowOf(listOf(cash)),
+            accountRows = listOf(cash),
         )
         val recogniser = FakeRecogniser()
         val viewModel = viewModel(ledger, recogniser)
@@ -394,7 +441,7 @@ class VoiceEntryTest {
             VoiceCategory("c-a", "Zakupy spożywcze", EntryKind.Expense),
             VoiceCategory("c-b", "Zakupy domowe", EntryKind.Expense),
         )
-        val ledger = FakeLedger(flowOf(tied), flowOf(listOf(cash)))
+        val ledger = FakeLedger(flowOf(tied), listOf(cash))
         val viewModel = correct(ledger, FakeRecogniser(), "zakupy")
 
         val asking = viewModel.state.value as VoiceEntryState.Saved
@@ -447,7 +494,7 @@ class VoiceEntryTest {
     fun `a spoken note lands on the row and on the summary`() {
         val ledger = FakeLedger(
             flowOf(listOf(transport, VoiceCategory("c-groceries", "Zakupy spożywcze", EntryKind.Expense))),
-            flowOf(listOf(cash)),
+            listOf(cash),
         )
         val viewModel = correct(ledger, FakeRecogniser(), "te zakupy były w lidlu")
 
@@ -755,7 +802,7 @@ class VoiceEntryTest {
 
     private fun groceryLedger() = FakeLedger(
         flowOf(listOf(VoiceCategory("c-groceries", "Zakupy spożywcze", EntryKind.Expense))),
-        flowOf(listOf(cash)),
+        listOf(cash),
     )
 
     /**

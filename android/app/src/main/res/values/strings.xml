@@ -18,6 +18,7 @@
     <!-- Navigation -->
     <string name="nav_overview">Overview</string>
     <string name="nav_add">Add</string>
+    <string name="nav_save">Save</string>
     <string name="nav_transactions">History</string>
     <string name="nav_budget">Budget</string>
     <string name="nav_settings">Settings</string>

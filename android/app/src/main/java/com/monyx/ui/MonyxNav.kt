@@ -21,6 +21,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.DonutLarge
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Icon
@@ -48,6 +49,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.disabled
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.res.stringResource
@@ -72,6 +74,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.foundation.shape.CircleShape
 import com.monyx.sync.SyncWorker
+import com.monyx.ui.add.AddSaveSlot
 import com.monyx.ui.add.AddScreen
 import com.monyx.ui.add.AddViewModel
 import com.monyx.ui.budget.BudgetScreen
@@ -356,10 +359,16 @@ private fun MainScaffold(
         }
     }
 
+    // The keypad's save button, which is the bar's own middle button while the
+    // keypad is up — see AddSaveSlot. Owned here because the bar is drawn here
+    // and the screen that fills it is drawn inside this Scaffold.
+    val addSave = remember { AddSaveSlot() }
+
     Scaffold(
-        // Everywhere except the keypad, where the bottom right is already the
-        // save button and a second circle over it would be a mis-tap waiting
-        // to happen. Hides itself entirely when no number is configured.
+        // Everywhere except the keypad, where the lower half of the screen is
+        // the keys and the category grid and a circle floating over either
+        // would be a mis-tap waiting to happen. Hides itself entirely when no
+        // number is configured.
         floatingActionButton = {
             if (route != Destinations.ADD) CallAssistantButton()
         },
@@ -374,6 +383,7 @@ private fun MainScaffold(
                     if (isAdd) {
                         AddTabItem(
                             selected = selected,
+                            save = addSave,
                             voiceEnabled = recognitionAvailable && memberId != null,
                             onClick = { selectTab(tab.route) },
                             onHoldStart = {
@@ -444,6 +454,7 @@ private fun MainScaffold(
                 AddScreen(
                     viewModel = addViewModel,
                     memberId = memberId,
+                    saveSlot = addSave,
                     // Straight to the ledger, unfiltered, so the row just
                     // entered is on screen as proof it landed. Both saves come
                     // through here: a repeating rule materialises its first
@@ -583,6 +594,7 @@ private fun MainScaffold(
 @Composable
 private fun RowScope.AddTabItem(
     selected: Boolean,
+    save: AddSaveSlot,
     voiceEnabled: Boolean,
     onClick: () -> Unit,
     onHoldStart: () -> Unit,
@@ -590,12 +602,18 @@ private fun RowScope.AddTabItem(
     val haptics = LocalHapticFeedback.current
     val holdLabel = stringResource(R.string.voice_hold_to_talk)
     val addLabel = stringResource(R.string.nav_add)
+    val saveLabel = stringResource(R.string.nav_save)
+    // On the keypad, and the keypad wants this button: it stops being the tab
+    // you are already standing on — which is a button that does nothing — and
+    // becomes the one control that commits the transaction. See AddSaveSlot.
+    val saving = selected && save.active
+    val ready = save.enabled
     Box(
         modifier = Modifier
             .weight(1f)
             .height(NavigationBarHeight)
             .combinedClickable(
-                role = Role.Tab,
+                role = if (saving) Role.Button else Role.Tab,
                 onLongClickLabel = holdLabel.takeIf { voiceEnabled },
                 onLongClick = if (!voiceEnabled) {
                     null
@@ -608,15 +626,28 @@ private fun RowScope.AddTabItem(
                         onHoldStart()
                     }
                 },
-                onClick = onClick,
+                // Saving, or going to the keypad — never both. The tab is
+                // already selected whenever this is a save button, so there is
+                // no navigation left to lose. Still clickable while the entry
+                // is unfinished, because disabling it here would take the long
+                // press to talk with it; the tap lands on nothing and the grey
+                // is what says so.
+                onClick = { if (saving) save.save() else onClick() },
             )
             .semantics {
-                this.selected = selected
-                contentDescription = addLabel
+                if (saving) {
+                    // "Zapisz, niedostępne" rather than a tab that silently
+                    // refuses: the one thing TalkBack can say about a button
+                    // waiting for an amount and a category.
+                    if (!ready) disabled()
+                } else {
+                    this.selected = selected
+                }
+                contentDescription = if (saving) saveLabel else addLabel
             },
         contentAlignment = Alignment.Center,
     ) {
-        AddIcon()
+        AddIcon(saving = saving, ready = ready)
     }
 }
 
@@ -628,15 +659,35 @@ private fun RowScope.AddTabItem(
  * label — and centred the same way, so the plus sits on the icons' line and
  * "Dodaj" on the labels' line. The green is what sets it apart, not a different
  * baseline. 4dp of bar shows above and below it.
+ *
+ * On the keypad it is a tick and "Zapisz", and that is the same button doing the
+ * screen's one job rather than a second one added beside it. What it loses is
+ * the amount: the save bar said "Zapisz · 47,50 zł" and ADR 0010 put the figure
+ * there deliberately, to catch a mis-tap the verb alone would not. 76dp of bar
+ * cannot hold it. The figure is still the largest thing on the screen directly
+ * above, which is the next best place for the last thing read before money is
+ * written down.
+ *
+ * Greyed while the entry is unfinished, with the label kept legible rather than
+ * dropped to Material's 38%: disabled here means "unfinished", not
+ * "unavailable", which is ADR 0010's rule for this button and is why the colours
+ * are set by hand.
  */
 @Composable
-private fun AddIcon(modifier: Modifier = Modifier) {
+private fun AddIcon(
+    saving: Boolean,
+    ready: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    val waiting = saving && !ready
+    val accent = if (waiting) MaterialTheme.colorScheme.surfaceVariant else ADD_ACCENT
+    val onAccent = if (waiting) MaterialTheme.colorScheme.primary else ADD_ON_ACCENT
     Column(
         modifier = modifier
             .width(76.dp)
             .height(NavigationBarHeight - 8.dp)
             .clip(RoundedCornerShape(16.dp))
-            .background(ADD_ACCENT)
+            .background(accent)
             // Material's items sit their block 2dp above true centre; measured
             // on a device, without this the plus and the word ride 2dp low.
             .padding(bottom = 4.dp),
@@ -645,16 +696,16 @@ private fun AddIcon(modifier: Modifier = Modifier) {
     ) {
         Box(modifier = Modifier.height(32.dp), contentAlignment = Alignment.Center) {
             Icon(
-                Icons.Filled.Add,
+                if (saving) Icons.Filled.Check else Icons.Filled.Add,
                 contentDescription = null,
-                tint = ADD_ON_ACCENT,
+                tint = onAccent,
                 modifier = Modifier.size(28.dp),
             )
         }
         Spacer(Modifier.height(4.dp))
         Text(
-            text = stringResource(R.string.nav_add),
-            color = ADD_ON_ACCENT,
+            text = stringResource(if (saving) R.string.nav_save else R.string.nav_add),
+            color = onAccent,
             style = MaterialTheme.typography.labelMedium,
             fontWeight = FontWeight.SemiBold,
             maxLines = 1,

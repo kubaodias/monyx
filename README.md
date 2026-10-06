@@ -35,7 +35,10 @@
 
 The app opens on the summary. Add is in the middle of the bottom bar, or one
 long-press on the launcher icon from the home screen; saving lands on the ledger
-with the new row on screen.
+with the new row on screen. That same middle button is what saves: while the
+keypad is up it is a tick and **Zapisz**, so the screen carries one button
+rather than its own bar stacked above the bar — see
+[ADR 0010](docs/decisions/0010-the-save-button-is-not-a-keypad-key.md).
 
 - **Summary** — what the chosen month earned, spent, and the difference between
   them, filtered by account. Tapping it turns the card over to show the last
@@ -218,8 +221,11 @@ own currency.
   euro card is złoty, and a bare "100,00" in a list of euro rows reads as euro.
 - **A złoty row on a złoty account** carries no unit and no second figure, which
   is every row in a household that holds złoty only.
-- **The keypad and the save button** follow the entry's currency, which starts
-  as the chosen account's; that is the unit the figure being typed is in.
+- **The keypad** follows the entry's currency, which starts as the chosen
+  account's; that is the unit the figure being typed is in, and the symbol
+  beside it is the control that changes it. The save button in the bottom bar
+  has no room for a figure, so the edit sheet's is the one that still carries
+  one — in that entry's unit.
 
 Both rules come from `Money.accountStripFigure` and `Money.ledgerRowFigure`, so
 each is stated once and the tests call the same function the screen does. The
@@ -443,7 +449,9 @@ button, and that path only ever reads.
 Hold the Add tab in the bottom bar until it buzzes, then say "dodaj 200 na
 transport" or "add 200 to Transport". The row is written and a sheet shows what
 it wrote — amount, category, account, day and note — with every field a tap into
-the editor, and **Anuluj** takes it back. Corrections can be spoken too: "ma być
+the editor, and **Anuluj** takes it back. No sentence names an account: a spoken
+row lands on the household's default, the same account the keypad opens on, and
+changing it is a tap on the sheet or on the row afterwards. Corrections can be spoken too: "ma być
 250", "zmień kategorię na zakupy".
 
 Whatever is left once the amount, the date and the category have claimed their
@@ -530,8 +538,8 @@ open, and is now unnecessary. See
 [ADR 0019](docs/decisions/0019-the-microphone-is-the-phones-not-the-lines.md).
 
 **The app has a call button** — a floating action button, bottom right, in
-Telnyx green, on every tab but the keypad, where the bottom right is already the
-save button. It is a different feature from the one above: it asks about the
+Telnyx green, on every tab but the keypad, where the lower half of the screen is
+the keys and the category grid and a circle floating over either is a mis-tap. It is a different feature from the one above: it asks about the
 month, and it does not write to it.
 
 It fires `ACTION_DIAL` rather than `ACTION_CALL`: dialling fills the number in

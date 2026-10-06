@@ -29,9 +29,10 @@ fun accountsInListOrder(accounts: List<AccountEntity>): List<AccountEntity> =
 /**
  * The household's default account: the first one on the list.
  *
- * Two screens need to agree on this. The keypad starts a new transaction on it,
- * and the ledger marks any row that is NOT on it — and if those two disagree,
- * the ledger is marking rows as unusual that the app itself has just made.
+ * Three callers need to agree on this. The keypad starts a new transaction on
+ * it, the microphone files a spoken one to it, and the ledger marks any row that
+ * is NOT on it — and if they disagree, the ledger is marking rows as unusual
+ * that the app itself has just made.
  *
  * "First on the list" means first as the household sees the list, which is not
  * the same as first in the table. Settings and the account strip both group
@@ -51,6 +52,12 @@ fun accountsInListOrder(accounts: List<AccountEntity>): List<AccountEntity> =
  * how a savings account called "Oszczędności" came to be the default over the
  * current account called "Portfel", and put a pill on 1703 rows saying they were
  * not where the money lives.
+ *
+ * The same tie caught the microphone, a release later and in a worse way. It
+ * took the first row of `activeAccounts()` straight from the table, under a
+ * comment claiming that was the same thing as this function — so every expense
+ * said out loud in that household was filed to the savings pot, and nothing on
+ * the summary sheet looked wrong. See VoiceEntryViewModel.defaultAccountId.
  *
  * @param accounts ordered as the DAO returns them: `sortOrder, name`.
  */

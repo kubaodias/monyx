@@ -19,6 +19,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.time.LocalDate
@@ -183,6 +184,34 @@ class VoiceEntryViewModel(
 
     val editableAccounts: StateFlow<List<AccountEntity>> =
         ledger.editableAccounts.stateIn(work, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    /**
+     * The account a spoken row lands on: the household's default, by the same
+     * rule the keypad uses.
+     *
+     * NOT the first of [accounts]. That list is the table's order, `sortOrder,
+     * name`, and the table interleaves the accounts held outside the summary
+     * with the ones that count — so in this household the first row is
+     * "Oszczędności", a savings pot nobody spends from, and every expense said
+     * out loud was being filed there. [com.monyx.data.defaultAccount] is the
+     * rule that was written for exactly this and is what AddViewModel's
+     * `ensureDefaultAccount` has used since: groups first, table order second.
+     * It was the one caller that never got it, because the parser took
+     * `accounts.first()` and the comment beside the list claimed otherwise.
+     *
+     * Read off [VoiceLedger.editableAccounts] — the entities — because the rule
+     * is about which group an account is in and [VoiceAccount] carries only a
+     * name. That list keeps closed cards, which costs nothing here:
+     * `defaultAccount` drops the archived itself, so it gives the same answer as
+     * the keypad's list of active ones.
+     *
+     * Eagerly, for the reason stated above [categories]: the parse runs the
+     * instant the finger lifts, and a null here means a sentence is understood
+     * and refused for having nowhere to go.
+     */
+    private val defaultAccountId: StateFlow<String?> = ledger.editableAccounts
+        .map { com.monyx.data.defaultAccountId(it) }
+        .stateIn(work, SharingStarted.Eagerly, null)
 
     private val _state = MutableStateFlow<VoiceEntryState>(VoiceEntryState.Hidden)
     val state: StateFlow<VoiceEntryState> = _state.asStateFlow()
@@ -426,7 +455,7 @@ class VoiceEntryViewModel(
             transcript = best,
             alternatives = alternatives,
             categories = categories.value,
-            accounts = accounts.value,
+            defaultAccountId = defaultAccountId.value,
             locale = locale,
             today = today(),
         )

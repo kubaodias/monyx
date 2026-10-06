@@ -51,3 +51,38 @@ The two-taps-plus-the-amount target is unchanged: amount, category, save.
   along with the only primary-coloured key. Nothing else referenced either.
 - Anyone who had learned the tick loses one tap-in-place: the button is a
   thumb's width lower. That is the price of the key having meant two things.
+
+## Addendum, 2026-10-06: the save button is the bar's own button
+
+The bar this decision created was right about what a save control should say
+and wrong about where one more of them could go. The add screen ended up with
+two full-width controls stacked at the bottom, a few millimetres apart: this
+62dp bar, and under it the navigation bar carrying a green **Dodaj** button —
+which, on the add screen, is the tab you are already standing on and does
+nothing at all. The screen with the least room to spare in the app was spending
+its last two rows on one action and a no-op.
+
+So there is one button now. While the keypad is up, the bar's middle item is the
+save button: a tick, the word **Zapisz**, and a tap that commits the
+transaction. Everywhere else it is the plus and **Dodaj** and takes you to the
+keypad. `AddSaveSlot` is the handover — the nav owns it, the keypad fills it in
+and withdraws it on the way out, because the question "can this be saved yet"
+belongs to the screen that knows what is missing.
+
+What this decision's reasoning keeps:
+
+- **Greyed, not absent, and legible.** Still "unfinished" rather than
+  "unavailable", still a hand-set colour rather than Material's 38%.
+- **The blocker that nothing else explains still gets said.** A household with
+  no account yet gets one line of text where the bar used to be. The other two
+  blockers were always on screen — the amount is the largest thing on it, the
+  categories fill the middle — and a bar narrating them cost 62dp to describe
+  what you are looking at.
+- **The keypad still cannot save.** `=` is still only `=`.
+
+What it gives up is the figure on the label. "Zapisz · 47,50 zł" was there to
+catch a mis-tap, and 76dp of navigation bar cannot hold it. The amount is still
+the largest thing on the screen directly above the button, which is the next
+best place for the last thing read before money is written down — and the edit
+sheet, which has no navigation bar to borrow anything from, keeps the full bar
+and its figure unchanged.

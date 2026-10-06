@@ -642,6 +642,12 @@ internal fun utcMillisToLocalDate(utcMillis: Long): LocalDate =
 /**
  * The one control that commits the expense, and it says so in words.
  *
+ * The EDIT SHEET's control, now. The keypad's save moved into the navigation
+ * bar's middle button — see AddSaveSlot — because two full-width buttons a few
+ * millimetres apart, about the same transaction, was 62dp spent twice on the
+ * one screen with no room to spare. A sheet has no navigation bar to lend it
+ * anything, so this stays exactly as it was, amount on the label and all.
+ *
  * It used to be the tick in the corner of the keypad — filled, primary-coloured,
  * sitting exactly where a calculator puts "=". So the key that ended the ENTRY
  * looked identical to the key that ended the SUM, and nothing on screen said

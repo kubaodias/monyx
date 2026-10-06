@@ -5,6 +5,7 @@ import com.monyx.data.AccountEntity
 import com.monyx.data.MonyxRepository
 import com.monyx.sync.Rejection
 import com.monyx.sync.SyncEngine
+import com.monyx.ui.add.AddSaveSlot
 import com.monyx.ui.budget.PlanState
 import com.monyx.ui.overview.OverviewViewModel
 import com.monyx.ui.overview.PieSlice
@@ -459,5 +460,55 @@ class VisibleSelectionTest {
     @Test
     fun `the default empty selection is left alone`() {
         assertEquals(emptySet<String>(), OverviewViewModel.visibleSelection(emptySet(), accounts))
+    }
+
+    // ---------------------------------------------- the bar's middle button
+
+    /**
+     * The keypad's save button lives in the navigation bar now, which means the
+     * button and the screen it commits are composed in different places. What
+     * is decidable here is the handover itself: an inactive slot must not save,
+     * and neither must an active one that is still waiting for an amount.
+     *
+     * Worth pinning because the failure is a wrong row rather than a wrong
+     * pixel — the bar reads two states and then runs a lambda between them.
+     */
+    @Test
+    fun `the bar's button does nothing until the keypad offers it something`() {
+        val slot = AddSaveSlot()
+        var saves = 0
+
+        assertEquals(false, slot.active)
+        slot.save()
+        assertEquals(0, saves)
+
+        slot.offer(enabled = false) { saves++ }
+        assertEquals(true, slot.active)
+        slot.save()
+        assertEquals("an unfinished entry is not saved by a tap", 0, saves)
+
+        slot.offer(enabled = true) { saves++ }
+        slot.save()
+        assertEquals(1, saves)
+    }
+
+    /**
+     * Leaving the keypad — a different tab, or the rule editor opening over it
+     * — takes the button back. The lambda goes with it: it closes over the
+     * screen that has gone, and a tap arriving afterwards would commit a draft
+     * nobody is looking at.
+     */
+    @Test
+    fun `withdrawing the offer drops the action with it`() {
+        val slot = AddSaveSlot()
+        var saves = 0
+        slot.offer(enabled = true) { saves++ }
+
+        slot.withdraw()
+
+        assertEquals(false, slot.active)
+        assertEquals(false, slot.enabled)
+        slot.save()
+        assertEquals(0, saves)
     }
 }
