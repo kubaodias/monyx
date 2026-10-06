@@ -63,9 +63,16 @@ nothing at all. The screen with the least room to spare in the app was spending
 its last two rows on one action and a no-op.
 
 So there is one button now. While the keypad is up, the bar's middle item is the
-save button: a tick, the word **Zapisz**, and a tap that commits the
-transaction. Everywhere else it is the plus and **Dodaj** and takes you to the
-keypad. `AddSaveSlot` is the handover — the nav owns it, the keypad fills it in
+save button: the word **Zapisz** over a list with a line being added to it, and
+a tap that commits the transaction. Everywhere else it is the plus and **Dodaj**
+and takes you to the keypad.
+
+The glyph is `PlaylistAdd`, not a tick. A tick was the first choice and it was
+wrong for this app: `Check` is already the selection mark in three places — the
+chosen account in the picker, the chosen member in Settings, an active filter
+chip — so it would have meant "this one is chosen" there and "commit this" here.
+Which is a smaller version of the two-meanings problem this decision was written
+about. A row joining a list is what the tap does. `AddSaveSlot` is the handover — the nav owns it, the keypad fills it in
 and withdraws it on the way out, because the question "can this be saved yet"
 belongs to the screen that knows what is missing.
 

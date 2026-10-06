@@ -148,7 +148,19 @@ fun EditTransactionSheet(
     // keypad would put a block of digits over the thing usually being changed.
     var keypadUp by remember(original.id) { mutableStateOf(false) }
     val gridState = rememberLazyGridState()
-    val imeBottom = WindowInsets.ime.getBottom(LocalDensity.current)
+    /**
+     * Whether the note has the focus, tracked rather than inferred.
+     *
+     * It used to be inferred — "the keys are down and the keyboard is up" — off
+     * an IME inset read HERE, outside the sheet. That was the bug: a
+     * ModalBottomSheet is its own window, Android dispatches IME insets to the
+     * window that owns the input, and this composition belongs to the one
+     * behind it. So the inset read zero, the condition never became true, and
+     * tapping the note opened the keyboard over the field being typed into.
+     * The inset is now read inside the sheet's content, where it is the sheet's
+     * own, and it only decides how far to follow — not whether to.
+     */
+    var noteFocused by remember(original.id) { mutableStateOf(false) }
     var showAccountPicker by remember { mutableStateOf(false) }
     var showDatePicker by remember { mutableStateOf(false) }
     var confirmDelete by remember { mutableStateOf(false) }
@@ -384,10 +396,16 @@ fun EditTransactionSheet(
                 NoteField(
                     value = note,
                     onValueChange = { note = it },
-                    onFocused = { keypadUp = false },
+                    onFocusChanged = { focused ->
+                        noteFocused = focused
+                        if (focused) keypadUp = false
+                    },
                 )
             }
-            val noteFocused = !keypadUp && imeBottom > 0
+            // The sheet's own window, so this is the keyboard that is actually
+            // covering this field. Re-read as it slides, because every frame of
+            // the animation takes a little more of the window.
+            val imeBottom = WindowInsets.ime.getBottom(LocalDensity.current)
             LaunchedEffect(noteFocused, imeBottom) {
                 if (noteFocused) {
                     val last = gridState.layoutInfo.totalItemsCount - 1
