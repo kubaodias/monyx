@@ -144,6 +144,12 @@ internal fun AmountDisplay(
      * limit for one that is already named by the screen it is on.
      */
     categoryMark: CategoryMark? = null,
+    /**
+     * Files the row on the family itself, given its id. Null where there is no
+     * category to change — see [SelectedCategoryMark], which only offers it
+     * when a subcategory is what is currently chosen.
+     */
+    onPickCategory: ((String) -> Unit)? = null,
 ) {
     Row(
         modifier = Modifier
@@ -157,7 +163,7 @@ internal fun AmountDisplay(
         // line that does not mean "type the amount" does not have to be outside
         // the line to say so.
         action?.let { Box(modifier = Modifier.padding(bottom = 10.dp)) { it() } }
-        SelectedCategoryMark(mark = categoryMark)
+        SelectedCategoryMark(mark = categoryMark, onPick = onPickCategory)
         AmountFigure(
             amount = amount,
             currency = currency,
@@ -169,14 +175,57 @@ internal fun AmountDisplay(
 
 /**
  * What the amount line shows about the chosen category: the same circle the
- * grid draws it with, in the same colour.
+ * grid draws it with, in the same colour, with its name under it.
  *
- * Not the [CategoryEntity] itself. The colour is resolved by the screen —
- * a subcategory is drawn in its parent's hue, which is a rule that lives in
+ * Always the FAMILY — the root — never the subcategory inside it. Picking
+ * "Prąd" does not change the line to "Prąd": the line answers "what is this
+ * spending about", which is "Rachunki" either way, and the grid directly below
+ * is already showing which of the family it is filed under. It also means the
+ * line does not change twice for what is one decision taken in two taps.
+ *
+ * Not the [CategoryEntity] itself. The colour is resolved by the screen — a
+ * subcategory is drawn in its parent's hue, which is a rule that lives in
  * [com.monyx.ui.theme.Palette] and not in a cell — and passing the resolved one
  * keeps this line from having to know it.
+ *
+ * @param family true when the selection is a CHILD of this root, which is the
+ *   one case the mark is worth tapping: it is how a subcategory is undone now
+ *   that the parent's own cell is no longer in the grid to tap.
  */
-data class CategoryMark(val id: String, val icon: String?, val color: Color)
+data class CategoryMark(
+    val id: String,
+    val name: String,
+    val icon: String?,
+    val color: Color,
+    val family: Boolean = false,
+)
+
+/**
+ * The mark for whatever is selected, or null when nothing is.
+ *
+ * A plain function rather than something computed in a composable, because
+ * "which category does this line show" is a rule — the root of the selection,
+ * not the selection — and both the keypad and the edit sheet have to answer it
+ * the same way. [CategoryGrid] hides exactly this category from its own list,
+ * so the two must agree or a category is in both places or neither.
+ */
+internal fun categoryMarkOf(
+    categories: List<CategoryEntity>,
+    selectedId: String?,
+    colorOf: (CategoryEntity) -> Color,
+): CategoryMark? {
+    val selected = categories.firstOrNull { it.id == selectedId } ?: return null
+    val root = selected.parentId
+        ?.let { parent -> categories.firstOrNull { it.id == parent } }
+        ?: selected
+    return CategoryMark(
+        id = root.id,
+        name = root.name,
+        icon = root.icon,
+        color = colorOf(root),
+        family = root.id != selected.id,
+    )
+}
 
 /**
  * The chosen category, pinned beside the figure.
@@ -198,36 +247,79 @@ data class CategoryMark(val id: String, val icon: String?, val color: Color)
  * taking width from the one figure on the screen that must never be squeezed.
  */
 @Composable
-private fun SelectedCategoryMark(mark: CategoryMark?) {
+private fun SelectedCategoryMark(mark: CategoryMark?, onPick: ((String) -> Unit)?) {
     Box(
-        modifier = Modifier.padding(bottom = 8.dp).size(40.dp),
+        // 60dp, which is the whole cost of this to the figure beside it: the
+        // name is read at 10sp under the circle rather than beside it, because
+        // the figure is 52sp and ellipsises at about nine glyphs — a name on
+        // this line's own axis would have started truncating four-figure
+        // amounts. Family names are short; "Rachunki" fits twice over.
+        modifier = Modifier.padding(bottom = 6.dp).width(60.dp),
         contentAlignment = Alignment.Center,
     ) {
         AnimatedContent(
             targetState = mark,
             transitionSpec = {
                 // In from below, out on the spot: two circles sliding past each
-                // other in a 40dp box is a scramble, and the one arriving is
-                // the answer.
+                // other in one box is a scramble, and the one arriving is the
+                // answer.
                 (slideInVertically { it } + fadeIn()) togetherWith fadeOut()
             },
             label = "categoryMark",
         ) { current ->
             if (current == null) {
-                Box(Modifier.size(40.dp))
+                Box(Modifier.size(36.dp))
             } else {
-                Box(
-                    modifier = Modifier
-                        .size(40.dp)
-                        .clip(CircleShape)
-                        .background(current.color),
-                    contentAlignment = Alignment.Center,
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = if (onPick == null || !current.family) {
+                        Modifier
+                    } else {
+                        // Tapping the family files the row on the family
+                        // itself, which is how a subcategory is undone now
+                        // that the parent is not in the grid to tap. No
+                        // ripple, like the cells it came from; the ring
+                        // appearing and the children un-dimming is the answer.
+                        Modifier.clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null,
+                            onClick = { onPick(current.id) },
+                        )
+                    },
                 ) {
-                    Icon(
-                        imageVector = Palette.icon(current.icon),
-                        contentDescription = null,
-                        tint = Color.White,
-                        modifier = Modifier.size(20.dp),
+                    Box(
+                        modifier = Modifier
+                            .size(36.dp)
+                            .clip(CircleShape)
+                            .background(current.color)
+                            // The same ring the grid puts on an open family:
+                            // filled is "this is the answer", ringed is "the
+                            // answer came from in here".
+                            .then(
+                                if (current.family) {
+                                    Modifier.border(2.dp, Color.White, CircleShape)
+                                } else {
+                                    Modifier
+                                },
+                            ),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(
+                            imageVector = Palette.icon(current.icon),
+                            contentDescription = null,
+                            tint = Color.White,
+                            modifier = Modifier.size(18.dp),
+                        )
+                    }
+                    Spacer(Modifier.height(2.dp))
+                    Text(
+                        text = current.name,
+                        fontSize = 10.sp,
+                        lineHeight = 12.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        textAlign = TextAlign.Center,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
             }
@@ -385,6 +477,13 @@ internal fun CategoryGrid(
     val openRootId = selected?.let { it.parentId ?: it.id }
     val children = openRootId?.let { childrenOf[it] }.orEmpty()
 
+    // The chosen family is not in the list, because it is on the amount line
+    // above — see [categoryMarkOf], which picks exactly this category. Two
+    // copies of the one answer, a thumb apart, with the grid's copy scrolling
+    // away under the one that does not: the list is for what you might choose
+    // next, and the family you are inside is no longer that.
+    val listed = if (openRootId == null) roots else roots.filterNot { it.id == openRootId }
+
     // Opening a family brings it into view.
     //
     // The children are appended after ALL the roots, not under the parent that
@@ -411,7 +510,7 @@ internal fun CategoryGrid(
             return@LaunchedEffect
         }
         if (children.isEmpty()) return@LaunchedEffect
-        state.animateScrollToItem(roots.size + children.size + if (footer != null) 1 else 0)
+        state.animateScrollToItem(listed.size + children.size + if (footer != null) 1 else 0)
     }
 
     LazyVerticalGrid(
@@ -425,18 +524,23 @@ internal fun CategoryGrid(
         horizontalArrangement = Arrangement.spacedBy(4.dp),
         verticalArrangement = if (footer != null) FooterToBottom else Arrangement.spacedBy(10.dp),
     ) {
-        items(roots, key = { it.id }) { category ->
+        items(listed, key = { it.id }) { category ->
             CategoryCell(
+                // Animated, so the chosen family leaving the list reads as the
+                // cells closing over it rather than as the grid blinking.
+                modifier = Modifier.animateItem(),
                 category = category,
                 color = colorOf(category),
-                selected = category.id == selectedId,
-                // The family whose children are showing below, when the choice
-                // itself is one of those children. A ring rather than a fill:
-                // it is not the answer, it is where the answer came from.
-                open = category.id == openRootId && category.id != selectedId,
-                // Faded once the choice is made, unless this IS the choice or
-                // the family it came from. See [CategoryCell].
-                dimmed = openRootId != null && category.id != openRootId,
+                // Neither of these can be true any more — the chosen family
+                // is not in this list — and they are passed explicitly rather
+                // than dropped, because the cell draws both marks and a reader
+                // of the grid should not have to infer that the list it is
+                // given cannot contain the answer.
+                selected = false,
+                open = false,
+                // Faded once the choice is made: everything still listed is
+                // something else. See [CategoryCell].
+                dimmed = openRootId != null,
                 onClick = { onSelect(category.id) },
             )
         }
@@ -505,6 +609,7 @@ private fun CategoryCell(
     color: Color,
     selected: Boolean,
     open: Boolean,
+    modifier: Modifier = Modifier,
     /**
      * Something else has been chosen, so this one steps back.
      *
@@ -526,7 +631,7 @@ private fun CategoryCell(
     // width of the slot, and the icons in one row stopped lining up.
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .alpha(fade)
             // No ripple. The clickable covers the whole cell — 56dp of circle
