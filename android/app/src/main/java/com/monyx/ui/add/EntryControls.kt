@@ -149,11 +149,10 @@ internal fun AmountDisplay(
      */
     categoryMark: CategoryMark? = null,
     /**
-     * Files the row on the family itself, given its id. Null where there is no
-     * category to change — see [SelectedCategoryMark], which only offers it
-     * when a subcategory is what is currently chosen.
+     * Scrolls the grid back to the families. Null on the budget keypad, which
+     * has no grid under it. See [SelectedCategoryMark].
      */
-    onPickCategory: ((String) -> Unit)? = null,
+    onMarkClick: (() -> Unit)? = null,
 ) {
     Row(
         modifier = Modifier
@@ -167,7 +166,7 @@ internal fun AmountDisplay(
         // line that does not mean "type the amount" does not have to be outside
         // the line to say so.
         action?.let { Box(modifier = Modifier.padding(bottom = 10.dp)) { it() } }
-        SelectedCategoryMark(mark = categoryMark, onPick = onPickCategory)
+        SelectedCategoryMark(mark = categoryMark, onClick = onMarkClick)
         AmountFigure(
             amount = amount,
             currency = currency,
@@ -251,7 +250,7 @@ internal fun categoryMarkOf(
  * taking width from the one figure on the screen that must never be squeezed.
  */
 @Composable
-private fun SelectedCategoryMark(mark: CategoryMark?, onPick: ((String) -> Unit)?) {
+private fun SelectedCategoryMark(mark: CategoryMark?, onClick: (() -> Unit)?) {
     Box(
         // The circle is the grid's own 48dp — this is a cell lifted out of the
         // grid, so it is the size of one. The column is 56dp, which is the
@@ -284,18 +283,19 @@ private fun SelectedCategoryMark(mark: CategoryMark?, onPick: ((String) -> Unit)
             } else {
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
-                    modifier = if (onPick == null || !current.family) {
+                    modifier = if (onClick == null) {
                         Modifier
                     } else {
-                        // Tapping the family files the row on the family
-                        // itself, which is how a subcategory is undone now
-                        // that the parent is not in the grid to tap. No
-                        // ripple, like the cells it came from; the ring
-                        // appearing and the children un-dimming is the answer.
+                        // A tap goes back to the families. The grid is
+                        // scrolled past them whenever a family is open — that
+                        // is the point of the block below — and this is the
+                        // one control on the screen that is about the family,
+                        // so it is where a thumb reaches to get out of it. No
+                        // ripple, like the cells it came from.
                         Modifier.clickable(
                             interactionSource = remember { MutableInteractionSource() },
                             indication = null,
-                            onClick = { onPick(current.id) },
+                            onClick = onClick,
                         )
                     },
                 ) {
@@ -551,7 +551,12 @@ internal fun CategoryGrid(
             return@LaunchedEffect
         }
         if (!family) return@LaunchedEffect
-        state.animateScrollToItem(if (pinned) familyIndex else lastIndex)
+        // Not animated, and the cells above do not animate out of its way
+        // either. Three things moved at once for one tap — the roots closing
+        // over the gap, the grid scrolling, the mark rising — and the scroll
+        // was chasing a target the reflow was still moving. One thing moves
+        // now: the mark. The grid is simply where it belongs on the next frame.
+        state.scrollToItem(if (pinned) familyIndex else lastIndex)
     }
 
     // BoxWithConstraints, for one number: how tall a window the family block
@@ -582,9 +587,6 @@ internal fun CategoryGrid(
         ) {
         items(listed, key = { it.id }) { category ->
             CategoryCell(
-                // Animated, so the chosen family leaving the list reads as the
-                // cells closing over it rather than as the grid blinking.
-                modifier = Modifier.animateItem(),
                 category = category,
                 color = colorOf(category),
                 // Neither of these can be true any more — the chosen family

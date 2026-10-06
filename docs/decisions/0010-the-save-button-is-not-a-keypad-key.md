@@ -143,8 +143,12 @@ Three details that are not arbitrary:
 - **The slot is reserved whether or not anything is in it.** The figure is the
   thing being typed and must not jump sideways when a category is picked. It is
   end-aligned, so an empty slot shows nothing.
-- **A ring, and a tap, when a subcategory is chosen.** The grid's own language:
-  filled is "this is the answer", ringed is "the answer came from in here".
-  Tapping it files the row on the family itself, which is how a subcategory is
-  undone now that the parent's cell is not in the grid to tap — the affordance
-  the parent cell used to provide, moved with it.
+- **A ring when a subcategory is chosen.** The grid's own language: filled is
+  "this is the answer", ringed is "the answer came from in here".
+- **A tap goes back to the families**, and takes the note's keyboard down on the
+  way. The grid is scrolled past the roots whenever a family is open, and this is
+  the one control on the screen that is about the family, so it is where a thumb
+  reaches to get out of one. It deliberately does not re-file the row on the
+  family — that was its first behaviour and it made a navigation gesture change
+  what was being saved. Undoing a subcategory is tapping another family and
+  coming back, which puts this one back in the list.

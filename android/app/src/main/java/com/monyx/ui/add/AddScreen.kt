@@ -41,6 +41,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -63,6 +64,7 @@ import com.monyx.data.Dates
 import com.monyx.ui.settings.RecurringEditor
 import com.monyx.ui.settings.RuleSeed
 import com.monyx.ui.theme.Palette
+import kotlinx.coroutines.launch
 
 /**
  * The keypad, first thing. Type the amount, tap a category, tap save. Account,
@@ -190,13 +192,17 @@ fun AddScreen(
 
     val focusManager = LocalFocusManager.current
     val keyboard = LocalSoftwareKeyboardController.current
+    val scope = rememberCoroutineScope()
 
     // Going back to the keypad has to take the system keyboard down with it,
     // and the only way to do that is to drop the note field's focus — a
     // keyboard hidden while its field is still focused comes straight back on
     // the next recomposition.
     fun editAmount() {
-        focusManager.clearFocus()
+        // force, because a field that has the focus is entitled to refuse to
+        // give it up, and a keyboard hidden over a field that still has it
+        // comes straight back on the next recomposition.
+        focusManager.clearFocus(force = true)
         keyboard?.hide()
         editing = Editing.Amount
     }
@@ -297,7 +303,19 @@ fun AddScreen(
             categoryMark = remember(state.categoryId, categories, colorOf) {
                 categoryMarkOf(categories, state.categoryId, colorOf)
             },
-            onPickCategory = viewModel::selectCategory,
+            // Back to the families. The grid is scrolled past them whenever a
+            // family is open, and this is the control that is about the family.
+            //
+            // It takes the note's keyboard down on the way, because a keyboard
+            // is the other thing that can be standing between a thumb and the
+            // families. It does NOT touch which input is live: changing that
+            // re-pins the grid, and a pin and a scroll racing each other is
+            // how a list ends up somewhere neither of them meant.
+            onMarkClick = {
+                focusManager.clearFocus(force = true)
+                keyboard?.hide()
+                scope.launch { gridState.animateScrollToItem(0) }
+            },
         )
 
         CategoryGrid(
@@ -313,7 +331,7 @@ fun AddScreen(
                 // taking the keys away at exactly the moment they are needed
                 // next would be the opposite of helping.
                 if (state.amountMinor > 0) {
-                    focusManager.clearFocus()
+                    focusManager.clearFocus(force = true)
                     keyboard?.hide()
                     editing = Editing.Nothing
                 } else {
@@ -362,7 +380,11 @@ fun AddScreen(
             Text(
                 text = stringResource(blocker),
                 style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                // The error colour, because this line only ever appears when
+                // something has refused to happen. In the theme's grey it read
+                // as a caption of the screen rather than as the answer to the
+                // tap that had just been ignored.
+                color = MaterialTheme.colorScheme.error,
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 12.dp, vertical = 10.dp),
