@@ -34,7 +34,9 @@ import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.mutableStateOf
@@ -49,6 +51,7 @@ import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -108,6 +111,12 @@ private enum class Editing {
 fun AddScreen(
     viewModel: AddViewModel,
     memberId: String?,
+    /**
+     * The bottom bar's middle button, which this screen borrows as its save
+     * button for as long as it is up. See [AddSaveSlot]: the save bar that used
+     * to sit directly above it is gone, and the 62dp is the category grid's.
+     */
+    saveSlot: AddSaveSlot,
     onSaved: () -> Unit,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -169,6 +178,32 @@ fun AddScreen(
         keyboard?.hide()
         editing = Editing.Amount
     }
+
+    // What the bar's middle button does while this screen is up.
+    //
+    // Saving needs an amount, an account AND a category, and it needs a member
+    // to credit the row to — no member id means enrolment has not landed and
+    // saving would write an orphan. The button is drawn greyed until all four
+    // are in, exactly as the save bar it replaced was, because an arriving
+    // button in the navigation bar would shift the whole bar's layout.
+    //
+    // Withdrawn while the rule editor is open: it covers this screen with a
+    // save button of its own, and the bar's would commit the transaction behind
+    // it. On dispose too, so leaving the tab puts "Dodaj" back even though the
+    // bar is composed by somebody else.
+    SideEffect {
+        if (seed == null) {
+            saveSlot.offer(enabled = memberId != null && state.canSave) {
+                memberId?.let {
+                    viewModel.save(it, onSaved)
+                    editAmount()
+                }
+            }
+        } else {
+            saveSlot.withdraw()
+        }
+    }
+    DisposableEffect(Unit) { onDispose { saveSlot.withdraw() } }
 
     // The keypad hands the half-typed transaction to the rule editor rather
     // than making anyone type it twice. A rule does not backfill, so an anchor
@@ -278,19 +313,23 @@ fun AddScreen(
             )
         }
 
-        SaveBar(
-            state = state,
-            currency = state.currencyOr(
-                Currency.of(accounts.firstOrNull { it.id == state.accountId }?.currency),
-            ),
-            hasMember = memberId != null,
-            onSave = {
-                memberId?.let {
-                    viewModel.save(it, onSaved)
-                    editAmount()
-                }
-            },
-        )
+        // The one blocker with nothing else on screen to show it. Everything
+        // else the save button waits for is visible — the amount is the largest
+        // thing here and the categories fill the middle — but a household with
+        // no account yet would be looking at a dead button in the bar below and
+        // no reason for it. A line of text rather than a bar: it costs nothing
+        // in the state that is not a bug report.
+        if (state.accountId == null) {
+            Text(
+                text = stringResource(R.string.add_needs_account),
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 12.dp, vertical = 10.dp),
+                textAlign = TextAlign.Center,
+            )
+        }
     }
 
     if (showCurrencyPicker) {
@@ -363,47 +402,6 @@ private fun KindSelector(selected: EntryKind, onSelect: (EntryKind) -> Unit) {
             }
         }
     }
-}
-
-/**
- * The save bar, once there is something to save.
- *
- * It used to stand there from the first frame saying "Podaj kwotę", then
- * "Wybierz kategorię" — narrating a screen that is already showing both. The
- * amount is the largest thing on it and the categories fill the middle of it;
- * a button spelling out that neither has been touched yet costs 62dp to tell
- * you what you are looking at. So while those two are what is missing, there is
- * no bar at all, and it arrives — filled, green, with the figure on it — at the
- * moment the transaction becomes savable. An arriving button is a better
- * signal than a dead one, and the space goes to the category grid.
- *
- * The two blockers that are NOT on screen still get said out loud: no account
- * and no member are states nothing else here would explain, and a screen that
- * simply refused to save would be a bug report.
- */
-@Composable
-private fun SaveBar(
-    state: AddUiState,
-    currency: Currency,
-    hasMember: Boolean,
-    onSave: () -> Unit,
-) {
-    // Always there, greyed until the entry is complete. It used to appear only
-    // once amount and category were both in — which is mid-typing when the
-    // category goes first — and a 62dp bar arriving under the keypad shoved
-    // every key up one row between the first digit and the second.
-    val unfinished = state.amountMinor <= 0 || state.categoryId == null
-    SaveBar(
-        // A missing account is the one gap with nothing else on screen to show
-        // it, so it is the one the bar still names.
-        blocker = if (state.accountId == null) R.string.add_needs_account else null,
-        amountMinor = state.amountMinor,
-        currency = currency,
-        // No member id means enrolment has not landed; there is nobody to
-        // credit the row to and saving would write an orphan.
-        enabled = hasMember && !unfinished,
-        onSave = onSave,
-    )
 }
 
 @OptIn(ExperimentalLayoutApi::class)

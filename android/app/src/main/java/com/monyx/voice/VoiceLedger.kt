@@ -77,9 +77,18 @@ class RepositoryVoiceLedger(private val repository: MonyxRepository) : VoiceLedg
      *  offered or editing its note would show no account selected at all. */
     override val editableAccounts: Flow<List<AccountEntity>> = repository.accounts()
 
-    /** activeAccounts(), so "the default account" means the same thing here as
-     *  it does in AddViewModel.ensureDefaultAccount — an archived card is not
-     *  somewhere to put money. */
+    /**
+     * The names, for the summary chip and for the correction pass to match a
+     * spoken "na kartę" against. activeAccounts(), because an archived card is
+     * not somewhere to put money.
+     *
+     * Table order, and nothing may read it positionally. This comment used to
+     * claim the first row was "the default account, the same thing it means in
+     * AddViewModel.ensureDefaultAccount", and it was not: that one sorts the
+     * groups first, and this one is raw `sortOrder, name`. The parser believed
+     * the comment and filed spoken expenses to whatever sorted first — see
+     * VoiceEntryViewModel.defaultAccountId, which works it out properly.
+     */
     override val accounts: Flow<List<VoiceAccount>> = repository.activeAccounts().map { rows ->
         rows.map { VoiceAccount(id = it.id, name = it.name) }
     }

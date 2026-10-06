@@ -33,7 +33,8 @@ sealed interface KeyAction {
     data object Backspace : KeyAction
     data class Operator(val op: Char) : KeyAction
 
-    /** Folds a pending sum into one number. It does NOT save — see SaveBar. */
+    /** Folds a pending sum into one number. It does NOT save — the bottom bar's
+     *  middle button does, while the keypad is up. See AddSaveSlot. */
     data object Equals : KeyAction
 }
 

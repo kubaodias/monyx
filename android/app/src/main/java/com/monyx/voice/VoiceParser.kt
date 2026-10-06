@@ -93,7 +93,20 @@ object VoiceParser {
         transcript: String,
         alternatives: List<String> = emptyList(),
         categories: List<VoiceCategory>,
-        accounts: List<VoiceAccount>,
+        /**
+         * The account every row this parser produces is filed to — the
+         * household's default, worked out by the caller. Null means the
+         * household has none yet, which is a refusal rather than a guess.
+         *
+         * It used to be a list, and the parser took the first of it. Nothing
+         * ever searched that list: no sentence names an account (see below), so
+         * the only thing the parameter did was choose a default, and "first in
+         * the table" is not the household's default — it is whatever sorts
+         * first, which here was a savings account. An id leaves nothing to pick
+         * wrong. See [com.monyx.data.defaultAccount] for the rule, which is now
+         * applied in one place for the keypad and the microphone both.
+         */
+        defaultAccountId: String?,
         locale: Locale,
         today: LocalDate,
     ): VoiceParse {
@@ -106,7 +119,7 @@ object VoiceParser {
         // got furthest, so the keypad opens with as much filled in as possible.
         var best: VoiceParse.Partial? = null
         for (hypothesis in hypotheses) {
-            when (val parsed = parseOne(hypothesis, categories, accounts, locale, today)) {
+            when (val parsed = parseOne(hypothesis, categories, defaultAccountId, locale, today)) {
                 is VoiceParse.Complete -> return parsed
                 is VoiceParse.Partial -> if (best == null || rank(parsed) > rank(best)) best = parsed
                 is VoiceParse.Unrecognised -> Unit
@@ -124,7 +137,7 @@ object VoiceParser {
     private fun parseOne(
         text: String,
         categories: List<VoiceCategory>,
-        accounts: List<VoiceAccount>,
+        defaultAccountId: String?,
         locale: Locale,
         today: LocalDate,
     ): VoiceParse {
@@ -219,8 +232,9 @@ object VoiceParser {
             categoryId = if (splitUtterance) null else category?.id,
             // Nobody names the account in a shop, and offering to would double
             // the ambiguity surface of a field that is right by default. The
-            // correction pass can set it, which is where it is actually used.
-            accountId = accounts.firstOrNull()?.id,
+            // correction pass can set it by name, and so can the ledger row
+            // afterwards, which is where changing it actually happens.
+            accountId = defaultAccountId,
             date = spokenDate?.date ?: today,
             note = note,
             transcript = text,

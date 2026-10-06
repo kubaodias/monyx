@@ -1,7 +1,6 @@
 package com.monyx
 
 import com.monyx.ui.add.EntryKind
-import com.monyx.voice.VoiceAccount
 import com.monyx.voice.VoiceCategory
 import com.monyx.voice.VoiceParse
 import com.monyx.voice.VoiceParser
@@ -48,17 +47,17 @@ class VoiceParserTest {
         groceries, transport, home, health, fun_, kids, salary, otherIncome, fuel, repairs,
     )
 
-    private val cash = VoiceAccount("a-cash", "Gotówka")
-    private val card = VoiceAccount("a-card", "Karta")
-    private val accounts = listOf(cash, card)
+    /** The household's default, worked out by the caller — see
+     *  VoiceEntryTest for the test that it IS the household's default. */
+    private val wallet = "a-wallet"
 
     private fun parse(
         text: String,
         alternatives: List<String> = emptyList(),
         locale: Locale = pl,
         categories: List<VoiceCategory> = this.categories,
-        accounts: List<VoiceAccount> = this.accounts,
-    ) = VoiceParser.parse(text, alternatives, categories, accounts, locale, today)
+        defaultAccountId: String? = wallet,
+    ) = VoiceParser.parse(text, alternatives, categories, defaultAccountId, locale, today)
 
     private fun complete(text: String, locale: Locale = pl) =
         (parse(text, locale = locale) as VoiceParse.Complete).transaction
@@ -72,7 +71,7 @@ class VoiceParserTest {
         assertEquals(transport.id, english.categoryId)
         assertEquals(EntryKind.Expense, english.kind)
         assertEquals(today, english.date)
-        assertEquals(cash.id, english.accountId)
+        assertEquals(wallet, english.accountId)
 
         val polish = complete("dodaj 200 na transport")
         assertEquals(english.amountMinor, polish.amountMinor)
@@ -130,7 +129,7 @@ class VoiceParserTest {
             "salary 5000",
             emptyList(),
             listOf(VoiceCategory("c-salary-en", "Salary", EntryKind.Income)),
-            accounts,
+            wallet,
             en,
             today,
         )
@@ -542,11 +541,11 @@ class VoiceParserTest {
         assertEquals(VoiceParse.Missing.Category, (parsed as VoiceParse.Partial).missing)
     }
 
-    /** A freshly enrolled phone whose accounts have not arrived. accounts.first()
-     *  would throw; the keypad already knows how to say "add an account first". */
+    /** A freshly enrolled phone whose accounts have not arrived. The keypad
+     *  already knows how to say "add an account first". */
     @Test
     fun `a household with no accounts yet refuses rather than throwing`() {
-        val parsed = parse("dodaj 200 na transport", accounts = emptyList())
+        val parsed = parse("dodaj 200 na transport", defaultAccountId = null)
         assertEquals(VoiceParse.Missing.Account, (parsed as VoiceParse.Partial).missing)
         assertNull(parsed.transaction.accountId)
     }
@@ -554,7 +553,7 @@ class VoiceParserTest {
     @Test
     fun `the date comes from the argument and nowhere else`() {
         val other = LocalDate.of(2019, 12, 31)
-        val parsed = VoiceParser.parse("dodaj 200 na transport", emptyList(), categories, accounts, pl, other)
+        val parsed = VoiceParser.parse("dodaj 200 na transport", emptyList(), categories, wallet, pl, other)
         assertEquals(other, (parsed as VoiceParse.Complete).transaction.date)
     }
 }

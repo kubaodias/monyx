@@ -438,3 +438,30 @@ can do is nothing.
 - **No new Gradle dependency.** `SpeechRecognizer` is framework, the sheet is
   Material3, the gesture is `foundation`. `gradle/libs.versions.toml` did not
   need to change, which is the cheapest possible answer to "is this worth it".
+
+## Addendum, 2026-10-06: a spoken row lands on the household's default account
+
+Nothing in a sentence picks an account, and nothing is going to. The grammar
+reads an amount, a category and a date; the account is a default, and the way to
+change it is a tap — on the summary sheet while it is up, or on the row in the
+ledger afterwards. Asking the sentence to carry it would double the ambiguity
+surface of the one field that is right nine times in ten, and asking a model to
+infer it would put a network round trip in the middle of a sentence, which the
+decision above forbids.
+
+That default was wrong. It was the first row of `activeAccounts()` — the table's
+own `sortOrder, name` — under a comment claiming it meant the same thing as
+`defaultAccount`, which groups the accounts the household actually spends from
+ahead of the ones it does not. In the owner's household those two answers
+differ: the first row is "Oszczędności", a savings pot held outside the summary,
+and every expense said out loud was filed there. The sheet named the account, so
+it was on screen; it just read as the account the app had chosen rather than as
+a mistake.
+
+`VoiceEntryViewModel.defaultAccountId` now applies `defaultAccount`, the one
+rule, read off the account entities — `VoiceAccount` carries only a name, and
+the rule is about which group an account is in. `VoiceParser.parse` stopped
+taking a list of accounts at all and takes the chosen id: nothing in the parser
+ever searched that list, so all the parameter did was offer a wrong default to
+pick from. A `VoiceEntryTest` case files a sentence in a two-account household
+shaped like the owner's and fails on the old behaviour.
