@@ -873,17 +873,17 @@ private fun TransactionRow(
             item.kind == "income" -> MaterialTheme.colorScheme.primary
             else -> MaterialTheme.colorScheme.onSurface
         }
-        // A foreign row carries its own unit and its złoty value underneath:
-        // "-15,00 €" over "-65,78 zł". Without the unit, "-15,00" from a euro
-        // card and "-15,00" from a złoty one were the same six characters for
-        // different money; without the conversion, nothing on the row connects
-        // it to the total above. A złoty row stays bare — see
-        // Money.ledgerRowFigure.
+        // Both units whenever the row has two: a euro row over its złoty value,
+        // or — on a euro account — a złoty row over its euro value. Without the
+        // unit, "-15,00" from a euro card and "-15,00" from a złoty one were the
+        // same six characters for different money. See Money.ledgerRowFigure.
         val figure = Money.ledgerRowFigure(
             amountMinor = item.amountMinor,
             kind = item.kind,
             currency = Currency.of(item.currency),
             plnMinor = item.plnMinor,
+            accountCurrency = Currency.of(item.accountCurrency),
+            accountMinor = item.accountMinor,
         )
         Column(horizontalAlignment = Alignment.End) {
             Text(

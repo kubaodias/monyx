@@ -192,23 +192,28 @@ own currency.
 - **Totals** — Overview, Bilans, Budget, the ledger's month figure — złoty,
   always. `Money.formatWithCurrency` takes no currency so it cannot be handed
   one.
-- **The Overview account strip** leads with the converted figure and puts the
-  account's own money in brackets after it, on **one line**:
-  `-65,78 zł (-15,00 €)`. Złoty leads because the strip is what Bilans is the
-  sum of — a strip of euro figures over a złoty total is a screen whose
-  arithmetic does not visibly work. One line, because a second one made exactly
+- **The Overview account strip** leads with the account's own money and puts the
+  złoty value in brackets after it, on **one line**: `-15,00 € (-65,78 zł)`. A
+  tile is one account's position, and "how many euro have I got" is what the
+  strip is opened to answer; the złoty figure beside it is what makes the strip
+  visibly the thing Bilans adds up. One line, because a second one made exactly
   one tile in the strip taller than its neighbours.
-- **A ledger row** is the other way round: what was entered, with its symbol,
-  and its złoty value smaller underneath. A row is an event, and the figure on
-  the receipt is the one to lead with. A złoty row carries no unit and no second
-  figure at all — marking the exception rather than putting "zł" on hundreds of
-  rows to disambiguate three.
+- **A ledger row** shows what was entered with its symbol, and the same money in
+  the unit the row is read *against* underneath — złoty for a foreign row. For a
+  **złoty row on a foreign account** it is the account's currency instead, with
+  złoty still leading: `-100,00 zł` over `-22,80 €`, because 100 zł paid from a
+  euro card is złoty, and a bare "100,00" in a list of euro rows reads as euro.
+- **A złoty row on a złoty account** carries no unit and no second figure, which
+  is every row in a household that holds złoty only.
 - **The keypad and the save button** follow the entry's currency, which starts
   as the chosen account's; that is the unit the figure being typed is in.
 
-Both of those come from `Money.accountStripFigure` and `Money.ledgerRowFigure`,
-so each rule is stated once and the tests call the same function the screen
-does.
+Both rules come from `Money.accountStripFigure` and `Money.ledgerRowFigure`, so
+each is stated once and the tests call the same function the screen does. The
+third figure — a row's amount in its account's currency — is
+`ledger_pln.accountMinor`, converted **through złoty**, since that is the only
+base `fx_rates` is keyed on. Nothing sums it; it exists to be printed on one
+row.
 
 `budgets.ts` carries a **second** implementation of the same sum, for the alert
 the server sends. It converts too, with integer division matching the view

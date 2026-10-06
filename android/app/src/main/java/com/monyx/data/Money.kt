@@ -124,59 +124,72 @@ object Money {
     data class Figure(val main: String, val aside: String?)
 
     /**
-     * An account on the Overview strip: złoty first, its own money in brackets
-     * after it, on ONE line.
+     * An account on the Overview strip: its own money first, the złoty value in
+     * brackets after it, on ONE line — "-15,00 € (-65,78 zł)".
      *
-     * Złoty leads because the strip is what Bilans is the sum of — a row of euro
-     * figures above a złoty total is a screen whose arithmetic does not visibly
-     * work. The account's own figure stays, because "how many euro have I got"
-     * is a real question, but it shares the line rather than taking a second
-     * one: a strip where only the foreign tile is two lines tall is a strip of
-     * unequal tiles, and the ragged one would be the odd account rather than an
-     * important one.
+     * The account's own currency leads because a tile is that one account's
+     * position, and "how many euro have I got" is the question somebody opens
+     * the strip to answer. The złoty value stays beside it, because the strip is
+     * also visibly what Bilans is the sum of. This is the reverse of the order
+     * shipped in 0.23.1, which led with złoty on the grounds that the total is
+     * what the strip adds up to — true of the total and not of the tile.
+     *
+     * One line either way: a strip where only the foreign tile is two lines tall
+     * is a strip of unequal tiles, and the ragged one would be the odd account
+     * rather than an important one.
      */
     fun accountStripFigure(balanceMinor: Long, currency: Currency, plnMinor: Long?): Figure =
         if (currency.isReporting) {
             Figure(formatWithCurrency(balanceMinor), null)
         } else {
             Figure(
-                // No rate synced yet: an em dash, not the euro figure dressed up
-                // as złoty. The account's own balance is beside it either way,
-                // so nothing is hidden.
-                plnMinor?.let { formatWithCurrency(it) } ?: "—",
-                "(${formatIn(balanceMinor, currency)})",
+                formatIn(balanceMinor, currency),
+                // An em dash INSIDE the brackets when no rate has synced. The
+                // account's own balance is the headline now, so a missing rate
+                // no longer hides the money — but it still has to be visible
+                // rather than silently absent, or the tile looks like a złoty
+                // account.
+                "(${plnMinor?.let { formatWithCurrency(it) } ?: "—"})",
             )
         }
 
     /**
-     * A ledger row: the amount as it was entered, with its złoty value under it.
+     * A ledger row: the amount as entered, with the same money in the unit of
+     * whatever else the row is being read against, underneath.
      *
-     * The other way round from [accountStripFigure], deliberately. A row is an
-     * event — 15 euro left the account, and that is the figure somebody
-     * recognises from the receipt. A tile is a position being summed into a
-     * złoty total. Each screen leads with the figure it is about, and the other
-     * unit is always there rather than left to be worked out.
+     * The "other" unit is złoty for a foreign row — the reporting currency,
+     * which is what the month total above it is in. For a złoty row sitting on a
+     * foreign account it is the ACCOUNT's currency instead: 100 zł paid from a
+     * euro card belongs to a list of euro rows and a euro balance, and "100,00"
+     * among them says nothing about which of the two it is. That case prints
+     * "-100,00 zł" over "-22,80 €" — złoty leading, because złoty is what
+     * happened.
      *
-     * A złoty row gets no unit and no aside. Marking the exception is what makes
-     * the exception visible; "zł" on five hundred rows to disambiguate three is
-     * the opposite, and the month total above them already says which unit it is
-     * in.
+     * A złoty row on a złoty account gets no unit and no second figure. Marking
+     * the exception is what makes the exception visible; "zł" on five hundred
+     * rows to disambiguate three is the opposite, and the month total above them
+     * already says which unit it is in.
      */
     fun ledgerRowFigure(
         amountMinor: Long,
         kind: String,
         currency: Currency,
         plnMinor: Long?,
-    ): Figure = if (currency.isReporting) {
-        Figure(formatSigned(amountMinor, kind), null)
-    } else {
-        Figure(
+        accountCurrency: Currency = Currency.PLN,
+        accountMinor: Long? = null,
+    ): Figure = when {
+        !currency.isReporting -> Figure(
             "${formatSigned(amountMinor, kind)} ${currency.suffix}",
             // Null, not "—": the amount that happened is already on the line
             // above in the unit it happened in, so a missing rate costs the
-            // reader nothing here. On the strip it is the headline figure.
+            // reader nothing here.
             plnMinor?.let { "${formatSigned(it, kind)} $CURRENCY" },
         )
+        !accountCurrency.isReporting -> Figure(
+            "${formatSigned(amountMinor, kind)} $CURRENCY",
+            accountMinor?.let { "${formatSigned(it, kind)} ${accountCurrency.suffix}" },
+        )
+        else -> Figure(formatSigned(amountMinor, kind), null)
     }
 
     /**
