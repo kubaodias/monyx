@@ -162,8 +162,8 @@ fun SettingsScreen(onOpenAccountTransactions: (accountId: String, period: String
     // enrolment has landed, and then never again.
     val myMemberId by viewModel.memberId.collectAsStateWithLifecycle(initialValue = null)
     // Null until DataStore answers, and null is also the answer for a household
-    // that has never chosen — see [com.monyx.data.Currencies.DEFAULT_SHOWN].
-    val shownCurrencies by viewModel.shownCurrencies.collectAsStateWithLifecycle(initialValue = null)
+    // that has never chosen — see [com.monyx.data.Currencies.DEFAULT].
+    val chosenCurrencies by viewModel.chosenCurrencies.collectAsStateWithLifecycle(initialValue = null)
 
     val snackbarHostState = remember { SnackbarHostState() }
     val coroutineScope = rememberCoroutineScope()
@@ -312,8 +312,9 @@ fun SettingsScreen(onOpenAccountTransactions: (accountId: String, period: String
                         inUse = remember(accounts) {
                             accounts.mapTo(HashSet()) { Currency.of(it.entity.currency).code }
                         },
-                        shown = shownCurrencies,
-                        onSetShown = viewModel::setCurrencyShown,
+                        chosen = chosenCurrencies,
+                        onAdd = viewModel::addCurrency,
+                        onRemove = viewModel::removeCurrency,
                     )
                 }
 

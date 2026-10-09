@@ -130,3 +130,37 @@ Two things worth stating, because both were wrong first:
   thing moves now, and it is the mark; the grid is simply where it belongs on
   the next frame. The one scroll that IS animated is the one a tap asks for
   directly, on the mark, where there is nothing else moving to race.
+
+
+## Addendum, 2026-10-09: the block is re-pinned, not pinned once
+
+The pin was computed in one place and scrolled to in another, and only when a
+family was *opened*. Everything else that changes the window — the note's
+keyboard arriving, the keys coming back as it leaves — left the scroll where it
+was and let the list clamp itself.
+
+That is the bug the owner found: open a family, type a note, then tap the amount
+again. The keyboard goes, the keys come back, the family block is still a window
+tall — and the list is wherever the keyboard's retreat left it, which showed the
+roots with the block starting below the fold. The note is at the END of that
+block, so the field somebody had just been typing in was off screen with nothing
+saying so.
+
+The effect is now keyed on the family, on whether the block is pinned, and on
+the keyboard's height — read inside the grid, because the grid is always inside
+the window that owns the input (the edit sheet is its own window, and an inset
+read outside it is zero). Every frame of the slide re-pins, which is the same
+"follow it down" the note already had, done once for both inputs.
+
+The asymmetry from the original decision survives, and had to be stated as a
+rule rather than a side effect of the keys: **only the pinned state scrolls.**
+A pin that goes away does not put the roots back, because the thing that makes
+it go away is a tap on a subcategory — and throwing the grid to the top under
+the thumb that just tapped was the first version of this bug. The roots still
+come back; they come back because the content stops overflowing.
+
+One consequence worth naming: the two screens with a note under the grid no
+longer scroll it into view themselves while the grid is pinning. A pinned block
+already puts the note at the foot of the window it takes, so both effects were
+aiming at the same offset through each other, one animated and one not. They ask
+`familyHasChildren` first.

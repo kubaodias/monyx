@@ -25,11 +25,11 @@ import com.monyx.data.Currency
 @Composable
 internal fun rememberOfferedCurrencies(inUse: Collection<String?>): List<Currency> {
     val app = LocalContext.current.applicationContext as MonyxApp
-    val shown by app.currencyPreferences.shown.collectAsStateWithLifecycle(initialValue = null)
+    val chosen by app.currencyPreferences.chosen.collectAsStateWithLifecycle(initialValue = null)
     // The first frame reads null, which is "nobody has chosen" — the same answer
     // a fresh install gives, and the same list. A phone that HAS hidden things
     // shows them for one frame of a dialog opening; cheap, and the alternative
     // is an empty picker while DataStore reads from disk.
     val keep = inUse.filterNotNullTo(HashSet())
-    return remember(shown, keep) { Currencies.offered(shown, keep) }
+    return remember(chosen, keep) { Currencies.offered(chosen, keep) }
 }

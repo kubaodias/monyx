@@ -36,31 +36,57 @@ class CurrencyTest {
     }
 
     @Test
-    fun `an unrecognised currency reads as zloty rather than crashing`() {
-        // A row from a newer client offering a currency this build does not
-        // know. A figure in the wrong unit on one row beats a crash on open,
-        // and the server refuses codes IT does not know, so the set can only
-        // run ahead of a phone and never be invented.
-        assertEquals(Currency.PLN, Currency.of("JPY"))
-        assertEquals(Currency.PLN, Currency.of("HRK"))
+    fun `a currency this build has no symbol for reads as itself, not as zloty`() {
+        // It used to read as złoty, which was defensible while the nine were
+        // the only possibilities and is the opposite of safe now that a
+        // household can add its own: a baht row resolving to PLN would print
+        // "zł" after a baht figure AND claim to be the reporting currency, so
+        // the summary would count it as złoty. Itself, with no rate, is the
+        // truth about a code nobody on this phone has named.
+        assertEquals("THB", Currency.of("THB").code)
+        assertEquals("THB", Currency.of("THB").suffix)
+        assertFalse(Currency.of("THB").isReporting)
+    }
+
+    @Test
+    fun `two of the same code are the same currency whatever symbol each carries`() {
+        // The app compares these to answer "is this the account's own unit",
+        // and one side may have been resolved before the symbols had loaded.
+        assertEquals(Currency.of("THB"), Currency.custom("THB", "฿"))
+        assertEquals(Currency.of("EUR"), Currency.EUR)
+        assertFalse(Currency.of("THB") == Currency.of("SEK"))
+    }
+
+    @Test
+    fun `a code has to be three capitals`() {
+        // The same rule the server applies, so nothing offered here can be
+        // refused at sync time. See isCurrencyCode in server/src/rates.ts.
+        assertTrue(Currency.isValidCode("THB"))
+        assertFalse(Currency.isValidCode("thb"))
+        assertFalse(Currency.isValidCode("EU"))
+        assertFalse(Currency.isValidCode("EURO"))
+        assertFalse(Currency.isValidCode(""))
     }
 
     @Test
     fun `only zloty is the reporting currency`() {
         assertTrue(Currency.PLN.isReporting)
-        for (other in Currency.entries.filter { it != Currency.PLN }) {
+        for (other in Currency.KNOWN.filter { it != Currency.PLN }) {
             assertFalse("${other.code} must not read as the reporting currency", other.isReporting)
         }
+        assertFalse(Currency.custom("PLX", "zl").isReporting)
     }
 
     @Test
-    fun `the nine offered currencies match the server's list`() {
-        // rates.ts carries the same nine. They have to agree or the picker
-        // offers a currency a push is then refused for.
+    fun `the nine rated currencies match the server's list`() {
+        // rates.ts carries the same nine. They have to agree or a currency the
+        // picker calls convertible has no rate to convert by — which is no
+        // longer a rejected push, and is therefore worth asserting.
         assertEquals(
             listOf("PLN", "EUR", "USD", "GBP", "CHF", "CZK", "SEK", "NOK", "DKK"),
-            Currency.entries.map { it.code },
+            Currency.KNOWN.map { it.code },
         )
+        assertEquals(Currency.KNOWN.map { it.code }.toSet(), Currency.RATED)
     }
 
     @Test
@@ -175,13 +201,56 @@ class CurrencyTest {
     // ------------------------------------------ which ones a picker offers
 
     @Test
-    fun `a phone nobody has configured offers zloty, the euro and the dollar`() {
-        // The nine are what the app can HANDLE; this is what a Polish household
-        // meets. Six Scandinavian-and-friends entries in a picker reached from
-        // a chip beside the amount is six things between a thumb and the euro.
+    fun `a phone nobody has configured offers zloty and the euro`() {
+        // The nine are what the app can CONVERT; this is what a Polish
+        // household meets. Seven more entries in a picker reached from a chip
+        // beside the amount is seven things between a thumb and the euro, and
+        // the dollar was the eighth until somebody counted them.
         assertEquals(
-            listOf("PLN", "EUR", "USD"),
+            listOf("PLN", "EUR"),
             Currencies.offered(null).map { it.code },
+        )
+    }
+
+    @Test
+    fun `one typed in by hand is offered with the symbol it was given`() {
+        // A code and the text to print after a figure is all a currency is
+        // here. No rate, which is a separate fact — see the ledger rows below.
+        val offered = Currencies.offered(setOf("EUR", "THB=฿"))
+        assertEquals(listOf("PLN", "EUR", "THB"), offered.map { it.code })
+        assertEquals("฿", offered.last().suffix)
+    }
+
+    @Test
+    fun `an added currency with no symbol prints its code`() {
+        // Which is what CHF and the krona do anyway. A figure with no unit
+        // after it on a ledger of mixed currencies is the worse outcome.
+        assertEquals("THB", Currencies.offered(setOf("THB")).last().suffix)
+        assertEquals("THB", Currencies.offered(setOf("THB=")).last().suffix)
+    }
+
+    @Test
+    fun `a known currency keeps its own symbol whatever was stored beside it`() {
+        // "EUR=E" would be one phone printing a glyph for the euro that no
+        // other screen in the app agrees with.
+        assertEquals("€", Currencies.offered(setOf("EUR=E")).last().suffix)
+        assertEquals("EUR", Currencies.entry("eur", "E"))
+        assertEquals("THB=฿", Currencies.entry("thb", " ฿ "))
+        assertEquals("THB", Currencies.entry("THB", ""))
+    }
+
+    @Test
+    fun `an entry that is not a code is dropped rather than shown`() {
+        assertEquals(listOf("PLN"), Currencies.offered(setOf("zloty", "EU", "")).map { it.code })
+    }
+
+    @Test
+    fun `the symbols handed to the resolver are the added ones only`() {
+        // What MonyxApp publishes to Currency.of, which every ledger row goes
+        // through. The nine resolve themselves and do not belong in it.
+        assertEquals(
+            mapOf("THB" to "฿"),
+            Currencies.symbols(setOf("EUR", "USD", "THB=฿")),
         )
     }
 
@@ -194,38 +263,41 @@ class CurrencyTest {
     }
 
     @Test
-    fun `a currency an account holds is offered even when it is hidden`() {
-        // Hiding is about not being asked. An account denominated in krona is a
-        // fact already written down, and a form that would not offer SEK could
-        // not edit that account without silently changing what its money is.
-        val offered = Currencies.offered(setOf("EUR"), inUse = setOf("SEK"))
-        assertEquals(listOf("PLN", "EUR", "SEK"), offered.map { it.code })
-        assertTrue("Settings must refuse to hide it", Currencies.locked(Currency.SEK, setOf("SEK")))
+    fun `a currency an account holds is offered even when it was removed`() {
+        // Removing is about not being asked. An account denominated in krona is
+        // a fact already written down, and a form that would not offer SEK
+        // could not edit that account without silently changing what its money
+        // is. Including a custom one, which is the case that matters most: it
+        // is the only record of what that symbol means.
+        val offered = Currencies.offered(setOf("EUR"), inUse = setOf("SEK", "THB"))
+        assertEquals(listOf("PLN", "EUR", "SEK", "THB"), offered.map { it.code })
+        assertTrue("Settings must refuse it", Currencies.locked(Currency.SEK, setOf("SEK")))
     }
 
     @Test
-    fun `hiding one leaves the others alone`() {
+    fun `removing one leaves the others alone`() {
         val offered = Currencies.offered(setOf("USD")).map { it.code }
         assertEquals(listOf("PLN", "USD"), offered)
         assertFalse(Currencies.locked(Currency.EUR, emptySet()))
     }
 
     @Test
-    fun `switching the last one off is not the same as never choosing`() {
+    fun `removing the last one is not the same as never choosing`() {
         // Empty is a decision and has to stick; absent is "nobody has said",
-        // which is the default pair. Collapsing the two would make the last
-        // switch-off silently restore the euro and the dollar.
+        // which is the default. Collapsing the two would make the last removal
+        // silently bring the euro back.
         assertEquals(listOf("PLN"), Currencies.offered(emptySet()).map { it.code })
-        assertEquals(listOf("PLN", "EUR", "USD"), Currencies.offered(null).map { it.code })
+        assertEquals(listOf("PLN", "EUR"), Currencies.offered(null).map { it.code })
     }
 
     @Test
-    fun `the offer keeps the enum's order rather than the household's`() {
+    fun `the offer lists the rated ones in their own order, then the rest`() {
         // The picker is a reference list, not a ranking: PLN, EUR, USD, GBP …
         // is the order it has always been in, and a set has no order to carry.
+        // Anything added by hand comes after all of those, alphabetically.
         assertEquals(
-            listOf("PLN", "EUR", "GBP", "DKK"),
-            Currencies.offered(setOf("DKK", "GBP", "EUR")).map { it.code },
+            listOf("PLN", "EUR", "GBP", "DKK", "BHD", "THB"),
+            Currencies.offered(setOf("THB", "DKK", "GBP", "EUR", "BHD")).map { it.code },
         )
     }
 

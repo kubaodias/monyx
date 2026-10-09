@@ -161,8 +161,12 @@ fun AddScreen(
     // because every frame of its slide takes a little more of the window.
     val gridState = rememberLazyGridState()
     val imeBottom = WindowInsets.ime.getBottom(LocalDensity.current)
-    LaunchedEffect(editing, imeBottom) {
-        if (editing == Editing.Note) {
+    // Unless the grid is pinning a family, which already puts the note at the
+    // foot of the window it pins — two effects scrolling the one list at the
+    // same target through each other. See [familyHasChildren].
+    val gridPins = familyHasChildren(selectable, state.categoryId)
+    LaunchedEffect(editing, imeBottom, gridPins) {
+        if (editing == Editing.Note && !gridPins) {
             val last = gridState.layoutInfo.totalItemsCount - 1
             if (last >= 0) gridState.animateScrollToItem(last)
         }

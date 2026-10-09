@@ -12,6 +12,8 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -65,6 +67,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -513,6 +516,21 @@ internal fun KindSelector(
 }
 
 /**
+ * Whether [CategoryGrid] will pin a family block when it is asked to.
+ *
+ * Which is to say: the selection has a family, and that family has children to
+ * show. The two screens with a note under the grid ask this before following
+ * the note down — when the grid is pinning, the block is a window tall and the
+ * note is already at the foot of it, so a second scroll would be two effects
+ * aiming at the same place through each other.
+ */
+internal fun familyHasChildren(categories: List<CategoryEntity>, selectedId: String?): Boolean {
+    val selected = categories.firstOrNull { it.id == selectedId } ?: return false
+    val root = selected.parentId ?: selected.id
+    return categories.any { it.parentId == root }
+}
+
+/**
  * The categories, and — once one is chosen — its subcategories below them.
  *
  * It was one flat grid: every root followed by its children, so a household
@@ -622,19 +640,39 @@ internal fun CategoryGrid(
     // has nowhere to go and does nothing, which is the case the moment the
     // keypad stands down.
     //
-    // Keyed on the family and NOTHING else, so nothing but opening a family
-    // ever moves the list. It was keyed on [pinned] as well, to put the roots
-    // back when the keypad stood down — which meant a tap on a subcategory,
-    // which is what makes the keypad stand down, jumped the grid to the top.
-    // Nothing had to: once the block stops being a window tall the content no
-    // longer overflows, and a lazy list clamps its own offset to zero when that
-    // happens. The roots come back because there is room for them.
+    // Re-pinned whenever the bottom of the screen changes hands, not only when
+    // a family is opened — which is the bug this shape exists to fix. The
+    // sequence was: open a family, type a note (the keyboard comes up, the grid
+    // follows the note down), then tap the amount again. Nothing re-ran, the
+    // list stayed wherever the keyboard's retreat had clamped it, and the window
+    // came back showing the roots with the family block starting below the fold
+    // — so the note, which is at the END of that block, was off screen with no
+    // way to tell that it was.
+    //
+    // So the keys are: the family, whether the block is pinned, and the
+    // keyboard's height. The last one is read here rather than passed in
+    // because this composable is always inside the window that owns the input —
+    // the edit sheet is its own window, and an inset read outside it is zero.
+    // It changes on every frame of the slide, which is exactly the point: each
+    // one takes a little more of the window.
+    //
+    // Only `pinned` scrolls on its own. A pinned→false transition does NOT put
+    // the roots back, because that transition is a tap on a subcategory — and
+    // jumping the grid to the top under the thumb that just tapped was the
+    // previous version of this bug. Nothing has to: once the block stops being a
+    // window tall the content no longer overflows, and a lazy list clamps its
+    // own offset when that happens. The roots come back because there is room
+    // for them.
     //
     // The FIRST composition is skipped deliberately: the edit sheet opens on a
     // row that may already be filed under a subcategory, and a sheet that
     // arrives mid-scroll looks like it was left that way.
     var settled by remember { mutableStateOf(false) }
-    LaunchedEffect(openRootId) {
+    var lastOpened by remember { mutableStateOf(openRootId) }
+    val imeBottom = WindowInsets.ime.getBottom(LocalDensity.current)
+    LaunchedEffect(openRootId, pinned, imeBottom) {
+        val opening = openRootId != lastOpened
+        lastOpened = openRootId
         if (!settled) {
             settled = true
             return@LaunchedEffect
@@ -645,7 +683,10 @@ internal fun CategoryGrid(
         // over the gap, the grid scrolling, the mark rising — and the scroll
         // was chasing a target the reflow was still moving. One thing moves
         // now: the mark. The grid is simply where it belongs on the next frame.
-        state.scrollToItem(if (pinned) familyIndex else lastIndex)
+        when {
+            pinned -> state.scrollToItem(familyIndex)
+            opening -> state.scrollToItem(lastIndex)
+        }
     }
 
     // BoxWithConstraints, for one number: how tall a window the family block

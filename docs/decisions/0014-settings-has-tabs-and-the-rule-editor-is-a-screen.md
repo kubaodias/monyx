@@ -143,3 +143,30 @@ interleaved — so it offered a savings account called "Oszczędności" ahead of
 current account everything is spent from. That is the third screen to make this
 mistake (see `defaultAccount`) and the worst place to make it: a rule writes to
 the wrong account every month until somebody notices.
+
+
+## Addendum, 2026-10-09 (later the same day): and the amount is the keypad's too
+
+The line above — "the amount sits directly under it, with the account's currency
+on its label" — was still describing an `OutlinedTextField` with a decimal
+keyboard. One screen back, the same question is asked with a 52sp figure, a
+calculator and the unit beside it; here it was a text field, which meant "120 +
+40" was arithmetic on one screen and a rejected string on the other, and the
+system keyboard opened over a form that had its own keys available.
+
+It is now the same `AmountDisplay` and the same `Keypad`, with the keys in the
+bottom bar above the save button exactly as they sit above the bar's middle
+button on the keypad screen. The three rules that came with them:
+
+- **The keys are up only when there is no amount yet.** Opened from Settings,
+  typing one is the first thing anybody does; opened from the keypad, the figure
+  was already typed and what brought somebody here is the dates below it.
+- **Picking a category stands them down, if an amount has been typed.** The same
+  bargain as the keypad screen: with the figure in, 188dp of digits is in the way
+  of the only thing left to answer. With no figure, taking the keys away at the
+  moment they are needed would be the opposite of helping.
+- **The unit is not a control here.** A rule has no currency of its own — every
+  occurrence takes the account's — so the symbol beside the figure is shown and
+  not tappable. A picker there would be a control that cannot be honoured, which
+  is worse than no picker. ADR 0022 records the gap; it is the one thing on this
+  screen that still differs from the keypad.
