@@ -4,6 +4,7 @@ import android.app.Application
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.os.Build
+import com.monyx.data.CurrencyPreferences
 import com.monyx.data.MonyxDatabase
 import com.monyx.data.MonyxRepository
 import com.monyx.sync.Session
@@ -20,6 +21,9 @@ class MonyxApp : Application() {
 
     /** This phone's own view of the twelve-month chart. Never synced. */
     val chartPreferences by lazy { ChartPreferences(this) }
+
+    /** Which currencies this phone offers to pick from. Never synced. */
+    val currencyPreferences by lazy { CurrencyPreferences(this) }
 
     /**
      * Held here because it has to outlive every ViewModel that reads it. Three

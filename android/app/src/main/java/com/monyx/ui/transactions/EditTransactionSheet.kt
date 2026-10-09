@@ -58,6 +58,7 @@ import com.monyx.data.Currency
 import com.monyx.data.CategoryEntity
 import com.monyx.data.Dates
 import com.monyx.data.TransactionEntity
+import com.monyx.ui.rememberOfferedCurrencies
 import com.monyx.ui.add.AccountPickerDialog
 import com.monyx.ui.add.AmountDisplay
 import com.monyx.ui.add.CurrencyPickerDialog
@@ -385,6 +386,13 @@ fun EditTransactionSheet(
                 CurrencyPickerDialog(
                     selected = currency,
                     accountCurrency = Currency.of(account?.currency),
+                    // The row's own currency is in the list whatever Settings
+                    // hides: a euro row stays editable on a phone that has since
+                    // stopped offering euro, and the dialog has to be able to
+                    // show its own answer.
+                    options = rememberOfferedCurrencies(
+                        accounts.map { it.currency } + currency.code,
+                    ),
                     onPick = {
                         currency = it
                         showCurrencyPicker = false

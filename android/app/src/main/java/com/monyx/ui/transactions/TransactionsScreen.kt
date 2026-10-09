@@ -24,11 +24,9 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
-import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.Repeat
-import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material3.AssistChip
@@ -55,14 +53,11 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -110,6 +105,15 @@ fun TransactionsScreen(
     filterRevision: Int = 0,
     scrollToDay: String? = null,
     onSyncRequested: () -> Unit = {},
+    /**
+     * Which account the list is currently narrowed to, reported upwards.
+     *
+     * So that reaching for Dodaj while looking at one account's ledger starts
+     * the new transaction on THAT account rather than on the household's
+     * default. The filter lives in this screen's ViewModel, which the navigation
+     * bar cannot see — and the bar is where the button is. See MonyxNav.
+     */
+    onAccountFilterChanged: (String?) -> Unit = {},
 ) {
     val app = LocalContext.current.applicationContext as MonyxApp
     val viewModel: TransactionsViewModel = viewModel(
@@ -163,9 +167,9 @@ fun TransactionsScreen(
     val pinnedArchived = remember(accounts, accountId) {
         accounts.firstOrNull { it.id == accountId && it.archived == 1 }
     }
-    val includePlanned by viewModel.includePlanned.collectAsStateWithLifecycle()
-    val plannedAvailable by viewModel.plannedAvailable.collectAsStateWithLifecycle()
-    val plannedIds by viewModel.plannedIds.collectAsStateWithLifecycle()
+    // Reported on every change, and on arrival: the Add button needs the answer
+    // at the moment it is tapped, from a composition somewhere else entirely.
+    LaunchedEffect(accountId) { onAccountFilterChanged(accountId) }
 
     var editing by remember { mutableStateOf<TransactionEntity?>(null) }
     val snackbarHostState = remember { SnackbarHostState() }
@@ -176,8 +180,7 @@ fun TransactionsScreen(
     // The month is not in here. It is the scope of the screen, always set, the
     // way it is on Overview and Budget — a chip offering to clear it would be
     // offering to clear something that cannot be empty.
-    val hasActiveFilters =
-        query.isNotBlank() || categoryId != null || accountId != null || includePlanned
+    val hasActiveFilters = query.isNotBlank() || categoryId != null || accountId != null
 
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
@@ -286,7 +289,14 @@ fun TransactionsScreen(
                 }
                 val rootId = chosen?.parentId ?: chosen?.id
                 CategoryFilterChip(
-                    categories = remember(categories) { categories.filter { it.parentId == null } },
+                    // Families only, each kind in the household's own order and
+                    // kept apart from the other kind. The table sorts
+                    // `sortOrder, name` across both — and both start at zero —
+                    // so straight from the query this menu alternated: the first
+                    // expense family, the first income family, the second
+                    // expense family. Neither list was in the order Settings
+                    // shows, and nothing said which was which.
+                    categories = remember(categories) { filterableFamilies(categories) },
                     selectedId = rootId,
                     // Picking a family drops any subcategory that was set: the
                     // old child belongs to a family you have just left.
@@ -310,37 +320,12 @@ fun TransactionsScreen(
                         onSelect = { viewModel.setCategoryFilter(it ?: rootId) },
                     )
                 }
-                // Third, after the two that narrow, because this one is the odd
-                // one out: it ADDS rows rather than removing them. A FilterChip
-                // with a tick rather than a bare Checkbox — it is a checkbox in
-                // every way that matters and it is the only shape that belongs
-                // in a row of chips.
-                //
-                // Disabled outside this month and the next, where there is
-                // nothing to project. See Planned.isAvailable.
-                FilterChip(
-                    selected = includePlanned,
-                    enabled = plannedAvailable,
-                    onClick = { viewModel.setIncludePlanned(!includePlanned) },
-                    label = { Text(stringResource(R.string.transactions_filter_planned)) },
-                    leadingIcon = if (includePlanned) {
-                        {
-                            Icon(
-                                Icons.Filled.Check,
-                                contentDescription = null,
-                                modifier = Modifier.size(16.dp),
-                            )
-                        }
-                    } else {
-                        {
-                            Icon(
-                                Icons.Filled.Schedule,
-                                contentDescription = null,
-                                modifier = Modifier.size(16.dp),
-                            )
-                        }
-                    },
-                )
+                // There was a third chip here, "Planowane", which added the rows
+                // the repeating rules were going to write later in the month.
+                // Removed at the owner's request: it answered "what is still
+                // coming?" in the middle of the answer to "what did we spend?",
+                // and it was the one control on the row that made the list
+                // longer rather than shorter.
                 if (hasActiveFilters) {
                     AssistChip(
                         onClick = viewModel::clearFilters,
@@ -453,7 +438,6 @@ fun TransactionsScreen(
                             DayGroup(
                                 day = day,
                                 items = dayItems,
-                                plannedIds = plannedIds,
                                 defaultAccountId = defaultAccountId,
                                 accountColors = accountColors,
                                 // The day that was asked for, marked. Scrolling
@@ -470,9 +454,6 @@ fun TransactionsScreen(
                                 // The list projection is a join, not the row —
                                 // load the real entity before handing it to
                                 // something that will write it back.
-                                // A planned row has no entity behind it, so
-                                // this is never reached for one — DayGroup does
-                                // not make it clickable.
                                 onRowClick = { item -> scope.launch { editing = viewModel.load(item.id) } },
                             )
                         }
@@ -510,6 +491,25 @@ fun TransactionsScreen(
     }
 }
 
+/**
+ * The families the category filter offers: expense ones, then income ones, each
+ * in the order the household dragged them into.
+ *
+ * Two lists in one menu rather than two menus: the question is "which
+ * category", and a household files a handful of things as income and everything
+ * else as spending, so splitting the control in two would mean choosing a kind
+ * first in order to answer a question that is not about kinds.
+ *
+ * `sortOrder` is per-kind and both sequences start at zero, which is why the
+ * table's own order cannot be used here — see the call site. Expense first,
+ * because that is the order every other screen in the app asks it in.
+ */
+internal fun filterableFamilies(categories: List<CategoryEntity>): List<CategoryEntity> =
+    categories.filter { it.parentId == null }
+        .sortedWith(
+            compareBy({ if (it.kind == "income") 1 else 0 }, { it.sortOrder }, { it.name }),
+        )
+
 @Composable
 private fun CategoryFilterChip(
     categories: List<CategoryEntity>,
@@ -531,14 +531,42 @@ private fun CategoryFilterChip(
                 text = { Text(stringResource(R.string.transactions_filter_all)) },
                 onClick = { onSelect(null); expanded = false },
             )
-            categories.forEach { category ->
-                DropdownMenuItem(
-                    text = { Text(category.name) },
-                    onClick = { onSelect(category.id); expanded = false },
+            // "Wszystkie" is a different kind of answer from the rows under it —
+            // it clears the filter rather than setting one — so it gets a rule
+            // of its own, and each kind gets a heading above its block. Without
+            // them the menu was one column of names in which the point where
+            // spending stopped and earning started was invisible.
+            //
+            // groupBy keeps the order it was handed, which is already grouped:
+            // see [filterableFamilies], which is also what decides that spending
+            // comes first.
+            categories.groupBy { it.kind }.forEach { (kind, family) ->
+                HorizontalDivider()
+                MenuSectionLabel(
+                    stringResource(
+                        if (kind == "income") R.string.overview_income else R.string.overview_expenses,
+                    ),
                 )
+                family.forEach { category ->
+                    DropdownMenuItem(
+                        text = { Text(category.name) },
+                        onClick = { onSelect(category.id); expanded = false },
+                    )
+                }
             }
         }
     }
+}
+
+/** A heading inside a dropdown. Not a DropdownMenuItem: it is not tappable. */
+@Composable
+private fun MenuSectionLabel(text: String) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.labelMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+    )
 }
 
 /**
@@ -623,19 +651,42 @@ private fun AccountFilterChip(
     }
 }
 
+/**
+ * What one day came to, in złoty.
+ *
+ * [TransactionListItem.plnMinor], never amountMinor. The heading is one figure
+ * over a day's rows, and a day can hold rows in two currencies — so adding up
+ * each row's own amount produced a number that was not money: one euro counted
+ * as one złoty. A day with three euro purchases on it printed a euro-sized
+ * figure with "zł" beside it while every other day in the list was honest,
+ * which is the version of this bug that is hardest to spot.
+ *
+ * The same rule and the same reason as the filtered total under the search box
+ * — see TransactionsViewModel.totalsOf. Null plnMinor (no rate has synced for
+ * that currency) contributes nothing, which is the degradation every total in
+ * the app shares.
+ *
+ * Transfers are left out: moving money between two of your own accounts is not
+ * spending it.
+ */
+internal fun dayTotalMinor(items: List<TransactionListItem>): Long = items
+    .filter { it.kind != "transfer" }
+    .sumOf { row ->
+        val pln = row.plnMinor ?: 0L
+        if (row.kind == "income") pln else -pln
+    }
+
 @Composable
 private fun DayGroup(
     day: String,
     items: List<TransactionListItem>,
-    plannedIds: Set<String>,
     defaultAccountId: String?,
     accountColors: Map<String, Color>,
     highlighted: Boolean = false,
     onRowClick: (TransactionListItem) -> Unit,
 ) {
     // A transfer moves money, it does not spend it — it never enters the total.
-    val totalMinor = items.filter { it.kind != "transfer" }
-        .sumOf { if (it.kind == "income") it.amountMinor else -it.amountMinor }
+    val totalMinor = dayTotalMinor(items)
     val totalKind = if (totalMinor >= 0) "income" else "expense"
 
     Column(modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) {
@@ -671,7 +722,8 @@ private fun DayGroup(
                 color = headingColor,
             )
             Text(
-                text = Money.formatSigned(kotlin.math.abs(totalMinor), totalKind),
+                // In złoty, with "zł" on it. See [dayTotalMinor].
+                text = Money.formatSignedIn(kotlin.math.abs(totalMinor), totalKind),
                 style = MaterialTheme.typography.labelLarge.copy(fontFeatureSettings = "tnum"),
                 fontWeight = headingWeight,
                 color = headingColor,
@@ -692,7 +744,6 @@ private fun DayGroup(
                     items.forEachIndexed { index, item ->
                         TransactionRow(
                             item = item,
-                            planned = item.id in plannedIds,
                             defaultAccountId = defaultAccountId,
                             accountColor = item.accountId?.let { accountColors[it] },
                             onClick = { onRowClick(item) },
@@ -713,7 +764,6 @@ private fun DayGroup(
 @Composable
 private fun TransactionRow(
     item: TransactionListItem,
-    planned: Boolean = false,
     /**
      * The household's first open account — the one the keypad starts on. Rows on
      * any other account say so; rows on this one do not, or the mark would be on
@@ -732,26 +782,11 @@ private fun TransactionRow(
         // when a whole family has never been given one. See categoryColorKey.
         Palette.colorFor(item.categoryColor, item.categoryColorKey ?: item.id)
     }
-    val plannedLabel = stringResource(R.string.transactions_planned)
 
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            // Not clickable when planned: there is no row to open. Tapping one
-            // used to be indistinguishable from tapping a real one and did
-            // nothing at all, which reads as the app being broken rather than as
-            // the row being hypothetical. TalkBack gets the reason in words.
-            .then(
-                if (planned) {
-                    Modifier.semantics { stateDescription = plannedLabel }
-                } else {
-                    Modifier.clickable(onClick = onClick)
-                },
-            )
-            // Faded, the way an unsent draft is faded. The row is otherwise
-            // identical — same colour, same icon, same figure — because it is
-            // the same expense, just not yet.
-            .alpha(if (planned) 0.55f else 1f)
+            .clickable(onClick = onClick)
             .padding(horizontal = 12.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -792,15 +827,8 @@ private fun TransactionRow(
                 if (item.recurringRuleId != null) {
                     Spacer(Modifier.width(6.dp))
                     Icon(
-                        // A clock, not the repeat arrows, when the row has not
-                        // happened yet. Both facts are true of it and only one
-                        // is worth 14dp: that this is a plan.
-                        imageVector = if (planned) Icons.Filled.Schedule else Icons.Filled.Repeat,
-                        contentDescription = if (planned) {
-                            plannedLabel
-                        } else {
-                            stringResource(R.string.recurring_from_rule)
-                        },
+                        imageVector = Icons.Filled.Repeat,
+                        contentDescription = stringResource(R.string.recurring_from_rule),
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.size(14.dp),
                     )

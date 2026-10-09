@@ -22,7 +22,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
@@ -60,6 +61,9 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -131,6 +135,7 @@ fun OverviewScreen(
                         accounts = state.accounts,
                         selected = state.selectedAccountIds,
                         onToggle = viewModel::toggleAccount,
+                        onIsolate = viewModel::isolateAccount,
                     )
                 }
             }
@@ -897,6 +902,8 @@ private fun AccountFilter(
     accounts: List<AccountBalance>,
     selected: Set<String>,
     onToggle: (String, List<AccountBalance>) -> Unit,
+    /** A long press: this account alone. See OverviewViewModel.isolateAccount. */
+    onIsolate: (String, List<AccountBalance>) -> Unit,
 ) {
     // Counted first, then the ones outside the summary — a stable sort, so
     // within each group the household's own order survives. The strip answers
@@ -910,10 +917,10 @@ private fun AccountFilter(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         items(counted, key = { it.id }) { account ->
-            AccountChip(account, selected, accounts, onToggle)
+            AccountChip(account, selected, accounts, onToggle, onIsolate)
         }
         items(outside, key = { it.id }) { account ->
-            AccountChip(account, selected, accounts, onToggle)
+            AccountChip(account, selected, accounts, onToggle, onIsolate)
         }
     }
 }
@@ -924,6 +931,7 @@ private fun AccountChip(
     selected: Set<String>,
     all: List<AccountBalance>,
     onToggle: (String, List<AccountBalance>) -> Unit,
+    onIsolate: (String, List<AccountBalance>) -> Unit,
 ) {
     // Convertible once a rate for its currency has synced. Until then the
     // account shows its own balance but cannot be switched on: a lit chip whose
@@ -950,6 +958,7 @@ private fun AccountChip(
         // second visual language for the same fact would be one too many.
         outsideSummary = account.excludedFromSummary == 1 || !convertible,
         onClick = { if (convertible) onToggle(account.id, all) },
+        onLongClick = { if (convertible) onIsolate(account.id, all) },
     )
 }
 
@@ -960,6 +969,7 @@ private fun AccountChip(
  * account's own colour is already on the icon, so a tinted background on its
  * own would be one more shade of the same thing.
  */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun AccountButton(
     name: String,
@@ -972,6 +982,8 @@ private fun AccountButton(
     selected: Boolean,
     outsideSummary: Boolean,
     onClick: () -> Unit,
+    /** Hold it: this account alone. See [AccountFilter]. */
+    onLongClick: () -> Unit,
 ) {
     val container = if (selected) {
         MaterialTheme.colorScheme.secondaryContainer
@@ -986,6 +998,7 @@ private fun AccountButton(
     // the chip should stop apologising for itself.
     val quiet = outsideSummary && !selected
     val outline = MaterialTheme.colorScheme.outlineVariant
+    val isolateLabel = stringResource(R.string.overview_account_only)
     Column(
         modifier = Modifier
             .clip(shape)
@@ -1012,7 +1025,16 @@ private fun AccountButton(
                     )
                 },
             )
-            .selectable(selected = selected, onClick = onClick)
+            // combinedClickable, not selectable, for the long press — and the
+            // selected state then has to be stated by hand, because that is the
+            // one thing selectable() was doing for the screen reader.
+            .combinedClickable(
+                role = Role.Checkbox,
+                onLongClickLabel = isolateLabel,
+                onLongClick = onLongClick,
+                onClick = onClick,
+            )
+            .semantics { this.selected = selected }
             .padding(horizontal = 14.dp, vertical = 10.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {

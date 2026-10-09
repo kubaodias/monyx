@@ -1,6 +1,7 @@
 package com.monyx
 
 import com.monyx.data.AccountBalance
+import com.monyx.data.Currencies
 import com.monyx.data.Currency
 import com.monyx.data.Money
 import com.monyx.data.TransactionListItem
@@ -9,6 +10,7 @@ import com.monyx.ui.add.AddViewModel
 import com.monyx.ui.add.EntryKind
 import com.monyx.ui.overview.OverviewViewModel
 import com.monyx.ui.transactions.TransactionsViewModel
+import com.monyx.ui.transactions.dayTotalMinor
 import com.monyx.ui.settings.currencyLabel
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -170,6 +172,63 @@ class CurrencyTest {
         assertEquals(100_00L, OverviewViewModel.summedBalance(withExcluded, setOf("pzu")))
     }
 
+    // ------------------------------------------ which ones a picker offers
+
+    @Test
+    fun `a phone nobody has configured offers zloty, the euro and the dollar`() {
+        // The nine are what the app can HANDLE; this is what a Polish household
+        // meets. Six Scandinavian-and-friends entries in a picker reached from
+        // a chip beside the amount is six things between a thumb and the euro.
+        assertEquals(
+            listOf("PLN", "EUR", "USD"),
+            Currencies.offered(null).map { it.code },
+        )
+    }
+
+    @Test
+    fun `zloty cannot be hidden, whatever has been chosen`() {
+        // Every total is in it and every account defaults to it: a picker
+        // without złoty is one you cannot get back out of.
+        assertTrue(Currency.PLN in Currencies.offered(emptySet()))
+        assertTrue(Currencies.locked(Currency.PLN, emptySet()))
+    }
+
+    @Test
+    fun `a currency an account holds is offered even when it is hidden`() {
+        // Hiding is about not being asked. An account denominated in krona is a
+        // fact already written down, and a form that would not offer SEK could
+        // not edit that account without silently changing what its money is.
+        val offered = Currencies.offered(setOf("EUR"), inUse = setOf("SEK"))
+        assertEquals(listOf("PLN", "EUR", "SEK"), offered.map { it.code })
+        assertTrue("Settings must refuse to hide it", Currencies.locked(Currency.SEK, setOf("SEK")))
+    }
+
+    @Test
+    fun `hiding one leaves the others alone`() {
+        val offered = Currencies.offered(setOf("USD")).map { it.code }
+        assertEquals(listOf("PLN", "USD"), offered)
+        assertFalse(Currencies.locked(Currency.EUR, emptySet()))
+    }
+
+    @Test
+    fun `switching the last one off is not the same as never choosing`() {
+        // Empty is a decision and has to stick; absent is "nobody has said",
+        // which is the default pair. Collapsing the two would make the last
+        // switch-off silently restore the euro and the dollar.
+        assertEquals(listOf("PLN"), Currencies.offered(emptySet()).map { it.code })
+        assertEquals(listOf("PLN", "EUR", "USD"), Currencies.offered(null).map { it.code })
+    }
+
+    @Test
+    fun `the offer keeps the enum's order rather than the household's`() {
+        // The picker is a reference list, not a ranking: PLN, EUR, USD, GBP …
+        // is the order it has always been in, and a set has no order to carry.
+        assertEquals(
+            listOf("PLN", "EUR", "GBP", "DKK"),
+            Currencies.offered(setOf("DKK", "GBP", "EUR")).map { it.code },
+        )
+    }
+
     // ------------------------------------- the ledger's rows and its total
 
     private fun row(kind: String, amountMinor: Long, currency: String, plnMinor: Long?) =
@@ -238,7 +297,7 @@ class CurrencyTest {
     }
 
     @Test
-    fun `a foreign row carries its unit and a zloty row does not`() {
+    fun `every ledger row carries its unit and only a foreign one converts`() {
         // Money.ledgerRowFigure, not a copy of the rule. The previous version
         // of this test reimplemented the suffix inline and asserted its own
         // arithmetic — so it passed while the production change it was written
@@ -248,9 +307,50 @@ class CurrencyTest {
         assertEquals("${Money.formatSigned(15_00, "expense")} €", euro.main)
         assertEquals("${Money.formatSigned(65_78, "expense")} zł", euro.aside)
 
+        // "zł" on the ordinary row too, which it did not use to carry: only the
+        // exceptions were marked, and a column holding one marked figure and
+        // four unmarked ones is four figures the reader has to attribute from
+        // memory. The second line stays an exception — there is nothing to
+        // convert a złoty row to.
         val zloty = Money.ledgerRowFigure(89_99, "expense", Currency.PLN, 89_99)
-        assertEquals(Money.formatSigned(89_99, "expense"), zloty.main)
+        assertEquals("${Money.formatSigned(89_99, "expense")} zł", zloty.main)
         assertNull("a złoty row has nothing to convert to", zloty.aside)
+    }
+
+    @Test
+    fun `a day heading converts instead of adding two currencies together`() {
+        // The same bug as the total under the search box, one release later and
+        // one heading further down: a day holding three euro purchases printed
+        // a euro-sized figure with "zł" beside it, while every other day in the
+        // list was honest. 15,00 € is 65,78 zł, so this day cost 155,77 zł.
+        val rows = listOf(
+            row("expense", 15_00, "EUR", 65_78),
+            row("expense", 89_99, "PLN", 89_99),
+        )
+        assertEquals(-155_77L, dayTotalMinor(rows))
+        assertEquals("the old answer added cents to grosze", false, dayTotalMinor(rows) == -104_99L)
+    }
+
+    @Test
+    fun `a day heading nets income against spending and leaves transfers out`() {
+        val rows = listOf(
+            row("income", 5_000_00, "PLN", 5_000_00),
+            row("expense", 89_99, "PLN", 89_99),
+            // A transfer is one row with one amount and it is not spending.
+            row("transfer", 1_000_00, "PLN", 1_000_00),
+        )
+        assertEquals(4_910_01L, dayTotalMinor(rows))
+    }
+
+    @Test
+    fun `a day with a row the rate is missing for counts the rest of it`() {
+        // Null plnMinor contributes nothing rather than its face value in the
+        // wrong unit — the degradation every total in the app shares.
+        val rows = listOf(
+            row("expense", 15_00, "EUR", null),
+            row("expense", 89_99, "PLN", 89_99),
+        )
+        assertEquals(-89_99L, dayTotalMinor(rows))
     }
 
     @Test

@@ -495,6 +495,29 @@ class OverviewViewModel(
         viewModelScope.launch { chartPreferences.setSelectedAccounts(next) }
     }
 
+    /**
+     * A long press on one chip: that account alone, the rest off.
+     *
+     * Tapping is a toggle, which is the right gesture for "and this one too"
+     * and the wrong one for the question people actually bring to this strip —
+     * "what does THIS account look like on its own". With four accounts that
+     * answer cost four taps, three of them switching things off, and the figures
+     * changed under you at each one.
+     *
+     * See [isolatedAccounts]: pressing the chip that is already alone puts
+     * everything back, so the gesture undoes itself and nobody is stranded on
+     * one account wondering which tap gets out.
+     */
+    fun isolateAccount(id: String, buttons: List<AccountBalance>) {
+        val next = isolatedAccounts(
+            current = selectedAccounts.value,
+            id = id,
+            defaults = buttons.filter { it.excludedFromSummary == 0 }.map { it.id }.toSet(),
+            archived = uiState.value.archivedIds,
+        )
+        viewModelScope.launch { chartPreferences.setSelectedAccounts(next) }
+    }
+
     companion object {
 
         /**
@@ -572,6 +595,32 @@ class OverviewViewModel(
                 next.containsAll(defaults) -> next + archived
                 else -> next
             }
+        }
+
+        /**
+         * The selection after a long press on [id]: that one alone.
+         *
+         * Empty — the default view, every counted account — in the two cases
+         * where "only this one" is not a narrowing. One is the undo: the chip
+         * being held is already the whole selection, so the gesture means
+         * "back to all". The other is a household with one counted account,
+         * where isolating it IS the default and storing an explicit set would
+         * only mean the stored value stops following the account list.
+         *
+         * No [archived] ids ride along, unlike the tap. They ride along with a
+         * selection that contains every default — "all of them, plus" — and
+         * this is the opposite of that: a finished account's history is not
+         * part of what one open account did.
+         */
+        internal fun isolatedAccounts(
+            current: Set<String>,
+            id: String,
+            defaults: Set<String>,
+            archived: Set<String>,
+        ): Set<String> {
+            val effective = current.ifEmpty { defaults } - archived
+            val alone = setOf(id)
+            return if (effective == alone || defaults == alone) emptySet() else alone
         }
 
         fun factory(

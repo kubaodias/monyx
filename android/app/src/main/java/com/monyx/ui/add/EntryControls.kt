@@ -32,6 +32,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.EditNote
+import androidx.compose.material.icons.filled.NorthEast
+import androidx.compose.material.icons.filled.SouthWest
 import androidx.compose.material.icons.filled.Wallet
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -431,6 +433,82 @@ internal fun ContextChip(
     ) {
         icon?.invoke()
         Text(label, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurface, maxLines = 1)
+    }
+}
+
+/**
+ * Which way the money goes: two segments, each with an arrow on it.
+ *
+ * One component, wired on the string the database stores rather than on
+ * [EntryKind], because three screens ask this question — the keypad, the rule
+ * editor and (implicitly) the edit sheet — and two of them had a hand-rolled
+ * copy of it. The copies had already drifted in their padding, and the rule
+ * editor's was the one people met second, so the second screen asking "wydatek
+ * or przychód" looked like a slightly different question.
+ *
+ * The arrows are new, and they are plain compass arrows rather than a metaphor.
+ * `NorthEast` leaves, `SouthWest` arrives: money out of the household and money
+ * into it, which is the one thing these two words mean. The obvious
+ * alternatives were both worse here — `TrendingUp`/`TrendingDown` describe a
+ * series and this is one transaction, and `CallMade`/`CallReceived` are the same
+ * glyphs under names that read as telephony in a budget app. A plus and a minus
+ * were the other candidate and they collide with the keypad's own `+` and `−`
+ * directly below, which mean arithmetic on the amount and not its direction.
+ *
+ * Both halves carry their arrow, in whatever colour that half's text is. An
+ * arrow that appeared only on the chosen one would be a second mark saying what
+ * the fill already says — and the point of the glyphs is to be recognisable
+ * before either word has been read, which only works if they are both there.
+ */
+@Composable
+internal fun KindSelector(
+    selected: String,
+    onSelect: (String) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val options = listOf(
+        Triple("expense", R.string.add_expense, Icons.Filled.NorthEast),
+        Triple("income", R.string.add_income, Icons.Filled.SouthWest),
+    )
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(14.dp))
+            .background(MaterialTheme.colorScheme.surfaceVariant)
+            .padding(4.dp),
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        options.forEach { (value, label, icon) ->
+            val active = value == selected
+            val content = if (active) {
+                MaterialTheme.colorScheme.onSurface
+            } else {
+                MaterialTheme.colorScheme.onSurfaceVariant
+            }
+            Row(
+                modifier = Modifier
+                    .weight(1f)
+                    .clip(RoundedCornerShape(11.dp))
+                    .background(if (active) MaterialTheme.colorScheme.surface else Color.Transparent)
+                    .clickable { onSelect(value) }
+                    .padding(vertical = 10.dp),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = content,
+                    modifier = Modifier.size(18.dp),
+                )
+                Spacer(Modifier.width(6.dp))
+                Text(
+                    text = stringResource(label),
+                    fontWeight = if (active) FontWeight.SemiBold else FontWeight.Normal,
+                    color = content,
+                )
+            }
+        }
     }
 }
 
@@ -1048,7 +1126,7 @@ internal fun SaveBar(
 }
 
 /**
- * The nine currencies, for one entry.
+ * The currencies this phone offers, for one entry.
  *
  * Shared by the keypad and the edit sheet, like [AccountPickerDialog] beside it,
  * so the same choice is not offered two ways. A dialog rather than the dropdown
@@ -1057,11 +1135,17 @@ internal fun SaveBar(
  *
  * The account's own currency is marked, because it is the one this entry started
  * in and "back to normal" is the most likely reason anybody opens this twice.
+ *
+ * @param options what to list, which is NOT every [Currency] any more — see
+ *   [com.monyx.data.Currencies]. The caller asks
+ *   [com.monyx.ui.rememberOfferedCurrencies] rather than deciding, because
+ *   "which currencies does this household use" is one answer for the whole app.
  */
 @Composable
 internal fun CurrencyPickerDialog(
     selected: Currency,
     accountCurrency: Currency,
+    options: List<Currency>,
     onPick: (Currency) -> Unit,
     onDismiss: () -> Unit,
 ) {
@@ -1070,7 +1154,7 @@ internal fun CurrencyPickerDialog(
         title = { Text(stringResource(R.string.add_pick_currency)) },
         text = {
             Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
-                Currency.entries.forEach { option ->
+                options.forEach { option ->
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()

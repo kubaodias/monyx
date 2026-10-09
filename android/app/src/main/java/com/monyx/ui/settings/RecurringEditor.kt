@@ -33,6 +33,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
@@ -51,6 +52,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardCapitalization
@@ -62,12 +64,15 @@ import androidx.compose.ui.unit.sp
 import com.monyx.R
 import com.monyx.data.AccountEntity
 import com.monyx.data.Currency
-import com.monyx.data.accountsInListOrder
+import com.monyx.data.defaultAccountId
 import com.monyx.data.CategoryEntity
 import com.monyx.data.Dates
 import com.monyx.data.Money
 import com.monyx.data.Recurrence
 import com.monyx.ui.JumpToToday
+import com.monyx.ui.add.AccountPickerDialog
+import com.monyx.ui.add.ContextChip
+import com.monyx.ui.add.KindSelector
 import com.monyx.ui.theme.Palette
 import java.time.Instant
 import java.time.LocalDate
@@ -112,30 +117,46 @@ fun RecurringEditor(
     var amountText by remember {
         mutableStateOf(seed.amountMinor?.takeIf { it > 0 }?.let { Money.format(it) } ?: "")
     }
-    var accountId by remember { mutableStateOf(seed.accountId ?: accounts.firstOrNull()?.id) }
+    // The household's default account, exactly as the keypad and the microphone
+    // pick it — NOT the first row of the table. See [defaultAccount]: the table
+    // interleaves the groups, so `accounts.firstOrNull()` handed this form a
+    // savings account called "Oszczędności" ahead of the current account
+    // everything is actually spent from. That is the third screen to have made
+    // the same mistake, and it is the worst place to make it: a rule writes to
+    // the wrong account every month until somebody notices.
+    var accountId by remember { mutableStateOf(seed.accountId ?: defaultAccountId(accounts)) }
     var categoryId by remember { mutableStateOf(seed.categoryId) }
     var note by remember { mutableStateOf(seed.note.orEmpty()) }
     var freq by remember { mutableStateOf(seed.freq) }
     var startsOn by remember { mutableStateOf(seed.startsOn ?: Dates.today()) }
     var endsOn by remember { mutableStateOf(seed.endsOn) }
     var picking by remember { mutableStateOf<DateField?>(null) }
+    var showAccountPicker by remember { mutableStateOf(false) }
 
     /**
-     * The earliest anchor the picker will offer.
+     * How many transactions an anchor in the past is about to write.
      *
-     * A rule is a statement about the future — it does not backfill — so a new
-     * one cannot start before today. Left unbounded, a mis-scrolled year would
-     * have the rule quietly write hundreds of transactions into a history nobody
-     * asked for, sixty at a time, over many app opens.
+     * The picker used to refuse yesterday altogether, on the grounds that a rule
+     * is a statement about the future. That was never true of the machinery —
+     * [com.monyx.data.MonyxRepository.materializeRecurring] has always written
+     * every occurrence from the anchor through today — only of the form in front
+     * of it, and it made the obvious thing impossible: a subscription that has
+     * been running since March is entered in October, and the seven months it
+     * has already taken are what the household wants in the ledger.
      *
-     * An existing rule keeps its own anchor as the floor instead. Otherwise
-     * opening September's rent in November would show its start date greyed out
-     * and unselectable, which reads as the app having broken the rule.
+     * So the floor is gone, and the count takes its place. A back-dated anchor
+     * now means real rows, they are not undone by deleting the rule (that is a
+     * tombstone on the rule alone, deliberately), and a mis-scrolled year is the
+     * one way to ask for a hundred of them by accident. Saying the number before
+     * the tap is cheaper than any guard that would also block the real case.
      */
-    val anchorFloor = remember(seed) {
+    val backfill = remember(freq, startsOn, endsOn) {
         val today = Dates.today()
-        val original = seed.startsOn?.takeIf { seed.ruleId != null }
-        if (original != null && original.isBefore(today)) original else today
+        if (!startsOn.isBefore(today)) {
+            0
+        } else {
+            Recurrence.occurrences(freq, startsOn, endsOn, today).count { it.isBefore(today) }
+        }
     }
 
     val ofKind = remember(categories, kind) { categories.filter { it.kind == kind && it.deleted == 0 } }
@@ -252,21 +273,44 @@ fun RecurringEditor(
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 16.dp),
         ) {
-            // Account first, the way the keypad screen asks it: it is the
-            // question that is already answered nine times in ten, and it
-            // belongs where the eye lands rather than buried between the
-            // subcategory and the frequency, which is where it used to be.
+            // Account, then which way the money goes, then the amount — the
+            // keypad's order, with the keypad's controls, because this screen
+            // sets up a transaction too and the one before it is where people
+            // learn where these three things live.
             //
-            // As circles, not as a row of bare names. An account is the one
-            // thing in this app people recognise by colour before they read it
-            // — the overview's strip is nothing but coloured icons — and this
-            // was the last place that made you read instead.
-            Spacer(Modifier.height(16.dp))
-            FieldLabel(stringResource(R.string.add_pick_account))
-            AccountPicker(
-                accounts = accounts,
-                selectedId = accountId,
-                onSelect = { accountId = it },
+            // The account is a chip that opens the shared picker, not a grid of
+            // circles. The grid was the right answer on a screen with three
+            // controls and the wrong one here: this form asks nine things, and
+            // two rows of 72dp circles for the question that is already answered
+            // nine times in ten pushed the amount — the thing somebody came here
+            // to type — below the fold on a short phone.
+            Spacer(Modifier.height(8.dp))
+            val account = accounts.firstOrNull { it.id == accountId }
+            val accountColor = account?.let { Palette.colorFor(it.color, it.id) }
+            ContextChip(
+                icon = {
+                    Icon(
+                        imageVector = account?.icon?.let { Palette.icon(it) } ?: Icons.Filled.Wallet,
+                        contentDescription = null,
+                        tint = accountColor ?: LocalContentColor.current,
+                        modifier = Modifier.size(16.dp),
+                    )
+                },
+                label = account?.name ?: stringResource(R.string.add_needs_account),
+                accent = accountColor,
+                onClick = { showAccountPicker = true },
+            )
+
+            Spacer(Modifier.height(12.dp))
+            KindSelector(
+                selected = kind,
+                onSelect = {
+                    kind = it
+                    // Expense and income categories are different lists,
+                    // so a category chosen under one kind is meaningless
+                    // under the other. Same rule as AddViewModel.setKind.
+                    categoryId = null
+                },
             )
 
             // The amount in the shape of the row it will write: the
@@ -304,24 +348,21 @@ fun RecurringEditor(
                 OutlinedTextField(
                     value = amountText,
                     onValueChange = { amountText = it },
-                    label = { Text(stringResource(R.string.recurring_amount)) },
+                    // The unit on the label, the way the account editor's
+                    // balance field carries it: this is the one field here
+                    // where a wrong currency is silently expensive, and the
+                    // rule's account decides it.
+                    label = {
+                        Text(
+                            stringResource(R.string.recurring_amount) +
+                                " (" + Currency.of(account?.currency).suffix + ")",
+                        )
+                    },
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                     modifier = Modifier.weight(1f),
                 )
             }
-
-            Spacer(Modifier.height(16.dp))
-            KindToggle(
-                selected = kind,
-                onSelect = {
-                    kind = it
-                    // Expense and income categories are different lists,
-                    // so a category chosen under one kind is meaningless
-                    // under the other. Same rule as AddViewModel.setKind.
-                    categoryId = null
-                },
-            )
 
             Spacer(Modifier.height(16.dp))
             FieldLabel(stringResource(R.string.add_pick_category))
@@ -398,6 +439,18 @@ fun RecurringEditor(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
+            // What an anchor in the past will do, before it is saved. See
+            // [backfill]: these are real transactions, dated in months that are
+            // already closed, and deleting the rule afterwards does not take
+            // them back out.
+            if (backfill > 0) {
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    pluralStringResource(R.plurals.recurring_backfill, backfill, backfill),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+            }
 
             Spacer(Modifier.height(16.dp))
             OutlinedTextField(
@@ -414,12 +467,25 @@ fun RecurringEditor(
         }
     }
 
+    if (showAccountPicker) {
+        AccountPickerDialog(
+            accounts = accounts,
+            selectedId = accountId,
+            onPick = { accountId = it; showAccountPicker = false },
+            onDismiss = { showAccountPicker = false },
+        )
+    }
+
     picking?.let { field ->
         RuleDatePickerDialog(
             selected = if (field == DateField.Start) startsOn else endsOn ?: startsOn,
             // An end date before the anchor is a rule that never fires, and the
             // server rejects it outright. Cheaper to make it unselectable.
-            notBefore = if (field == DateField.End) startsOn else anchorFloor,
+            //
+            // The anchor itself has no floor at all now. It used to stop at
+            // today — see [backfill] for why that was the form lying about what
+            // the machinery does.
+            notBefore = if (field == DateField.End) startsOn else null,
             onPick = { date ->
                 if (field == DateField.Start) {
                     startsOn = date
@@ -501,107 +567,6 @@ private fun CategoryPicker(
                     textAlign = TextAlign.Center,
                     color = MaterialTheme.colorScheme.onBackground,
                     fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
-                )
-            }
-        }
-    }
-}
-
-/**
- * The accounts, as circles — the same shape and the same colours as the
- * category picker above it and the account picker on the keypad screen.
- */
-@OptIn(ExperimentalLayoutApi::class)
-@Composable
-private fun AccountPicker(
-    accounts: List<AccountEntity>,
-    selectedId: String?,
-    onSelect: (String) -> Unit,
-) {
-    // The same order the keypad's picker shows, and the same order Settings
-    // lists them in one screen back. See [accountsInListOrder].
-    val ordered = remember(accounts) { accountsInListOrder(accounts) }
-    FlowRow(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
-    ) {
-        ordered.forEach { account ->
-            // colorFor, not color: an account with no colour set still gets a
-            // stable one from its id, and it is the same one the overview and
-            // the add screen give it.
-            val color = Palette.colorFor(account.color, account.id)
-            val selected = account.id == selectedId
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                modifier = Modifier.width(72.dp).clickable { onSelect(account.id) },
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(48.dp)
-                        .clip(CircleShape)
-                        .background(if (selected) color else color.copy(alpha = 0.16f))
-                        .then(
-                            if (selected) Modifier.border(2.dp, color, CircleShape) else Modifier,
-                        ),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(
-                        // The account's own icon where it has one, falling back
-                        // to the wallet rather than to Palette's Category blob:
-                        // an account is never a category.
-                        imageVector = account.icon?.let { Palette.icon(it) } ?: Icons.Filled.Wallet,
-                        contentDescription = null,
-                        tint = if (selected) Color.White else color,
-                        modifier = Modifier.size(22.dp),
-                    )
-                }
-                Spacer(Modifier.height(4.dp))
-                Text(
-                    text = account.name,
-                    fontSize = 11.sp,
-                    lineHeight = 13.sp,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                    textAlign = TextAlign.Center,
-                    color = MaterialTheme.colorScheme.onBackground,
-                    fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun KindToggle(selected: String, onSelect: (String) -> Unit) {
-    val options = listOf("expense" to R.string.add_expense, "income" to R.string.add_income)
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(14.dp))
-            .background(MaterialTheme.colorScheme.surfaceVariant)
-            .padding(4.dp),
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
-    ) {
-        options.forEach { (value, label) ->
-            val active = value == selected
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .clip(RoundedCornerShape(11.dp))
-                    .background(if (active) MaterialTheme.colorScheme.surface else Color.Transparent)
-                    .clickable { onSelect(value) }
-                    .padding(vertical = 10.dp),
-                contentAlignment = Alignment.Center,
-            ) {
-                Text(
-                    text = stringResource(label),
-                    fontWeight = if (active) FontWeight.SemiBold else FontWeight.Normal,
-                    color = if (active) {
-                        MaterialTheme.colorScheme.onSurface
-                    } else {
-                        MaterialTheme.colorScheme.onSurfaceVariant
-                    },
                 )
             }
         }

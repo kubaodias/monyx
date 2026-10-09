@@ -7,6 +7,7 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import com.monyx.MonyxApp
 import com.monyx.data.AccountEntity
 import com.monyx.data.Currency
+import com.monyx.data.CurrencyPreferences
 import com.monyx.data.CategoryEntity
 import com.monyx.data.RecurringRuleListItem
 import com.monyx.sync.Api
@@ -103,6 +104,19 @@ class SettingsViewModel(private val app: MonyxApp) : ViewModel() {
 
     /** Why the last sync failed, or null. See [Session.recordSyncError]. */
     val syncError: Flow<String?> = session.syncErrorFlow
+
+    /**
+     * Which currencies this phone offers, and the write that changes it.
+     *
+     * A DataStore preference rather than a synced row: see [CurrencyPreferences].
+     * It goes through the ViewModel like everything else this screen writes, so
+     * the section stays a function of its arguments.
+     */
+    val shownCurrencies: Flow<Set<String>?> = app.currencyPreferences.shown
+
+    fun setCurrencyShown(code: String, shown: Boolean) {
+        viewModelScope.launch { app.currencyPreferences.setShown(code, shown) }
+    }
 
     private val _inviteState = MutableStateFlow<InviteUiState>(InviteUiState.Idle)
     val inviteState: StateFlow<InviteUiState> = _inviteState.asStateFlow()

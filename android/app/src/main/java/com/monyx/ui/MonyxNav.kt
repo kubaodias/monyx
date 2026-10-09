@@ -270,6 +270,12 @@ private fun MainScaffold(
     // offering them, on purpose.
     var txAccountId by remember { mutableStateOf<String?>(null) }
 
+    // Which account the transactions list is narrowed to RIGHT NOW, whoever
+    // narrowed it — the chip on the screen, or a jump in from Settings. Reported
+    // up by the screen, because the filter lives in its ViewModel and the button
+    // that needs the answer is down here in the bar.
+    var txViewingAccountId by remember { mutableStateOf<String?>(null) }
+
     // Bumped by every jump in, and a key on the screen's LaunchedEffect. Without
     // it, asking for the SAME filter twice is not a change and does nothing:
     // open an account's ledger, clear the chip by hand to compare, tap the same
@@ -384,7 +390,25 @@ private fun MainScaffold(
                             selected = selected,
                             save = addSave,
                             voiceEnabled = recognitionAvailable && memberId != null,
-                            onClick = { selectTab(tab.route) },
+                            onClick = {
+                                // Looking at one account's ledger and reaching
+                                // for Dodaj: that account is what the row is
+                                // going on. The default is right nine times in
+                                // ten and this is the tenth — somebody has just
+                                // said which money they are dealing with, on the
+                                // screen they said it on.
+                                //
+                                // Only from the ledger, and only for an account
+                                // the keypad can actually file to: the filter can
+                                // be pinned to an archived account from Settings,
+                                // and a new row must not land in one of those.
+                                if (route == Destinations.TRANSACTIONS) {
+                                    txViewingAccountId
+                                        ?.takeIf { id -> addViewModel.accounts.value.any { it.id == id } }
+                                        ?.let(addViewModel::selectAccount)
+                                }
+                                selectTab(tab.route)
+                            },
                             onHoldStart = {
                                 if (microphone.granted) {
                                     voiceViewModel.startListening(languageTag, memberId)
@@ -506,6 +530,7 @@ private fun MainScaffold(
                     filterPeriod = txPeriod,
                     scrollToDay = txDay,
                     onSyncRequested = { SyncWorker.syncNow(context) },
+                    onAccountFilterChanged = { txViewingAccountId = it },
                 )
             }
             composable(Destinations.BUDGET) {

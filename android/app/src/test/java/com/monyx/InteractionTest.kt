@@ -14,6 +14,7 @@ import com.monyx.ui.overview.PieSlice
 import com.monyx.ui.overview.sliceIdAt
 import com.monyx.ui.theme.Palette
 import com.monyx.ui.transactions.TransactionsViewModel
+import com.monyx.ui.transactions.filterableFamilies
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNull
@@ -200,6 +201,53 @@ class InteractionTest {
         assertEquals("a trip nobody in the house paid for must stay out", false, "tatry" in switchedOn)
     }
 
+    private fun isolate(current: Set<String>, id: String) = OverviewViewModel.isolatedAccounts(
+        current = current,
+        id = id,
+        defaults = setOf("portfel", "poduszka"),
+        archived = setOf("wakacje"),
+    )
+
+    @Test
+    fun `holding a chip leaves that account on and the rest off`() {
+        // The question people bring to the strip is "what does THIS account
+        // look like on its own", which a toggle answers in as many taps as
+        // there are other accounts.
+        assertEquals(setOf("portfel"), isolate(emptySet(), "portfel"))
+        assertEquals(setOf("pzu"), isolate(setOf("portfel", "poduszka"), "pzu"))
+    }
+
+    @Test
+    fun `holding the chip that is already alone puts everything back`() {
+        // The gesture has to undo itself, or somebody is stranded on one
+        // account with no obvious way out.
+        assertEquals(emptySet<String>(), isolate(setOf("portfel"), "portfel"))
+    }
+
+    @Test
+    fun `isolating does not drag the archived fund along`() {
+        // Archived ids ride with a selection that contains every default —
+        // "all of them, plus" — and this is the opposite: a finished account's
+        // history is not part of what one open account did.
+        assertEquals(setOf("poduszka"), isolate(setOf("portfel", "poduszka", "wakacje"), "poduszka"))
+    }
+
+    @Test
+    fun `isolating the only counted account is the default view`() {
+        // "Only this one" is not a narrowing when there is nothing to narrow
+        // from, and storing it as an explicit set would stop the stored value
+        // following the account list.
+        assertEquals(
+            emptySet<String>(),
+            OverviewViewModel.isolatedAccounts(
+                current = emptySet(),
+                id = "portfel",
+                defaults = setOf("portfel"),
+                archived = emptySet(),
+            ),
+        )
+    }
+
     // ------------------------------------------- what the ledger can filter by
 
     private val ledgerAccounts = listOf(
@@ -222,6 +270,26 @@ class InteractionTest {
         // finished with. Only the second one takes an account off this list.
         val offered = TransactionsViewModel.filterableAccounts(ledgerAccounts, null)
         assertEquals("savings held elsewhere are still a ledger you can read", true, offered.any { it.id == "pzu" })
+    }
+
+    @Test
+    fun `the category filter groups the kinds and keeps each household order`() {
+        // sortOrder is per-kind and both sequences start at zero, so the
+        // table's `sortOrder, name` interleaves them: the menu read Dom,
+        // Wypłata, Transport, Odsetki — neither list in the order Settings
+        // shows, and nothing saying where one stopped.
+        val categories = listOf(
+            CategoryEntity(id = "wyplata", name = "Wypłata", kind = "income", sortOrder = 0),
+            CategoryEntity(id = "dom", name = "Dom", kind = "expense", sortOrder = 0),
+            CategoryEntity(id = "odsetki", name = "Odsetki", kind = "income", sortOrder = 1),
+            CategoryEntity(id = "transport", name = "Transport", kind = "expense", sortOrder = 1),
+            // A subcategory belongs to the second chip, not this one.
+            CategoryEntity(id = "paliwo", name = "Paliwo", kind = "expense", parentId = "transport"),
+        )
+        assertEquals(
+            listOf("dom", "transport", "wyplata", "odsetki"),
+            filterableFamilies(categories).map { it.id },
+        )
     }
 
     @Test

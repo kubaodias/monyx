@@ -103,3 +103,43 @@ Two things came out of the move rather than going in with it:
 
 The confirmations that live beside it — archive, delete — stay dialogs. A
 question with two answers is what a dialog is for.
+
+## Addendum, 2026-10-09: seven tabs, and the rule editor asks in the keypad's order
+
+**"Ogólne" is two tabs now, Konta and Kategorie, and Waluty is a third.** The
+first tab held accounts and categories together because they are both lists of
+things the household names — a fact about their shape, not about why anybody
+opens them. An account is edited when a bank balance has drifted; a category
+when the way the household thinks about its spending has changed. Those errands
+are months apart, and the accounts list has grown two more blocks since this
+decision (outside the summary, archived), so the tab opened on three groups of
+accounts with the categories somewhere below them.
+
+Waluty is new rather than moved: which of the nine currencies the pickers bother
+to offer. It is not the Region tab 0004 refused — the REPORTING currency is
+still fixed and still złoty, and nothing on that tab can change a total. See
+ADR 0022's addendum.
+
+**The rule editor now asks its first three questions in the keypad's order,
+with the keypad's controls.** Account, then expense-or-income, then the amount.
+It had the account first already but as a grid of 72dp circles, the kind toggle
+below the amount, and its own hand-rolled copy of that toggle:
+
+- The account is the shared `ContextChip` + `AccountPickerDialog`, as on the
+  keypad. The circle grid was right on a screen with three controls and wrong on
+  one with nine: two rows of circles for the question that is already answered
+  nine times in ten pushed the amount — the thing somebody came here to type —
+  below the fold on a short phone.
+- The kind toggle is one `KindSelector` shared with the keypad, which is also
+  where it got its arrows (`NorthEast` out, `SouthWest` in). Two copies had
+  already drifted in their padding, and the rule editor's is the one people meet
+  second — so the second screen asking "wydatek or przychód" looked like a
+  slightly different question.
+- The amount sits directly under it, with the account's currency on its label.
+
+**Its default account is the household's, not the first row of the table.** It
+read `accounts.firstOrNull()`, which is `sortOrder, name` with the groups
+interleaved — so it offered a savings account called "Oszczędności" ahead of the
+current account everything is spent from. That is the third screen to make this
+mistake (see `defaultAccount`) and the worst place to make it: a rule writes to
+the wrong account every month until somebody notices.

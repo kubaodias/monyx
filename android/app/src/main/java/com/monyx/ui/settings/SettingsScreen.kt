@@ -84,6 +84,7 @@ import com.monyx.Locales
 import com.monyx.MonyxApp
 import com.monyx.R
 import com.monyx.update.UpdateState
+import com.monyx.data.Currency
 import com.monyx.data.Dates
 import com.monyx.data.MemberEntity
 import com.monyx.sync.ReleaseNote
@@ -100,18 +101,30 @@ private const val BACKUP_STALE_MS = 3L * 24 * 60 * 60 * 1000
  * every repeating rule, the household, the invite code, language, sync, backup,
  * re-upload, build. Finding the invite code meant scrolling past the rent.
  *
- * Four groups, by what the person is there to do rather than by what the code
- * calls things: set the app up, describe the month's fixed shape, deal with
- * other people, and the levers pulled once and then left alone.
+ * Grouped by what the person is there to do rather than by what the code calls
+ * things: describe the money, describe the month's fixed shape, deal with other
+ * people, and the levers pulled once and then left alone.
  *
- * Language has a tab of its own rather than a card under General. It is named
- * for what is actually in it: Region would be naming the tab for a currency
- * setting that [0004] says will not exist — the currency is fixed and the
- * timezone is the household's, neither of them a preference. If that decision
- * is ever reversed, renaming one string is the whole cost.
+ * **Accounts and categories are two tabs, not one "General".** They were put
+ * together because they are both lists of things the household names, which is a
+ * fact about their shape and not about why anybody opens them: an account is
+ * edited when a bank balance has drifted, a category when the way the household
+ * thinks about its spending has changed, and those errands are months apart. One
+ * tab meant the shorter list was always below the longer one — and the accounts
+ * list grows a section for archived accounts and another for the ones held
+ * outside the summary, so "Ogólne" opened on three blocks of accounts with the
+ * categories somewhere under them.
+ *
+ * Language has a tab of its own. It is named for what is actually in it: Region
+ * would be naming the tab for a currency setting that [0004] says will not exist
+ * — the REPORTING currency is fixed and the timezone is the household's, neither
+ * of them a preference. Currencies is a different question, and now a tab: which
+ * of the nine the pickers bother to offer. See [CurrenciesSection].
  */
 private enum class SettingsTab(val labelRes: Int) {
-    General(R.string.settings_tab_general),
+    Accounts(R.string.settings_tab_accounts),
+    Categories(R.string.settings_tab_categories),
+    Currencies(R.string.settings_tab_currencies),
     Recurring(R.string.settings_tab_recurring),
     People(R.string.settings_tab_people),
     Language(R.string.settings_tab_language),
@@ -148,6 +161,9 @@ fun SettingsScreen(onOpenAccountTransactions: (accountId: String, period: String
     // Which of the household's members is holding THIS phone. Null until
     // enrolment has landed, and then never again.
     val myMemberId by viewModel.memberId.collectAsStateWithLifecycle(initialValue = null)
+    // Null until DataStore answers, and null is also the answer for a household
+    // that has never chosen — see [com.monyx.data.Currencies.DEFAULT_SHOWN].
+    val shownCurrencies by viewModel.shownCurrencies.collectAsStateWithLifecycle(initialValue = null)
 
     val snackbarHostState = remember { SnackbarHostState() }
     val coroutineScope = rememberCoroutineScope()
@@ -163,7 +179,7 @@ fun SettingsScreen(onOpenAccountTransactions: (accountId: String, period: String
         }
     }
 
-    var tab by rememberSaveable { mutableStateOf(SettingsTab.General) }
+    var tab by rememberSaveable { mutableStateOf(SettingsTab.Accounts) }
     // Non-null while the repeating-rule editor is open. A seed rather than a
     // nullable rule, because "add" and "edit rule X" are both open states and
     // only one of them has a rule behind it.
@@ -237,9 +253,10 @@ fun SettingsScreen(onOpenAccountTransactions: (accountId: String, period: String
         topBar = {
             Column {
                 TopAppBar(title = { Text(stringResource(R.string.nav_settings)) })
-                // Scrollable rather than fixed: four Polish labels do not fit
-                // four equal columns on a narrow phone, and a fixed TabRow
-                // answers that by shrinking the text until it wraps mid-word.
+                // Scrollable rather than fixed: seven Polish labels do not fit
+                // seven equal columns on a narrow phone — four did not either —
+                // and a fixed TabRow answers that by shrinking the text until it
+                // wraps mid-word.
                 ScrollableTabRow(
                     selectedTabIndex = tab.ordinal,
                     edgePadding = 12.dp,
@@ -265,26 +282,39 @@ fun SettingsScreen(onOpenAccountTransactions: (accountId: String, period: String
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             when (tab) {
-                SettingsTab.General -> {
-                    item {
-                        AccountsSection(
-                            accounts = accounts,
-                            onOpenEditor = { accountEditor = it },
-                            onArchive = viewModel::setAccountArchived,
-                            onDelete = viewModel::deleteAccount,
-                            onReorder = viewModel::reorderAccounts,
-                            onOpenTransactions = onOpenAccountTransactions,
-                        )
-                    }
-                    item {
-                        CategoriesSection(
-                            groups = categoryGroups,
-                            onAdd = viewModel::addCategory,
-                            onUpdate = viewModel::updateCategory,
-                            onDelete = viewModel::deleteCategory,
-                            onReorder = viewModel::reorderCategories,
-                        )
-                    }
+                SettingsTab.Accounts -> item {
+                    AccountsSection(
+                        accounts = accounts,
+                        onOpenEditor = { accountEditor = it },
+                        onArchive = viewModel::setAccountArchived,
+                        onDelete = viewModel::deleteAccount,
+                        onReorder = viewModel::reorderAccounts,
+                        onOpenTransactions = onOpenAccountTransactions,
+                    )
+                }
+
+                SettingsTab.Categories -> item {
+                    CategoriesSection(
+                        groups = categoryGroups,
+                        onAdd = viewModel::addCategory,
+                        onUpdate = viewModel::updateCategory,
+                        onDelete = viewModel::deleteCategory,
+                        onReorder = viewModel::reorderCategories,
+                    )
+                }
+
+                SettingsTab.Currencies -> item {
+                    CurrenciesSection(
+                        // Every account, archived ones included: a currency a
+                        // finished account is denominated in is still a fact
+                        // written down, and hiding it would mean re-opening that
+                        // account changed what its money was.
+                        inUse = remember(accounts) {
+                            accounts.mapTo(HashSet()) { Currency.of(it.entity.currency).code }
+                        },
+                        shown = shownCurrencies,
+                        onSetShown = viewModel::setCurrencyShown,
+                    )
                 }
 
                 SettingsTab.Recurring -> item {

@@ -29,10 +29,10 @@ fun accountsInListOrder(accounts: List<AccountEntity>): List<AccountEntity> =
 /**
  * The household's default account: the first one on the list.
  *
- * Three callers need to agree on this. The keypad starts a new transaction on
- * it, the microphone files a spoken one to it, and the ledger marks any row that
- * is NOT on it — and if they disagree, the ledger is marking rows as unusual
- * that the app itself has just made.
+ * Four callers need to agree on this. The keypad starts a new transaction on it,
+ * the microphone files a spoken one to it, the repeating-rule editor opens on it,
+ * and the ledger marks any row that is NOT on it — and if they disagree, the
+ * ledger is marking rows as unusual that the app itself has just made.
  *
  * "First on the list" means first as the household sees the list, which is not
  * the same as first in the table. Settings and the account strip both group
@@ -58,6 +58,12 @@ fun accountsInListOrder(accounts: List<AccountEntity>): List<AccountEntity> =
  * comment claiming that was the same thing as this function — so every expense
  * said out loud in that household was filed to the savings pot, and nothing on
  * the summary sheet looked wrong. See VoiceEntryViewModel.defaultAccountId.
+ *
+ * And then the repeating-rule editor, which is the worst of the three: it was
+ * `accounts.firstOrNull()` too, and a rule files to the wrong account every
+ * month until somebody notices. The pattern is always the same — a screen that
+ * wants "the usual account" reaches for the first element of a list it was
+ * handed for a different reason. Anything that wants a default calls this.
  *
  * @param accounts ordered as the DAO returns them: `sortOrder, name`.
  */
