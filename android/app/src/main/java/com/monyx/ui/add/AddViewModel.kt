@@ -123,6 +123,24 @@ class AddViewModel(private val repository: MonyxRepository) : ViewModel() {
     }
 
     /**
+     * The category the ledger was filtered to, carried over to a new entry.
+     *
+     * Same bargain as the account: somebody looking at one category's rows and
+     * reaching for Dodaj has already said what the next one is about. The kind
+     * comes with it, in the SAME write — an income category under
+     * [EntryKind.Expense] is a category the grid does not list, and
+     * [setKind] clears the choice it is given, so two calls would leave the
+     * screen with the right kind and nothing filed under it.
+     *
+     * A category this screen cannot offer — deleted since the filter was set,
+     * or belonging to neither list — is ignored rather than guessed at.
+     */
+    fun pickUpCategory(id: String) {
+        val kind = kindOf(id, expenseCategories.value, incomeCategories.value) ?: return
+        _state.value = _state.value.copy(kind = kind, categoryId = id)
+    }
+
+    /**
      * Picking an account also drops any currency chosen by hand.
      *
      * Switching from the złoty card to the euro one means the next thing typed
@@ -257,6 +275,23 @@ class AddViewModel(private val repository: MonyxRepository) : ViewModel() {
         }
 
     companion object {
+        /**
+         * Which list a category id is in, or null when it is in neither.
+         *
+         * The two lists are the two kinds, and nothing else says which kind a
+         * category is — the id arrives from another screen's filter with no
+         * kind attached to it.
+         */
+        internal fun kindOf(
+            id: String,
+            expense: List<CategoryEntity>,
+            income: List<CategoryEntity>,
+        ): EntryKind? = when {
+            expense.any { it.id == id } -> EntryKind.Expense
+            income.any { it.id == id } -> EntryKind.Income
+            else -> null
+        }
+
         /**
          * The state the keypad starts the next entry in.
          *

@@ -276,6 +276,9 @@ private fun MainScaffold(
     // that needs the answer is down here in the bar.
     var txViewingAccountId by remember { mutableStateOf<String?>(null) }
 
+    // And which category, reported the same way and used by the same button.
+    var txViewingCategoryId by remember { mutableStateOf<String?>(null) }
+
     // Bumped by every jump in, and a key on the screen's LaunchedEffect. Without
     // it, asking for the SAME filter twice is not a change and does nothing:
     // open an account's ledger, clear the chip by hand to compare, tap the same
@@ -406,6 +409,13 @@ private fun MainScaffold(
                                     txViewingAccountId
                                         ?.takeIf { id -> addViewModel.accounts.value.any { it.id == id } }
                                         ?.let(addViewModel::selectAccount)
+                                    // The same argument for the category: the
+                                    // filter is somebody saying what they are
+                                    // looking at, and the next row is almost
+                                    // always more of it. It brings the kind with
+                                    // it — see pickUpCategory — and a category
+                                    // the keypad cannot offer is ignored there.
+                                    txViewingCategoryId?.let(addViewModel::pickUpCategory)
                                 }
                                 selectTab(tab.route)
                             },
@@ -531,6 +541,7 @@ private fun MainScaffold(
                     scrollToDay = txDay,
                     onSyncRequested = { SyncWorker.syncNow(context) },
                     onAccountFilterChanged = { txViewingAccountId = it },
+                    onCategoryFilterChanged = { txViewingCategoryId = it },
                 )
             }
             composable(Destinations.BUDGET) {

@@ -7,7 +7,10 @@ import com.monyx.sync.Rejection
 import com.monyx.sync.SyncEngine
 import com.monyx.data.CategoryEntity
 import com.monyx.ui.add.AddSaveSlot
+import com.monyx.ui.add.AddViewModel
+import com.monyx.ui.add.EntryKind
 import com.monyx.ui.add.categoryMarkOf
+import com.monyx.ui.add.familyHasChildren
 import com.monyx.ui.budget.PlanState
 import com.monyx.ui.overview.OverviewViewModel
 import com.monyx.ui.overview.PieSlice
@@ -16,8 +19,10 @@ import com.monyx.ui.theme.Palette
 import com.monyx.ui.transactions.TransactionsViewModel
 import com.monyx.ui.transactions.filterableFamilies
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
@@ -587,6 +592,54 @@ class VisibleSelectionTest {
         val mark = categoryMarkOf(listOf(prad), prad.id, hue)
         assertEquals("Prąd", mark?.name)
         assertEquals(false, mark?.family)
+    }
+
+    // --------------------------------------- what the Dodaj button picks up
+
+    /**
+     * Tapping Dodaj while the ledger is filtered to a category files the next
+     * row under it — and the kind has to come with it, because the two lists
+     * are the two kinds and nothing about an id says which one it is in.
+     *
+     * Decidable here and nowhere else: the filter lives in one screen's
+     * ViewModel, the button is in the navigation bar, and the lookup is the
+     * only part either of them can get wrong.
+     */
+    @Test
+    fun `a category id resolves to the kind whose list it is in`() {
+        val expense = listOf(rachunki, prad, dom)
+        val income = listOf(CategoryEntity(id = "c-pay", name = "Wypłata", kind = "income"))
+
+        assertEquals(EntryKind.Expense, AddViewModel.kindOf("c-bills", expense, income))
+        assertEquals(EntryKind.Income, AddViewModel.kindOf("c-pay", expense, income))
+        // A subcategory is a category: the filter offers families, but a jump
+        // in from the summary can pin one of these.
+        assertEquals(EntryKind.Expense, AddViewModel.kindOf("c-power", expense, income))
+        // Deleted since the filter was set, or never there. Guessing a kind
+        // here would put the screen on a category its grid does not list.
+        assertNull(AddViewModel.kindOf("c-gone", expense, income))
+    }
+
+    // ------------------------------------------- when the grid pins a family
+
+    /**
+     * Whether the category grid is going to take a window for the open family,
+     * which is the question the two screens with a note under the grid ask
+     * before scrolling the note into view themselves.
+     *
+     * The bug it exists for: both of them scrolling the same list at the same
+     * target, through each other, every frame of a keyboard animation.
+     */
+    @Test
+    fun `the grid pins only when the chosen family has children`() {
+        assertTrue(familyHasChildren(family, "c-bills"))
+        // From the child, which is the same family and the same block.
+        assertTrue(familyHasChildren(family, "c-power"))
+        // A family with nothing under it is one cell, not a block.
+        assertFalse(familyHasChildren(family, "c-home"))
+        // Nothing chosen at all, and a choice the list does not hold.
+        assertFalse(familyHasChildren(family, null))
+        assertFalse(familyHasChildren(family, "c-gone"))
     }
 
     // ---------------------------------------------- the bar's middle button

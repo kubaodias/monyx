@@ -186,9 +186,15 @@
     <string name="settings_account_balance">Current balance</string>
     <string name="settings_account_currency">Currency</string>
     <string name="settings_currencies">Currencies</string>
-    <string name="settings_currencies_hint">Only the ones shown here are offered when you add an account or change what a transaction is in. Totals are always in złoty.</string>
-    <string name="settings_currency_reporting">totals are in this one</string>
-    <string name="settings_currency_in_use">an account holds it</string>
+    <string name="settings_currencies_hint">These are offered when you add an account or change what a transaction is in. Totals are always in złoty.</string>
+    <string name="settings_currency_add">Add a currency</string>
+    <string name="settings_currency_rated">These have an NBP rate, so their rows convert into złoty:</string>
+    <string name="settings_currency_code">Code</string>
+    <string name="settings_currency_symbol">Symbol</string>
+    <string name="settings_currency_code_hint">Three letters, as on a bank statement.</string>
+    <string name="settings_currency_bad_code">Three letters, like THB.</string>
+    <string name="settings_currency_exists">Already on the list.</string>
+    <string name="settings_currency_no_rate">No NBP rate for this one: its amounts stay in it and are left out of złoty totals.</string>
     <string name="settings_account_currency_hint">Totals stay in złoty. This account is converted at the NBP rate on each transaction’s date.</string>
     <string name="settings_account_in_summary">Include in summary</string>
     <string name="settings_account_in_summary_hint">Off: its balance and its spending stay out of every total, budget and chart. You can still book transactions on it.</string>
@@ -272,7 +278,6 @@
     <string name="recurring_finished">Finished</string>
     <string name="recurring_add_title">New repeating transaction</string>
     <string name="recurring_edit_title">Edit repeating transaction</string>
-    <string name="recurring_amount">Amount</string>
     <string name="recurring_how_often">How often</string>
     <string name="recurring_first_on">First on</string>
     <string name="recurring_until">Until</string>

@@ -5,7 +5,7 @@
 // failures reject with a plain Error — no typed class, no error codes. A single
 // malformed row reaching SQL would roll back the entire push, and classifying
 // why would mean matching on message substrings.
-import { isCurrency } from "./rates.ts";
+import { isCurrencyCode } from "./rates.ts";
 
 export type TableName =
   | "members"
@@ -196,12 +196,13 @@ export function validateChange(raw: unknown): ValidationResult {
       if (row["excluded_from_summary"] !== undefined && !flag(row["excluded_from_summary"])) {
         return reject("bad_excluded_from_summary");
       }
-      // Same bargain again: absent means PLN. Unlike the flags above, an
-      // unrecognised value is REJECTED rather than defaulted — a currency the
-      // server has no rates for would convert to nothing and silently drop the
-      // account out of every total, which is worse than refusing the row and
-      // telling the client so.
-      if (row["currency"] !== undefined && !isCurrency(row["currency"])) {
+      // Same bargain again: absent means PLN. What is checked is the SHAPE of
+      // the code, not membership of the nine the server fetches rates for — a
+      // household may add a currency of its own, and refusing it here would
+      // mean an account that cannot be pushed at all. See isCurrencyCode: a
+      // code with no rate is an account that keeps its own figures and stays
+      // out of the złoty totals, which is a state both ends already show.
+      if (row["currency"] !== undefined && !isCurrencyCode(row["currency"])) {
         return reject("bad_currency");
       }
       break;
@@ -285,10 +286,10 @@ export function validateChange(raw: unknown): ValidationResult {
       if (row["source"] !== undefined && !SOURCES.has(String(row["source"]))) return reject("bad_source");
       if (!optionalId(row["recurring_rule_id"])) return reject("bad_recurring_rule_id");
       // Absent means PLN, so a client built before this column keeps working.
-      // A present-but-unknown code is refused for the same reason as on an
-      // account: there are no rates for it, so it would convert to nothing and
-      // drop the row out of every total with nothing on screen to say so.
-      if (row["currency"] !== undefined && !isCurrency(row["currency"])) {
+      // The shape is checked and the list is not, exactly as on an account
+      // above: a row in a currency this server has no rate for is a row that
+      // keeps its own figure and is left out of the złoty sums.
+      if (row["currency"] !== undefined && !isCurrencyCode(row["currency"])) {
         return reject("bad_currency");
       }
       // A transfer has no category and never enters spending statistics.

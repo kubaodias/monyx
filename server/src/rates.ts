@@ -28,8 +28,29 @@ const CURRENCY_SET = new Set<string>(CURRENCIES);
 /** The reporting currency. Needs no rate: it is the unit the rates are in. */
 export const BASE: Currency = "PLN";
 
+/** One of the nine a rate is published for. */
 export function isCurrency(value: unknown): value is Currency {
   return typeof value === "string" && CURRENCY_SET.has(value);
+}
+
+/**
+ * Any currency CODE an account or a row may carry: three capitals.
+ *
+ * Deliberately wider than [isCurrency]. A household can add a currency of its
+ * own in Settings — a code and the symbol to print after a figure — and the
+ * server's job is to store what it is told, not to hold an opinion about which
+ * currencies exist. A code outside [CURRENCIES] simply has no rate, which every
+ * total on both ends already handles: the row keeps its own figure and is left
+ * out of the złoty sums, visibly, the same way a rated currency behaves before
+ * its first rate has synced.
+ *
+ * Still a shape check, so a push cannot write "zloty" or an empty string into
+ * the column and leave a client resolving it to nothing. ISO 4217 is not
+ * enumerated here or on the phone: "QQQ" is a currency as far as both are
+ * concerned, and the household that typed it is the one that knows.
+ */
+export function isCurrencyCode(value: unknown): value is string {
+  return typeof value === "string" && /^[A-Z]{3}$/.test(value);
 }
 
 /** Rates are stored scaled by this, so conversion is integer arithmetic. */

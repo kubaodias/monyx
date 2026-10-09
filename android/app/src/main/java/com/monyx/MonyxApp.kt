@@ -4,6 +4,7 @@ import android.app.Application
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.os.Build
+import com.monyx.data.Currencies
 import com.monyx.data.CurrencyPreferences
 import com.monyx.data.MonyxDatabase
 import com.monyx.data.MonyxRepository
@@ -11,6 +12,10 @@ import com.monyx.sync.Session
 import com.monyx.ui.SelectedMonth
 import com.monyx.ui.overview.ChartPreferences
 import com.monyx.update.Updater
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 
 class MonyxApp : Application() {
 
@@ -32,14 +37,42 @@ class MonyxApp : Application() {
      */
     val selectedMonth by lazy { SelectedMonth() }
 
+    /**
+     * For the one thing that has to be collected for as long as the process
+     * lives, and belongs to no screen: see [publishCurrencySymbols]. Anything
+     * with a ViewModel to live in belongs in that ViewModel's scope instead.
+     */
+    private val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+
     override fun onCreate() {
         super.onCreate()
         createNotificationChannel()
+        publishCurrencySymbols()
         // NOTE: sync is deliberately NOT enqueued here. Application.onCreate and
         // everything before it is what actually threatens the five-second target
         // — WorkManager initialises through an androidx.startup
         // ContentProvider that runs first and opens its own Room database.
         // Enqueue from a LaunchedEffect after the first frame instead.
+    }
+
+    /**
+     * Keeps [com.monyx.data.Currency] able to print a currency this household
+     * typed in itself.
+     *
+     * A ledger row resolves its unit synchronously, from a list item, long
+     * before anybody opens a picker — so the symbols for the added currencies
+     * have to be in memory rather than behind a Flow a composable happens to be
+     * collecting. One collector for the life of the process, started here.
+     *
+     * Cheap in the way the note below cares about: launching a coroutine costs
+     * nothing on the main thread and DataStore reads the file on its own
+     * dispatcher. Until it answers, an added currency prints its code — the same
+     * thing it prints on a phone that has never been told about it.
+     */
+    private fun publishCurrencySymbols() {
+        applicationScope.launch {
+            currencyPreferences.chosen.collect(Currencies::publishSymbols)
+        }
     }
 
     /**

@@ -106,16 +106,20 @@ class SettingsViewModel(private val app: MonyxApp) : ViewModel() {
     val syncError: Flow<String?> = session.syncErrorFlow
 
     /**
-     * Which currencies this phone offers, and the write that changes it.
+     * Which currencies this phone deals in, and the two writes that change it.
      *
      * A DataStore preference rather than a synced row: see [CurrencyPreferences].
      * It goes through the ViewModel like everything else this screen writes, so
      * the section stays a function of its arguments.
      */
-    val shownCurrencies: Flow<Set<String>?> = app.currencyPreferences.shown
+    val chosenCurrencies: Flow<Set<String>?> = app.currencyPreferences.chosen
 
-    fun setCurrencyShown(code: String, shown: Boolean) {
-        viewModelScope.launch { app.currencyPreferences.setShown(code, shown) }
+    fun addCurrency(code: String, suffix: String) {
+        viewModelScope.launch { app.currencyPreferences.add(code, suffix) }
+    }
+
+    fun removeCurrency(code: String) {
+        viewModelScope.launch { app.currencyPreferences.remove(code) }
     }
 
     private val _inviteState = MutableStateFlow<InviteUiState>(InviteUiState.Idle)

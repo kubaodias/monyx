@@ -114,6 +114,11 @@ fun TransactionsScreen(
      * bar cannot see — and the bar is where the button is. See MonyxNav.
      */
     onAccountFilterChanged: (String?) -> Unit = {},
+    /**
+     * Which category the list is currently narrowed to, reported upwards, for
+     * the same reason and to the same button as [onAccountFilterChanged].
+     */
+    onCategoryFilterChanged: (String?) -> Unit = {},
 ) {
     val app = LocalContext.current.applicationContext as MonyxApp
     val viewModel: TransactionsViewModel = viewModel(
@@ -170,6 +175,7 @@ fun TransactionsScreen(
     // Reported on every change, and on arrival: the Add button needs the answer
     // at the moment it is tapped, from a composition somewhere else entirely.
     LaunchedEffect(accountId) { onAccountFilterChanged(accountId) }
+    LaunchedEffect(categoryId) { onCategoryFilterChanged(categoryId) }
 
     var editing by remember { mutableStateOf<TransactionEntity?>(null) }
     val snackbarHostState = remember { SnackbarHostState() }

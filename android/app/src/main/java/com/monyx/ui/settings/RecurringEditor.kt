@@ -51,12 +51,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardCapitalization
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -71,8 +73,14 @@ import com.monyx.data.Money
 import com.monyx.data.Recurrence
 import com.monyx.ui.JumpToToday
 import com.monyx.ui.add.AccountPickerDialog
+import com.monyx.ui.add.AmountDisplay
+import com.monyx.ui.add.AmountInput
 import com.monyx.ui.add.ContextChip
+import com.monyx.ui.add.KeypadHeight
 import com.monyx.ui.add.KindSelector
+import com.monyx.ui.add.Keypad
+import com.monyx.ui.add.categoryMarkOf
+import com.monyx.ui.add.press
 import com.monyx.ui.theme.Palette
 import java.time.Instant
 import java.time.LocalDate
@@ -114,9 +122,23 @@ fun RecurringEditor(
     onSave: (RuleDraft) -> Unit,
 ) {
     var kind by remember { mutableStateOf(seed.kind) }
-    var amountText by remember {
-        mutableStateOf(seed.amountMinor?.takeIf { it > 0 }?.let { Money.format(it) } ?: "")
+    // The keypad's own object, so an amount typed here and one typed on the
+    // screen before go through identical arithmetic — "120 + 40" included.
+    var amount by remember {
+        mutableStateOf(
+            seed.amountMinor?.takeIf { it > 0 }?.let(AmountInput::ofMinor) ?: AmountInput(),
+        )
     }
+    /**
+     * Whether the keys are up, which is the one piece of state this screen has
+     * that the keypad does not.
+     *
+     * Up when there is no amount yet — opening "Add a repeating transaction"
+     * from Settings, where typing one is the first thing anybody does. Down when
+     * the keypad handed one over: the figure is already right, and what brought
+     * somebody here is the dates below it.
+     */
+    var keypadUp by remember { mutableStateOf((seed.amountMinor ?: 0L) <= 0L) }
     // The household's default account, exactly as the keypad and the microphone
     // pick it — NOT the first row of the table. See [defaultAccount]: the table
     // interleaves the groups, so `accounts.firstOrNull()` handed this form a
@@ -160,8 +182,7 @@ fun RecurringEditor(
     }
 
     val ofKind = remember(categories, kind) { categories.filter { it.kind == kind && it.deleted == 0 } }
-    val amountMinor = Money.parseToMinor(amountText)
-    val chosen = ofKind.firstOrNull { it.id == categoryId }
+    val amountMinor = amount.evaluate().toMinor()
 
     // Family first, then — only if that family has one — the subcategory.
     //
@@ -193,9 +214,10 @@ fun RecurringEditor(
         resolve
     }
 
-    // The ONE coloured thing on the screen, and it is the category's circle —
-    // the same mark the ledger will show. Everything else is the theme.
+    // The family the amount line carries, drawn in the same circle, in the same
+    // colour, as the row this rule will write every month.
     //
+    // The ONE coloured thing on the screen, and everything else is the theme.
     // The whole editor used to be painted in it: the app bar, the card behind
     // the amount, the selected chips, the save button, all animating from one
     // category's colour to the next. That made a form for setting up the rent
@@ -203,7 +225,22 @@ fun RecurringEditor(
     // editor here takes its colour from its content. The category colour is a
     // way to recognise a category at a glance, and it stops being that when it
     // is also the background, the button and the chrome.
-    val chosenColor = chosen?.let(colorOf)
+    val mark = remember(categoryId, ofKind, colorOf) {
+        categoryMarkOf(ofKind, categoryId, colorOf)
+    }
+
+    val focusManager = LocalFocusManager.current
+    val keyboard = LocalSoftwareKeyboardController.current
+
+    // Back to the keys, taking the note's keyboard with them. A keyboard hidden
+    // over a field that still has the focus comes straight back on the next
+    // recomposition, so the focus goes first — the same two lines the add
+    // screen and the edit sheet use, for the same reason.
+    fun editAmount() {
+        focusManager.clearFocus(force = true)
+        keyboard?.hide()
+        keypadUp = true
+    }
 
     // Which single thing is still missing, in the order a person fills the form
     // in. Naming it beats grey-and-silent: a disabled control that will not say
@@ -245,25 +282,37 @@ fun RecurringEditor(
             )
         },
         bottomBar = {
-            SaveButton(
-                blocker = blocker,
-                amountMinor = amountMinor,
-                currency = Currency.of(accounts.firstOrNull { it.id == accountId }?.currency),
-                onSave = {
-                    onSave(
-                        RuleDraft(
-                            kind = kind,
-                            amountMinor = amountMinor,
-                            accountId = accountId!!,
-                            categoryId = categoryId!!,
-                            note = note.trim().takeIf { it.isNotBlank() },
-                            freq = freq,
-                            startsOn = startsOn,
-                            endsOn = endsOn,
-                        ),
+            Column {
+                // Above the save button, exactly as on the keypad screen —
+                // where the bar's middle button IS the save button and the keys
+                // sit on top of it. See AddScreen.
+                if (keypadUp) {
+                    Keypad(
+                        onKey = { amount = amount.press(it) },
+                        equalsEnabled = amount.hasPendingOperation,
+                        modifier = Modifier.height(KeypadHeight),
                     )
-                },
-            )
+                }
+                SaveButton(
+                    blocker = blocker,
+                    amountMinor = amountMinor,
+                    currency = Currency.of(accounts.firstOrNull { it.id == accountId }?.currency),
+                    onSave = {
+                        onSave(
+                            RuleDraft(
+                                kind = kind,
+                                amountMinor = amountMinor,
+                                accountId = accountId!!,
+                                categoryId = categoryId!!,
+                                note = note.trim().takeIf { it.isNotBlank() },
+                                freq = freq,
+                                startsOn = startsOn,
+                                endsOn = endsOn,
+                            ),
+                        )
+                    },
+                )
+            }
         },
             ) { padding ->
         Column(
@@ -313,56 +362,24 @@ fun RecurringEditor(
                 },
             )
 
-            // The amount in the shape of the row it will write: the
-            // category's own circle, then the figure. The card behind it is
-            // the theme's surface, not the category's colour.
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 16.dp)
-                    .clip(RoundedCornerShape(20.dp))
-                    .background(MaterialTheme.colorScheme.surfaceVariant)
-                    .padding(16.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(52.dp)
-                        .background(
-                            chosenColor ?: MaterialTheme.colorScheme.surface,
-                            CircleShape,
-                        ),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(
-                        Palette.icon(chosen?.icon),
-                        contentDescription = null,
-                        tint = if (chosen == null) {
-                            MaterialTheme.colorScheme.onSurfaceVariant
-                        } else {
-                            Color.White
-                        },
-                    )
-                }
-                Spacer(Modifier.width(14.dp))
-                OutlinedTextField(
-                    value = amountText,
-                    onValueChange = { amountText = it },
-                    // The unit on the label, the way the account editor's
-                    // balance field carries it: this is the one field here
-                    // where a wrong currency is silently expensive, and the
-                    // rule's account decides it.
-                    label = {
-                        Text(
-                            stringResource(R.string.recurring_amount) +
-                                " (" + Currency.of(account?.currency).suffix + ")",
-                        )
-                    },
-                    singleLine = true,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                    modifier = Modifier.weight(1f),
-                )
-            }
+            // The amount exactly as the keypad asks for it: the category's
+            // circle, the figure at 52sp, the unit beside it, and the keys
+            // below. It was an OutlinedTextField with a decimal keyboard — a
+            // second way to type the same thing, two rows above a screen that
+            // had just done it the other way, and the one place in the app
+            // where "120 + 40" was not arithmetic but a rejected string.
+            //
+            // The unit is not tappable here. A rule has no currency of its own:
+            // every occurrence it writes takes the account's, so a picker on
+            // this line would be a control that cannot be honoured. See
+            // ADR 0022.
+            Spacer(Modifier.height(8.dp))
+            AmountDisplay(
+                amount = amount,
+                onClick = { editAmount() },
+                currency = Currency.of(account?.currency),
+                categoryMark = mark,
+            )
 
             Spacer(Modifier.height(16.dp))
             FieldLabel(stringResource(R.string.add_pick_category))
@@ -375,7 +392,13 @@ fun RecurringEditor(
                 colorOf = colorOf,
                 // Straight to the root, dropping any subcategory: picking a new
                 // family cannot keep the old family's child.
-                onSelect = { categoryId = it },
+                //
+                // And the keys stand down once they have done their job, as on
+                // the keypad screen: with an amount typed, what is left is the
+                // dates below, and 188dp of digits is in their way. With no
+                // amount yet, somebody is working in the other order and taking
+                // the keys away would be the opposite of helping.
+                onSelect = { categoryId = it; if (amountMinor > 0) keypadUp = false },
             )
 
             if (children.isNotEmpty()) {
@@ -391,7 +414,10 @@ fun RecurringEditor(
                     // Tapping the lit one puts the rule back on the parent.
                     // Optional has to be undoable or it is just a second
                     // required step with a softer label.
-                    onSelect = { categoryId = if (it == categoryId) rootId else it },
+                    onSelect = {
+                        categoryId = if (it == categoryId) rootId else it
+                        if (amountMinor > 0) keypadUp = false
+                    },
                 )
             }
 
@@ -461,7 +487,12 @@ fun RecurringEditor(
                 keyboardOptions = KeyboardOptions(
                     capitalization = KeyboardCapitalization.Sentences,
                 ),
-                modifier = Modifier.fillMaxWidth(),
+                // Two keyboards cannot share the bottom of a screen. Focusing
+                // this field stands the keys down; tapping the figure brings
+                // them back and drops this field's focus. See [editAmount].
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .onFocusChanged { if (it.isFocused) keypadUp = false },
             )
             Spacer(Modifier.height(24.dp))
         }

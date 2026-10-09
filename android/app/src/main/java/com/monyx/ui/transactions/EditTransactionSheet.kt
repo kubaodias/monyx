@@ -63,6 +63,7 @@ import com.monyx.ui.add.AccountPickerDialog
 import com.monyx.ui.add.AmountDisplay
 import com.monyx.ui.add.CurrencyPickerDialog
 import com.monyx.ui.add.AmountInput
+import com.monyx.ui.add.familyHasChildren
 import com.monyx.ui.add.NoteField
 import com.monyx.ui.add.NoteFieldHeight
 import com.monyx.ui.add.press
@@ -449,8 +450,12 @@ fun EditTransactionSheet(
             // covering this field. Re-read as it slides, because every frame of
             // the animation takes a little more of the window.
             val imeBottom = WindowInsets.ime.getBottom(LocalDensity.current)
-            LaunchedEffect(noteFocused, imeBottom) {
-                if (noteFocused) {
+            // And not at all while the grid is pinning a family: the block it
+            // pins is a window tall with the note at the foot of it, so this
+            // would be a second scroll aiming where the first one already is.
+            val gridPins = familyHasChildren(selectable, categoryId)
+            LaunchedEffect(noteFocused, imeBottom, gridPins) {
+                if (noteFocused && !gridPins) {
                     val last = gridState.layoutInfo.totalItemsCount - 1
                     if (last >= 0) gridState.animateScrollToItem(last)
                 }

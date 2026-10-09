@@ -185,9 +185,15 @@
     <string name="settings_account_balance">Aktualne saldo</string>
     <string name="settings_account_currency">Waluta</string>
     <string name="settings_currencies">Waluty</string>
-    <string name="settings_currencies_hint">Tylko widoczne waluty są proponowane przy dodawaniu konta i przy zmianie waluty transakcji. Podsumowania zawsze są w złotych.</string>
-    <string name="settings_currency_reporting">w niej są podsumowania</string>
-    <string name="settings_currency_in_use">konto ją trzyma</string>
+    <string name="settings_currencies_hint">Te waluty są proponowane przy dodawaniu konta i przy zmianie waluty transakcji. Podsumowania zawsze są w złotych.</string>
+    <string name="settings_currency_add">Dodaj walutę</string>
+    <string name="settings_currency_rated">Te mają kurs NBP, więc przeliczają się na złote:</string>
+    <string name="settings_currency_code">Kod</string>
+    <string name="settings_currency_symbol">Symbol</string>
+    <string name="settings_currency_code_hint">Trzy litery, jak na wyciągu z banku.</string>
+    <string name="settings_currency_bad_code">Trzy litery, np. THB.</string>
+    <string name="settings_currency_exists">Już jest na liście.</string>
+    <string name="settings_currency_no_rate">Brak kursu NBP — kwoty zostaną w tej walucie i nie wejdą do podsumowań w złotych.</string>
     <string name="settings_account_currency_hint">Podsumowania zostają w złotych. To konto jest przeliczane kursem NBP z dnia każdej transakcji.</string>
     <string name="settings_account_in_summary">Uwzględniaj w podsumowaniu</string>
     <string name="settings_account_in_summary_hint">Wyłączone: saldo i wydatki tego konta nie wchodzą do sum, budżetów ani wykresów. Transakcje nadal można dodawać.</string>
@@ -267,7 +273,6 @@
     <string name="recurring_finished">Zakończona</string>
     <string name="recurring_add_title">Nowa transakcja cykliczna</string>
     <string name="recurring_edit_title">Edytuj transakcję cykliczną</string>
-    <string name="recurring_amount">Kwota</string>
     <string name="recurring_how_often">Jak często</string>
     <string name="recurring_first_on">Pierwsza</string>
     <string name="recurring_until">Do</string>

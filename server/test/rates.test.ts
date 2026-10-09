@@ -23,6 +23,7 @@ import {
   datesBetween,
   fetchNbpTable,
   isCurrency,
+  isCurrencyCode,
   latestStoredDate,
   rateFor,
   refreshRates,
@@ -178,6 +179,13 @@ test("every offered currency is two-decimal and PLN is among them", () => {
   }
   // Croatia adopted the euro in January 2023; the kuna is not a currency.
   assert.equal(isCurrency("HRK"), false);
+  // Wider on purpose: the nine have rates, any code can be stored. See
+  // isCurrencyCode — the household adds its own in Settings.
+  assert.equal(isCurrencyCode("HRK"), true);
+  assert.equal(isCurrencyCode("THB"), true);
+  assert.equal(isCurrencyCode("thb"), false);
+  assert.equal(isCurrencyCode("EU"), false);
+  assert.equal(isCurrencyCode(null), false);
 });
 
 test("a long backfill is split into windows NBP will answer", () => {
@@ -265,19 +273,41 @@ test("a push may set an account's currency, and omitting it means zloty", async 
   );
 });
 
-test("a currency the server has no rates for is refused, not defaulted", async () => {
+test("a currency the server has no rates for is stored, not refused", async () => {
   const fake = new FakeDb();
   seedHousehold(fake);
   const db = forHousehold("hh1", fake);
 
   const result = await push(db, [
-    { table: "accounts", row: { id: "a-x", name: "Jen", initial_balance_minor: 0, sort_order: 1, currency: "JPY", deleted: 0 } },
+    { table: "accounts", row: { id: "a-x", name: "Jen", initial_balance_minor: 0, sort_order: 1, currency: "THB", deleted: 0 } },
   ]);
 
-  // Defaulting it to PLN would silently misstate the balance; dropping it to
-  // NULL would drop the account out of every total. Refusing tells the client.
-  assert.equal(result.rejected[0]?.reason, "bad_currency");
-  assert.equal(result.applied, 0);
+  // The household added it in Settings: a code and a symbol. Refusing the row
+  // would mean an account that cannot be pushed at all, and the thing being
+  // protected against — an account silently dropping out of every total — is
+  // what both ends now SHOW, because there is no rate to convert it by.
+  assert.equal(result.rejected.length, 0);
+  assert.equal(result.applied, 1);
+  assert.equal(
+    fake.db.prepare("SELECT currency FROM accounts WHERE id = 'a-x'").get()?.["currency"],
+    "THB",
+  );
+});
+
+test("a currency that is not a code at all is still refused", async () => {
+  const fake = new FakeDb();
+  seedHousehold(fake);
+  const db = forHousehold("hh1", fake);
+
+  // Not a judgement about which currencies exist — a shape check, so the column
+  // cannot end up holding something no client can resolve to a unit.
+  for (const currency of ["zloty", "EU", "eur", "€", ""]) {
+    const result = await push(db, [
+      { table: "accounts", row: { id: "a-bad", name: "Jen", initial_balance_minor: 0, sort_order: 1, currency, deleted: 0 } },
+    ]);
+    assert.equal(result.rejected[0]?.reason, "bad_currency", `${currency} is refused`);
+    assert.equal(result.applied, 0);
+  }
 });
 
 test("a budget alert converts a foreign default account's spending", async () => {
@@ -390,14 +420,20 @@ test("a push without a currency is zloty, so an older client still works", async
   assert.equal(results[0]?.currency, "PLN");
 });
 
-test("an unknown transaction currency is refused rather than defaulted", async () => {
+test("a transaction in an unrated currency is stored; a malformed code is not", async () => {
   const fake = new FakeDb();
   seedHousehold(fake);
   const db = forHousehold("hh1", fake);
-  const row = expense("t1", 100_00, "cat1");
-  const result = await push(db, [{ ...row, row: { ...row.row, currency: "JPY" } }]);
-  assert.equal(result.rejected[0]?.reason, "bad_currency");
-  assert.equal(result.applied, 0);
+
+  const good = expense("t1", 100_00, "cat1");
+  const stored = await push(db, [{ ...good, row: { ...good.row, currency: "THB" } }]);
+  assert.equal(stored.rejected.length, 0);
+  assert.equal(stored.applied, 1);
+
+  const bad = expense("t2", 100_00, "cat1");
+  const refused = await push(db, [{ ...bad, row: { ...bad.row, currency: "baht" } }]);
+  assert.equal(refused.rejected[0]?.reason, "bad_currency");
+  assert.equal(refused.applied, 0);
 });
 
 test("0010's backfill restates existing rows in their account's currency", async () => {

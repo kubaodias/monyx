@@ -60,7 +60,9 @@ cannot answer says what is still missing instead — see
 - **Add** — a keypad that is also a calculator, a note, any date including the
   future, and *Make it repeat* to turn the row being typed into a repeating rule.
   Wydatek and Przychód carry an arrow each — out of the household and into it —
-  and it is the same control the rule editor asks the question with. A rule can
+  and it is the same control the rule editor asks the question with, as is the
+  amount: the rule editor has the same 52sp figure, with the same keypad under
+  it, rather than a decimal text field of its own. A rule can
   start in the past: it fills in every occurrence from its first date through
   today, and the editor says how many that will be before it saves.
   The family you pick rises into the slot beside the amount — circle and name —
@@ -75,8 +77,8 @@ cannot answer says what is still missing instead — see
   headings included, and every figure that adds rows up is in złoty — a day
   holding euro purchases is converted, not summed in cents. The category menu
   lists the families in the order they were dragged, spending and earning in
-  separate blocks. Narrow it to one account and the Dodaj button starts the next
-  transaction on that account. An archived account's rows are not
+  separate blocks. Narrow it to one account or one category and the Dodaj button
+  starts the next transaction on that account, under that category. An archived account's rows are not
   in here at all: the way to ask about a finished account is its row in Settings,
   which opens this screen pinned to it.
 - **Budget** — what there is to spend this month, limits on main categories, and
@@ -86,9 +88,12 @@ cannot answer says what is still missing instead — see
   the same as having set none.
 - **Settings** — accounts, categories (two levels, dragged into order),
   currencies, repeating rules, language, backup health, the update check and what
-  every release changed, a tab each. Currencies is which of the nine the pickers
-  offer — euro and dollar to begin with, the rest a switch away, and złoty and
-  anything an account holds cannot be switched off. Archiving an account takes it out of the summary as well: a finished
+  every release changed, a tab each. Currencies is the list this phone deals in
+  — złoty and the euro to begin with, anything else added by hand: a code and
+  the text to print after a figure. The nine with an NBP rate are offered as
+  chips in that dialog, because those are the ones that convert; anything else
+  keeps its own figures and stays out of the złoty totals. Złoty and whatever an
+  account holds have no remove button. Archiving an account takes it out of the summary as well: a finished
   account left counting is a balance inside every total with no chip anywhere to
   switch it off. The toggle stays on the row if it should go back in.
 
@@ -135,7 +140,7 @@ monyx/
 ```sh
 cd server
 npm install
-npm test          # 136 tests: sync, auth, budgets, voice, notes, releases, rates
+npm test          # 137 tests: sync, auth, budgets, voice, notes, releases, rates
 npm run typecheck
 telnyx-edge ship  # deploy
 ```
@@ -156,11 +161,16 @@ telnyx-edge storage sqldb migrations apply monyx --remote --migrations-dir serve
 ### Currencies and exchange rates
 
 Złoty is the reporting currency and is not configurable: every total the app
-prints is in złoty. An account may hold another currency — nine are supported
-(PLN, EUR, USD, GBP, CHF, CZK, SEK, NOK, DKK) — and `fx_rates` says what one
-unit of it was worth on a date. A phone offers the ones its household has said
-it uses (Settings › Waluty; euro and dollar to begin with), which changes what
-the pickers list and nothing else. See
+prints is in złoty. An account may hold another currency: nine have **rates** —
+PLN, EUR, USD, GBP, CHF, CZK, SEK, NOK, DKK, which `fx_rates` prices per date —
+and any other three-letter code can be **added by hand** in Settings › Waluty,
+with the symbol to print after a figure. An added currency is stored, synced and
+shown like any other; it simply has no rate, so its rows keep their own figure
+and are left out of every złoty total — the same state a rated currency is in
+before its first rate has synced. A phone offers złoty, the euro and whatever
+it has added (which changes what the pickers list and nothing else); the
+symbols for the added ones are a **local** preference, so until the other phone
+adds the same code it prints the code instead of the symbol. See
 [ADR 0022](docs/decisions/0022-zloty-is-the-reporting-currency-and-a-rate-has-a-date.md).
 
 Rates come from **NBP table A** (`api.nbp.pl`), the Polish central bank's own
@@ -262,9 +272,16 @@ to the grosz.
 
 All nine are two-decimal currencies in ISO 4217. That is what lets
 `amount_minor` keep meaning "hundredths of the unit" everywhere with no
-per-currency minor-unit handling, so **a currency does not go on the list
+per-currency minor-unit handling, so **a currency does not go on the rated list
 without checking it** — a rate table carrying JPY is refused rather than
 stored. There is no kuna: Croatia adopted the euro in January 2023.
+
+The same assumption is what a hand-added currency inherits, and the one thing
+Settings cannot check: a household typing in JPY or HUF-as-used would be out by
+a factor of a hundred on every amount in it. The server validates the **shape**
+of a code (three capitals, `isCurrencyCode`) and not a list, deliberately —
+refusing an unknown code would mean an account that cannot be pushed at all,
+and the thing that was being guarded against is now visible on both ends.
 
 ### Creating a household
 
@@ -623,6 +640,6 @@ No debts or savings goals, no bank integration, no Excel export, no iOS, no
 web.
 
 "No multiple currencies" was on this list until 2026-10-05. It was removed
-deliberately rather than quietly: an account may now hold one of nine
-currencies, while the currency the app *reports* in is still złoty and still
+deliberately rather than quietly: an account may hold any currency — nine of
+them convert — while the currency the app *reports* in is still złoty and still
 not configurable. ADR 0022 records what was decided and what it costs.

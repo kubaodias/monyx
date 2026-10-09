@@ -311,3 +311,51 @@ another currency by accident, because its row in Settings will not switch off.
 
 It is a DataStore preference, unsynced, like the chart's hidden categories: it
 is not a fact about the household's money, it is how one phone is set up.
+
+## Addendum, 2026-10-09 (later the same day): a currency is data, and nine of them have rates
+
+The list above lasted an afternoon. The owner's answer to "which of the nine do
+you want offered" was "two — and let me type in the rest", which is a better
+question than the one the switches answered: the set of currencies a household
+might hold is not the set the app happens to know rates for.
+
+So the two are now separate things.
+
+**`Currency` is no longer an enum.** It is a code and the text to print after a
+figure. `Currency.KNOWN` is the nine that have NBP rates — the same list
+`CURRENCIES` carries in `rates.ts`, and still the only list that converts — and
+anything else is a code the household typed into Settings with a symbol beside
+it. What stayed closed is the arithmetic: every currency here is assumed to be a
+two-decimal one, which is what lets `amount_minor` mean "hundredths of the unit"
+everywhere, and that is the one thing a typed-in code can get wrong (JPY,
+HUF-as-used). The README says so and Settings does not, because a dialog that
+explains ISO 4217 minor units is a dialog nobody reads.
+
+**An unrecognised code reads as itself, not as złoty.** `Currency.of("THB")` used
+to answer PLN, which was defensible while the nine were the only possibilities —
+a row from a newer client beats a crash — and is the opposite of safe now: a baht
+row resolving to złoty would print "zł" after a baht figure *and* claim to be the
+reporting currency, so the summary would count it. It now answers a currency
+called THB with no rate, which is the truth.
+
+**The server validates the shape of a code, not a list.** `isCurrencyCode` —
+three capitals — replaces `isCurrency` in `schema.ts`. The old rejection existed
+to stop an account silently dropping out of every total for want of a rate; what
+changed is that the drop is no longer silent. A rate-less account shows its own
+balance and is visibly not converted, exactly as a rated one does before its
+first rate syncs. Refusing the row instead would mean an account that cannot be
+pushed at all, which is a worse answer to the same problem. `isCurrency` stays,
+for the places that mean "has a rate".
+
+**The symbols are local, and that is a real cost.** A currency added on one
+phone prints its code on the other until it is added there too. Syncing them
+would mean a table, a migration and a push path for a preference — and the
+figure is never wrong meanwhile, only terse. `MonyxApp` publishes the symbols
+into `Currency` once per change, because a ledger row resolves its unit
+synchronously and cannot wait on DataStore.
+
+The switch list is gone with it. Two of its three lines of text were explaining
+why a row could not be switched off; the list now simply has no remove button on
+those rows, which says the same thing in no words. Nine switches was also nine
+hypotheticals — the thing being chosen from was the app's capability, not the
+household's money.
