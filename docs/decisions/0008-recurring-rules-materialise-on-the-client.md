@@ -108,3 +108,37 @@ already written under the old one.
 There is a small race: a phone that materialises before pulling can briefly
 rewrite an occurrence another phone deleted. `SyncWorker` pulls first for exactly
 this reason; the app-open path cannot, and last write wins if it happens.
+
+## Addendum, 2026-10-09: a rule may start in the past, and the projection is gone
+
+Two changes in opposite directions, and they are the same decision: a repeating
+rule is about what HAPPENS, never about what might.
+
+**A new rule may be anchored before today, and it fills in every occurrence
+through today.** Nothing in this decision ever said otherwise —
+`materializeRecurring` has always asked for `occurrences(anchor … today)`, and
+the idempotent occurrence id is what makes a backlog safe to write — but the
+editor refused any anchor before today, on the grounds that "a rule is a
+statement about the future". That sentence is true of the next occurrence and
+false of the first one, and it made the ordinary case impossible: a subscription
+that has been running since March is entered in October, and the seven months it
+has already taken are exactly what the household wants in the ledger. The owner
+asked for it in one line — "dodanie nowej reguły cyklicznej powinno być możliwe
+wstecz i wszystkie kolejne miesiące aż do dzisiaj powinny uzupełnić dane".
+
+The floor is replaced by a count. The editor says how many transactions an
+anchor in the past is about to write, before the save, because those are real
+rows in months that are already closed and **stopping the rule afterwards does
+not take them back out** — that is a tombstone on the rule alone, which is this
+decision's own rule and the right one. A mis-scrolled year is the one way to ask
+for a hundred rows by accident, and naming the number is cheaper than any guard
+that would also block the real case. `MAX_NEW_PER_PASS` still bounds the damage
+per pass.
+
+**The "Planned" chip on the ledger is removed.** It merged the occurrences a
+rule had not written yet into the list, as faded untappable rows. It was honest
+and it was in the wrong place: that tab answers "what did we spend", the chip
+answered "what is still coming", and it answered it in the middle of the first
+answer — the one control on a row of filters that made the list longer instead
+of shorter. `Planned` is deleted along with it. Nothing about materialisation
+changes; the rows still appear on their own dates, when they are facts.

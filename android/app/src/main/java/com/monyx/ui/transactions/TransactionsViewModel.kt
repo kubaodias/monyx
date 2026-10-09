@@ -7,9 +7,7 @@ import com.monyx.data.AccountActivity
 import com.monyx.data.AccountEntity
 import com.monyx.data.CategoryEntity
 import com.monyx.data.Currency
-import com.monyx.data.Dates
 import com.monyx.data.MonyxRepository
-import com.monyx.data.Planned
 import com.monyx.data.TransactionEntity
 import com.monyx.data.TransactionListItem
 import com.monyx.sync.SyncWorker
@@ -80,93 +78,37 @@ class TransactionsViewModel(
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyMap())
 
     /**
-     * Whether the list also shows what the repeating rules are going to write.
+     * The rows on screen.
      *
-     * Off, always, on arrival — and deliberately not remembered. This tab is
-     * where the household checks what it actually spent, and a projection left
-     * switched on from three days ago would put money in that list that has not
-     * moved. Turning it on is a question ("what is still coming?"), and a
-     * question is asked, not left standing.
+     * One query under four filters. It used to be able to carry a fifth thing —
+     * the "Planned" chip merged in what the repeating rules were going to write
+     * later this month, as faded, untappable rows. That is gone at the owner's
+     * request: this tab is where the household checks what it actually spent,
+     * the projection answered a different question ("what is still coming?"),
+     * and it answered it in the middle of the answer to this one. The rules
+     * themselves are unchanged and still materialise on their own dates.
      */
-    private val _includePlanned = MutableStateFlow(false)
-    val includePlanned: StateFlow<Boolean> = _includePlanned.asStateFlow()
-
-    /**
-     * Whether the projection means anything for the month on screen: this one or
-     * the next, per [Planned]. The chip is disabled rather than hidden when it
-     * does not — a control that vanishes as you step through months reads as a
-     * glitch, and one that greys out says which months it is for.
-     */
-    val plannedAvailable: StateFlow<Boolean> = _period
-        .map { Planned.isAvailable(it) }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
-
     @OptIn(ExperimentalCoroutinesApi::class)
-    private val listing: StateFlow<Listing> =
-        combine(_query, _categoryId, _accountId, _period, _includePlanned, ::Filters)
+    val transactions: StateFlow<List<TransactionListItem>> =
+        combine(_query, _categoryId, _accountId, _period, ::Filters)
             .flatMapLatest { f ->
-                val real = repository.transactions(
+                repository.transactions(
                     query = f.query,
                     categoryId = f.categoryId,
                     accountId = f.accountId,
                     period = f.period,
                 )
-                if (!f.includePlanned) {
-                    real.map { Listing(it, emptySet()) }
-                } else {
-                    // The rules flow, not a one-shot read: editing a rule in
-                    // Settings has to move the projection under this list, and a
-                    // suspend call inside flatMapLatest would freeze it at
-                    // whatever the rules were when the filter last changed.
-                    combine(real, repository.recurringRules()) { rows, rules ->
-                        val planned = Planned.forPeriod(
-                            rules = rules,
-                            period = f.period,
-                            today = Dates.today(),
-                            query = f.query,
-                            categoryId = f.categoryId,
-                            accountId = f.accountId,
-                        )
-                        Listing(
-                            // Merged and re-sorted as one list, because the
-                            // screen groups by day: leaving the projected rows
-                            // in a block at the end would give the same date two
-                            // separate day headers.
-                            rows = (rows + planned).sortedWith(
-                                compareByDescending<TransactionListItem> { it.occurredAt }
-                                    .thenByDescending { it.id },
-                            ),
-                            plannedIds = planned.mapTo(HashSet()) { it.id },
-                        )
-                    }
-                }
             }
-            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), Listing())
-
-    val transactions: StateFlow<List<TransactionListItem>> = listing
-        .map { it.rows }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
-
-    /**
-     * Which of [transactions] are projections rather than records.
-     *
-     * A set of ids beside the list, rather than a flag on the row, because the
-     * row is a Room projection shared with two other screens — adding a field
-     * that only one caller can ever set would make every other construction site
-     * answer a question it has no business being asked.
-     */
-    val plannedIds: StateFlow<Set<String>> = listing
-        .map { it.plannedIds }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptySet())
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     /**
      * What the rows on screen add up to.
      *
      * Summed from the list rather than asked of the database, because the list
-     * is already the answer: every filter has been applied to it, including the
-     * projected rows that exist nowhere to be queried. A second query would have
-     * to re-implement each of those filters and would disagree with the rows
-     * above it the first time one of them drifted.
+     * is already the answer: every filter has been applied to it, search
+     * included. A second query would have to re-implement each of those filters
+     * and would disagree with the rows above it the first time one of them
+     * drifted.
      *
      * Transfers are in neither total. Moving money between two of your own
      * accounts is not spending it, and a filter that happens to include one
@@ -182,17 +124,11 @@ class TransactionsViewModel(
         val incomeMinor: Long = 0,
     )
 
-    private data class Listing(
-        val rows: List<TransactionListItem> = emptyList(),
-        val plannedIds: Set<String> = emptySet(),
-    )
-
     private data class Filters(
         val query: String,
         val categoryId: String?,
         val accountId: String?,
         val period: String,
-        val includePlanned: Boolean,
     )
 
     fun setQuery(value: String) {
@@ -245,10 +181,6 @@ class TransactionsViewModel(
         ): List<AccountEntity> = accounts.filter { it.archived == 0 || it.id == selectedId }
     }
 
-    fun setIncludePlanned(on: Boolean) {
-        _includePlanned.value = on
-    }
-
     fun setPeriod(period: String) {
         selectedMonth.set(period)
     }
@@ -283,10 +215,6 @@ class TransactionsViewModel(
         _query.value = ""
         _categoryId.value = null
         _accountId.value = null
-        // Planned rows go with them. It is not a filter in the narrowing sense —
-        // it ADDS rows — but "Clear filters" means "show me the plain list of
-        // what happened", and leaving projections in it would not be that.
-        _includePlanned.value = false
     }
 
     /**

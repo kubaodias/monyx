@@ -26,6 +26,20 @@ import java.time.LocalDate
 enum class EntryKind(val wire: String) {
     Expense("expense"),
     Income("income"),
+    ;
+
+    companion object {
+        /**
+         * Back from the stored string, falling back to an expense.
+         *
+         * For the shared [com.monyx.ui.add.KindSelector], which is wired on the
+         * wire value because the rule editor holds one too. Anything else —
+         * "transfer", or a kind a newer build invented — reads as an expense
+         * rather than throwing: this is only ever called with a value the
+         * selector itself put there.
+         */
+        fun of(wire: String): EntryKind = entries.firstOrNull { it.wire == wire } ?: Expense
+    }
 }
 
 data class AddUiState(

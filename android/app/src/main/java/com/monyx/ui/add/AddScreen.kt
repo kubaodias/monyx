@@ -61,6 +61,7 @@ import com.monyx.data.AccountEntity
 import com.monyx.data.Currency
 import com.monyx.data.CategoryEntity
 import com.monyx.data.Dates
+import com.monyx.ui.rememberOfferedCurrencies
 import com.monyx.ui.settings.RecurringEditor
 import com.monyx.ui.settings.RuleSeed
 import com.monyx.ui.theme.Palette
@@ -246,9 +247,11 @@ fun AddScreen(
     DisposableEffect(Unit) { onDispose { saveSlot.withdraw() } }
 
     // The keypad hands the half-typed transaction to the rule editor rather
-    // than making anyone type it twice. A rule does not backfill, so an anchor
-    // in the past is pulled forward to today; a date in the FUTURE is kept,
-    // because "this starts next month" is an ordinary thing to mean.
+    // than making anyone type it twice, date included — in both directions now.
+    // A past date used to be pulled forward to today on the grounds that a rule
+    // does not backfill, which was never true of the machinery and is not true
+    // of the form any more either: an anchor in the past fills in every
+    // occurrence through today, and the editor says how many before it saves.
     seed?.let { open ->
         RecurringEditor(
             seed = open,
@@ -286,12 +289,18 @@ fun AddScreen(
                     accountId = state.accountId,
                     categoryId = state.categoryId,
                     note = state.note.trim().takeIf { it.isNotBlank() },
-                    startsOn = maxOf(state.date, Dates.today()),
+                    startsOn = state.date,
                 )
             },
         )
 
-        KindSelector(selected = state.kind, onSelect = viewModel::setKind)
+        // The shared control, so this screen and the rule editor ask the
+        // question with one voice. See [KindSelector] in EntryControls.
+        KindSelector(
+            selected = state.kind.wire,
+            onSelect = { viewModel.setKind(EntryKind.of(it)) },
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+        )
 
         // The ENTRY's unit, which follows the account until the symbol beside
         // the figure is tapped. Typing 50 for a euro purchase reads "50,00 €"
@@ -408,6 +417,11 @@ fun AddScreen(
         CurrencyPickerDialog(
             selected = state.currencyOr(Currency.of(account?.currency)),
             accountCurrency = Currency.of(account?.currency),
+            // What this household has said it uses, plus whatever its accounts
+            // are in and whatever this entry has already been set to.
+            options = rememberOfferedCurrencies(
+                accounts.map { it.currency } + state.currency?.code,
+            ),
             onPick = {
                 viewModel.selectCurrency(it)
                 showCurrencyPicker = false
@@ -430,48 +444,6 @@ fun AddScreen(
             onPick = { viewModel.setDate(it); showDatePicker = false },
             onDismiss = { showDatePicker = false },
         )
-    }
-}
-
-@Composable
-private fun KindSelector(selected: EntryKind, onSelect: (EntryKind) -> Unit) {
-    val options = listOf(
-        EntryKind.Expense to R.string.add_expense,
-        EntryKind.Income to R.string.add_income,
-    )
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 12.dp, vertical = 8.dp)
-            .clip(RoundedCornerShape(14.dp))
-            .background(MaterialTheme.colorScheme.surfaceVariant)
-            .padding(4.dp),
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
-    ) {
-        options.forEach { (kind, label) ->
-            val active = kind == selected
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .clip(RoundedCornerShape(11.dp))
-                    .background(
-                        if (active) MaterialTheme.colorScheme.surface else Color.Transparent,
-                    )
-                    .clickable { onSelect(kind) }
-                    .padding(vertical = 10.dp),
-                contentAlignment = Alignment.Center,
-            ) {
-                Text(
-                    text = stringResource(label),
-                    fontWeight = if (active) FontWeight.SemiBold else FontWeight.Normal,
-                    color = if (active) {
-                        MaterialTheme.colorScheme.onSurface
-                    } else {
-                        MaterialTheme.colorScheme.onSurfaceVariant
-                    },
-                )
-            }
-        }
     }
 }
 

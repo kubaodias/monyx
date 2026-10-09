@@ -54,9 +54,15 @@ cannot answer says what is still missing instead — see
   or that one month's spending, whichever the card is set to — one switch, shared
   by both faces and remembered, and the legend re-sorts itself to match. The eye at the end of a row hides
   the category from the chart; what is hidden sinks to the bottom and stays
-  hidden on that phone alone, across launches.
+  hidden on that phone alone, across launches. Tapping an account in the strip
+  adds it to the figures or takes it out; holding one leaves it on its own, and
+  holding it again puts everything back.
 - **Add** — a keypad that is also a calculator, a note, any date including the
   future, and *Make it repeat* to turn the row being typed into a repeating rule.
+  Wydatek and Przychód carry an arrow each — out of the household and into it —
+  and it is the same control the rule editor asks the question with. A rule can
+  start in the past: it fills in every occurrence from its first date through
+  today, and the editor says how many that will be before it saves.
   The family you pick rises into the slot beside the amount — circle and name —
   and leaves the grid, so the pair reads as the row being written however far
   the categories are scrolled. Picking a subcategory does not change it: the
@@ -65,8 +71,12 @@ cannot answer says what is still missing instead — see
   subcategory, with any row that is not on the household's default account — the
   first one on the list — carrying that account's name in its own colour; pick a category and the rows are totalled above them, so "how much
   went on coffee" is a figure rather than an addition. Pulled down to sync. Today and
-  yesterday are labelled as such, and *Planned* shows
-  what the repeating rules are about to write. An archived account's rows are not
+  yesterday are labelled as such. Every figure here carries its unit, day
+  headings included, and every figure that adds rows up is in złoty — a day
+  holding euro purchases is converted, not summed in cents. The category menu
+  lists the families in the order they were dragged, spending and earning in
+  separate blocks. Narrow it to one account and the Dodaj button starts the next
+  transaction on that account. An archived account's rows are not
   in here at all: the way to ask about a finished account is its row in Settings,
   which opens this screen pinned to it.
 - **Budget** — what there is to spend this month, limits on main categories, and
@@ -74,9 +84,11 @@ cannot answer says what is still missing instead — see
   month you set it in and carries forward from there; changing it later changes
   that month alone, unless you tick the box that carries the new figure on. A limit of zero is a limit: it means nothing may go here, which is not
   the same as having set none.
-- **Settings** — accounts, categories (two levels, dragged into order), repeating
-  rules, language, backup health, the update check and what every release
-  changed. Archiving an account takes it out of the summary as well: a finished
+- **Settings** — accounts, categories (two levels, dragged into order),
+  currencies, repeating rules, language, backup health, the update check and what
+  every release changed, a tab each. Currencies is which of the nine the pickers
+  offer — euro and dollar to begin with, the rest a switch away, and złoty and
+  anything an account holds cannot be switched off. Archiving an account takes it out of the summary as well: a finished
   account left counting is a balance inside every total with no chip anywhere to
   switch it off. The toggle stays on the row if it should go back in.
 
@@ -144,9 +156,11 @@ telnyx-edge storage sqldb migrations apply monyx --remote --migrations-dir serve
 ### Currencies and exchange rates
 
 Złoty is the reporting currency and is not configurable: every total the app
-prints is in złoty. An account may hold another currency — nine are offered
+prints is in złoty. An account may hold another currency — nine are supported
 (PLN, EUR, USD, GBP, CHF, CZK, SEK, NOK, DKK) — and `fx_rates` says what one
-unit of it was worth on a date. See
+unit of it was worth on a date. A phone offers the ones its household has said
+it uses (Settings › Waluty; euro and dollar to begin with), which changes what
+the pickers list and nothing else. See
 [ADR 0022](docs/decisions/0022-zloty-is-the-reporting-currency-and-a-rate-has-a-date.md).
 
 Rates come from **NBP table A** (`api.nbp.pl`), the Polish central bank's own
@@ -224,8 +238,10 @@ own currency.
   **złoty row on a foreign account** it is the account's currency instead, with
   złoty still leading: `-100,00 zł` over `-22,80 €`, because 100 zł paid from a
   euro card is złoty, and a bare "100,00" in a list of euro rows reads as euro.
-- **A złoty row on a złoty account** carries no unit and no second figure, which
-  is every row in a household that holds złoty only.
+- **A złoty row on a złoty account** carries "zł" and no second figure. It used
+  to carry neither, on the rule that only the exceptions are marked — which
+  reads well until one column holds a marked figure and four unmarked ones, and
+  the reader has to remember which is which.
 - **The keypad** follows the entry's currency, which starts as the chosen
   account's; that is the unit the figure being typed is in, and the symbol
   beside it is the control that changes it. The save button in the bottom bar

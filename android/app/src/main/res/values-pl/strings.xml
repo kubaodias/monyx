@@ -90,8 +90,6 @@
     <string name="transactions_filter_all">Wszystkie</string>
     <string name="transactions_filter_subcategory">Podkategoria</string>
     <string name="transactions_filter_category">Kategoria</string>
-    <string name="transactions_filter_planned">Planowane</string>
-    <string name="transactions_planned">Planowane, jeszcze nie zapisane</string>
     <string name="transactions_filter_account">Konto</string>
     <string name="transactions_clear_filters">Wyczyść filtry</string>
     <string name="transactions_delete">Usuń</string>
@@ -144,7 +142,9 @@
     <string name="notifications_enable">Włącz powiadomienia</string>
 
     <!-- Settings -->
-    <string name="settings_tab_general">Ogólne</string>
+    <string name="settings_tab_accounts">Konta</string>
+    <string name="settings_tab_categories">Kategorie</string>
+    <string name="settings_tab_currencies">Waluty</string>
     <string name="settings_tab_recurring">Reguły cykliczne</string>
     <string name="settings_tab_people">Użytkownicy</string>
     <string name="settings_tab_language">Język</string>
@@ -184,6 +184,10 @@
     <string name="settings_account_needs_name">Podaj nazwę konta</string>
     <string name="settings_account_balance">Aktualne saldo</string>
     <string name="settings_account_currency">Waluta</string>
+    <string name="settings_currencies">Waluty</string>
+    <string name="settings_currencies_hint">Tylko widoczne waluty są proponowane przy dodawaniu konta i przy zmianie waluty transakcji. Podsumowania zawsze są w złotych.</string>
+    <string name="settings_currency_reporting">w niej są podsumowania</string>
+    <string name="settings_currency_in_use">konto ją trzyma</string>
     <string name="settings_account_currency_hint">Podsumowania zostają w złotych. To konto jest przeliczane kursem NBP z dnia każdej transakcji.</string>
     <string name="settings_account_in_summary">Uwzględniaj w podsumowaniu</string>
     <string name="settings_account_in_summary_hint">Wyłączone: saldo i wydatki tego konta nie wchodzą do sum, budżetów ani wykresów. Transakcje nadal można dodawać.</string>
@@ -277,6 +281,12 @@
         <item quantity="many">Zatrzymać tę transakcję cykliczną? Dodanych już %1$d operacji pozostaje bez zmian.</item>
         <item quantity="other">Zatrzymać tę transakcję cykliczną? Dodanych już %1$d operacji pozostaje bez zmian.</item>
     </plurals>
+    <plurals name="recurring_backfill">
+        <item quantity="one">Doda %1$d operację z przeszłości</item>
+        <item quantity="few">Doda %1$d operacje z przeszłości</item>
+        <item quantity="many">Doda %1$d operacji z przeszłości</item>
+        <item quantity="other">Doda %1$d operacji z przeszłości</item>
+    </plurals>
     <string name="recurring_needs_account">Najpierw dodaj konto</string>
     <string name="recurring_from_rule">Dodane przez transakcję cykliczną</string>
     <string name="call_assistant">Zadzwoń do asystentki budżetu</string>
@@ -339,4 +349,5 @@
     <string name="transactions_account_span">%1$s – %2$s</string>
     <string name="budget_apply_forward">Zastosuj też do kolejnych miesięcy</string>
     <string name="overview_day_open">Zobacz transakcje</string>
+    <string name="overview_account_only">Pokaż tylko to konto</string>
 </resources>

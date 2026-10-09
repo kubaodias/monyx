@@ -273,3 +273,41 @@ test could reach it** — the ledger row that never carried its unit, and this. 
 query out of its own `@Query` annotation, and runs both through the `sqlite3`
 binary. It fails rather than skips when sqlite3 is missing: there is no CI here,
 and a test that quietly stops running is the failure mode that produced both bugs.
+
+## Addendum, 2026-10-09: every figure carries its unit, and a phone need not be offered nine
+
+Three changes, all from one report: a household with a euro card looked at a day
+in the ledger whose heading was a euro-sized number with "zł" beside it.
+
+**A day heading sums `plnMinor`.** It summed `amountMinor` — each row's own
+currency — so a day with three euro purchases on it added cents to grosze and
+printed the answer as złoty. This is the third figure in the app to have had
+exactly this bug: the month aggregates (fixed when this decision was written),
+the total under the search box (fixed in 0.23.x), and now the day heading, which
+is the one place the rule was implemented in a composable rather than in SQL or
+a view model. Anything that ADDS rows together converts first. There is no
+remaining exception, and `dayTotalMinor` is a function with a test rather than a
+`sumOf` inside a `@Composable`.
+
+**Every ledger figure prints its unit, złoty included.** The old rule was to
+mark only the exceptions: "zł" on five hundred rows to disambiguate three is
+noise, and the month total above them already says which unit it is in. That
+reads well and it did not survive one foreign card — a day heading, a row and a
+filtered total in one column, two of them marked and one not, is a figure the
+eye has to attribute from memory. The owner asked for the unit everywhere, and
+everywhere is the only version of this rule that cannot be read wrong. The
+second line stays the exception it was: it appears when there is another unit to
+show the same money in, and a złoty row on a złoty account has none.
+
+**A phone offers the currencies its household uses, not all nine.** `Currency`
+is the list the app can handle and the server agrees with; `Currencies` is the
+list one phone wants to be asked about, and they are different questions. EUR
+and USD are shown by default, the other six are a switch each in Settings, and
+three things are always offered whatever is chosen: złoty, anything an account
+is denominated in, and whatever the form being drawn has currently selected. So
+hiding changes what is OFFERED and never what is stored, shown or converted — a
+krona row stays readable, and the account holding krona cannot be edited into
+another currency by accident, because its row in Settings will not switch off.
+
+It is a DataStore preference, unsynced, like the chart's hidden categories: it
+is not a fact about the household's money, it is how one phone is set up.

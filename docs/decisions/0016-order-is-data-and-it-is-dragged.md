@@ -58,3 +58,26 @@ it anyway and the whole list is a handful of rows.
   it was built with. A rename, a recoloured icon and a moved balance were stale
   the same way. The override is dropped as soon as the database agrees with it,
   so an order arriving from another phone can still win.
+
+## Addendum, 2026-10-09: the one query that did not group before it sorted
+
+The consequence above says numbering restarts per sibling list — an expense root
+and an income root can both be `sortOrder = 0` — and calls it harmless, because
+"every query that cares filters by kind or groups before it sorts".
+
+The ledger's category filter did neither. It took `categories()` as the table
+returns it, `ORDER BY sortOrder, name`, and listed the roots: so the menu
+alternated between the two kinds, reading Dom, Wypłata, Transport, Odsetki.
+Neither list was in the order Settings shows, and nothing in the menu said where
+spending stopped and earning began — the household had dragged an order that one
+of its own screens then did not have.
+
+So `filterableFamilies` groups by kind (expense first, as everywhere else in the
+app), then sorts within the group, and the menu draws a rule and a heading above
+each block. One menu rather than two chips: the question is "which category",
+and splitting the control would mean choosing a kind in order to answer a
+question that is not about kinds.
+
+The general rule stands, and now has a name: **per-kind `sortOrder` is only
+harmless where something groups by kind first.** Anything that lists both kinds
+together has to do that grouping itself.

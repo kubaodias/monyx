@@ -113,6 +113,24 @@ object Money {
     }
 
     /**
+     * "-45,99 zł" — signed, with the unit on it.
+     *
+     * Every figure on the ledger carries its unit now, złoty included. The old
+     * rule was that only the exceptions did: "zł" on five hundred rows to
+     * disambiguate three is noise, and the month total above them already said
+     * which unit it was in. That reads well on paper and it did not survive one
+     * household holding a euro card — a day heading, a row and a filtered total
+     * sitting in one column, two of them in złoty and one unmarked, is three
+     * figures the eye has to attribute from memory. The owner asked for the unit
+     * everywhere, and everywhere is the only version of this rule that cannot be
+     * read wrong.
+     *
+     * @param currency the unit [minor] is in, defaulting to the reporting one.
+     */
+    fun formatSignedIn(minor: Long, kind: String, currency: Currency = Currency.PLN): String =
+        "${formatSigned(minor, kind)} ${currency.suffix}"
+
+    /**
      * One amount printed in two units: the figure to read, and the same money
      * in the other unit beside it.
      *
@@ -165,10 +183,10 @@ object Money {
      * "-100,00 zł" over "-22,80 €" — złoty leading, because złoty is what
      * happened.
      *
-     * A złoty row on a złoty account gets no unit and no second figure. Marking
-     * the exception is what makes the exception visible; "zł" on five hundred
-     * rows to disambiguate three is the opposite, and the month total above them
-     * already says which unit it is in.
+     * A złoty row on a złoty account gets the unit too, and no second figure.
+     * It used to get neither, on the rule that only the exceptions are marked —
+     * see [formatSignedIn] for why that rule is gone. The second figure stays an
+     * exception: there is nothing to convert it to.
      */
     fun ledgerRowFigure(
         amountMinor: Long,
@@ -179,17 +197,17 @@ object Money {
         accountMinor: Long? = null,
     ): Figure = when {
         !currency.isReporting -> Figure(
-            "${formatSigned(amountMinor, kind)} ${currency.suffix}",
+            formatSignedIn(amountMinor, kind, currency),
             // Null, not "—": the amount that happened is already on the line
             // above in the unit it happened in, so a missing rate costs the
             // reader nothing here.
-            plnMinor?.let { "${formatSigned(it, kind)} $CURRENCY" },
+            plnMinor?.let { formatSignedIn(it, kind) },
         )
         !accountCurrency.isReporting -> Figure(
-            "${formatSigned(amountMinor, kind)} $CURRENCY",
-            accountMinor?.let { "${formatSigned(it, kind)} ${accountCurrency.suffix}" },
+            formatSignedIn(amountMinor, kind),
+            accountMinor?.let { formatSignedIn(it, kind, accountCurrency) },
         )
-        else -> Figure(formatSigned(amountMinor, kind), null)
+        else -> Figure(formatSignedIn(amountMinor, kind), null)
     }
 
     /**

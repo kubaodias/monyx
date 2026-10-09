@@ -35,6 +35,23 @@ class RecurrenceTest {
     }
 
     @Test
+    fun `a rule entered today with an anchor in March fills in every month since`() {
+        // The editor used to refuse an anchor before today, which made the
+        // obvious case impossible: a subscription that has been running since
+        // March, entered in October, and the seven months it has already taken
+        // are what the household wants in the ledger. The arithmetic was always
+        // willing — materializeRecurring asks for everything through today —
+        // and the floor in front of it was the only thing saying no.
+        assertEquals(
+            listOf(
+                "2026-03-12", "2026-04-12", "2026-05-12", "2026-06-12",
+                "2026-07-12", "2026-08-12", "2026-09-12", "2026-10-12",
+            ),
+            monthly("2026-03-12", "2026-10-15"),
+        )
+    }
+
+    @Test
     fun `the anchor itself is the first occurrence`() {
         assertEquals(listOf("2026-09-10"), monthly("2026-09-10", "2026-09-10"))
     }

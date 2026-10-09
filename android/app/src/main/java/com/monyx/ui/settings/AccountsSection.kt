@@ -59,6 +59,7 @@ import androidx.compose.ui.unit.dp
 import com.monyx.R
 import com.monyx.data.AccountEntity
 import com.monyx.data.Money
+import com.monyx.ui.rememberOfferedCurrencies
 import com.monyx.ui.theme.Palette
 import androidx.compose.foundation.layout.Arrangement
 import com.monyx.data.Currency
@@ -603,7 +604,15 @@ fun AccountEditor(
             Spacer(Modifier.height(6.dp))
             ColorSwatchRow(selected = color, onSelect = { color = it })
             SectionRule()
-            CurrencyField(selected = currency, onSelect = { currency = it })
+            CurrencyField(
+                selected = currency,
+                // What this phone offers, plus whatever this account is already
+                // denominated in — an account in a hidden currency has to stay
+                // editable without silently changing what its money is. See
+                // [com.monyx.data.Currencies].
+                options = rememberOfferedCurrencies(listOf(seed.currency.code, currency.code)),
+                onSelect = { currency = it },
+            )
             // What picking a foreign currency costs, said on the screen
             // that does the picking rather than discovered on the Overview.
             if (!currency.isReporting) {
@@ -645,7 +654,7 @@ fun AccountEditor(
 }
 
 /**
- * The nine currencies, as a dropdown.
+ * The currencies this phone offers, as a dropdown.
  *
  * A grid of chips was the first attempt and it was wrong for this form: it is
  * already eight controls tall and scrolls, and two rows of chips pushed the
@@ -659,7 +668,11 @@ fun AccountEditor(
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun CurrencyField(selected: Currency, onSelect: (Currency) -> Unit) {
+private fun CurrencyField(
+    selected: Currency,
+    options: List<Currency>,
+    onSelect: (Currency) -> Unit,
+) {
     var expanded by remember { mutableStateOf(false) }
     ExposedDropdownMenuBox(
         expanded = expanded,
@@ -675,7 +688,7 @@ private fun CurrencyField(selected: Currency, onSelect: (Currency) -> Unit) {
             modifier = Modifier.fillMaxWidth().menuAnchor(MenuAnchorType.PrimaryNotEditable),
         )
         ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-            Currency.entries.forEach { option ->
+            options.forEach { option ->
                 DropdownMenuItem(
                     text = { Text(currencyLabel(option)) },
                     onClick = {
