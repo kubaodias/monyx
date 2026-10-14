@@ -81,3 +81,28 @@ question that is not about kinds.
 The general rule stands, and now has a name: **per-kind `sortOrder` is only
 harmless where something groups by kind first.** Anything that lists both kinds
 together has to do that grouping itself.
+
+## Addendum, 2026-10-14: the budget may be read in another order, on one phone
+
+The dragged order is still the data, and it is still the default everywhere.
+What the budget screen adds is a **lens**: the limits can be read by what is
+closest to running out, by what has been spent, or by the size of the limit.
+
+Nothing is written back. The sort is a `DataStore` preference on one phone, like
+the hidden chart categories and the breakdown's own switch — reordering a list
+to find something is not a decision about the household's money, and pushing it
+would rearrange a screen somebody else is reading. `sortedBudgets` is a pure
+function of the rows and the choice, applied after the query, and every order but
+the household's own is stable on top of it: two categories at the same figure
+stay in the order they always sit in.
+
+"Closest to the limit" is a share of the limit, not the money left in it. 180 of
+200 and 1 800 of 2 000 are the same answer to "what is about to run out", and
+ordering by what is left over would bury the first one. A limit of zero with
+anything spent against it sorts above everything; untouched, it sorts as nothing,
+which is where a category nobody has spent in belongs.
+
+Sorting in Kotlin rather than in SQL: three of the four orders are arithmetic on
+a spend the query has just computed with a correlated subquery per row, one of
+them a ratio, and the rule is the one thing on that screen worth a unit test —
+which it cannot have inside a `@Query`.

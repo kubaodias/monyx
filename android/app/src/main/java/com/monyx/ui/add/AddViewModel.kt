@@ -141,6 +141,25 @@ class AddViewModel(private val repository: MonyxRepository) : ViewModel() {
     }
 
     /**
+     * The month the screen behind this one was reading, carried over to the
+     * date.
+     *
+     * The same bargain as the account and the category, and the one filter the
+     * whole app shares: Overview, Transactions and Budget all point at one month
+     * — see [com.monyx.ui.SelectedMonth] — so somebody who stepped back to
+     * September and reached for Dodaj is entering something that happened in
+     * September. The keypad used to open on today whatever month was on screen,
+     * which filed the row into a month they were not looking at and left the
+     * ledger they landed on with no sign of it.
+     *
+     * [Dates.dayInPeriod] picks the day, and the current month resolves to today
+     * rather than to a date — so the usual path through this is a no-op.
+     */
+    fun pickUpMonth(period: String) {
+        _state.value = _state.value.copy(date = Dates.dayInPeriod(period))
+    }
+
+    /**
      * Picking an account also drops any currency chosen by hand.
      *
      * Switching from the złoty card to the euro one means the next thing typed
@@ -208,8 +227,14 @@ class AddViewModel(private val repository: MonyxRepository) : ViewModel() {
     /**
      * Saves to Room and returns immediately. The user never waits on the
      * network — the row is written with pending = 1 and SyncWorker picks it up.
+     *
+     * [onSaved] is handed the day the row landed on, so whoever navigates next
+     * can take the ledger to the month that actually holds it. A back-dated row
+     * used to be saved into September and followed by a jump to a ledger still
+     * reading October, which showed the household nothing where it had just put
+     * something.
      */
-    fun save(createdBy: String, onSaved: () -> Unit) {
+    fun save(createdBy: String, onSaved: (LocalDate) -> Unit) {
         val current = _state.value
         if (!current.canSave) return
         val accountId = current.accountId ?: return
@@ -230,7 +255,7 @@ class AddViewModel(private val repository: MonyxRepository) : ViewModel() {
             // next expense is usually like the last one. The account is not
             // kept; see [nextEntry].
             _state.value = nextEntry(current.kind, accounts.value)
-            onSaved()
+            onSaved(current.date)
         }
     }
 
@@ -244,7 +269,7 @@ class AddViewModel(private val repository: MonyxRepository) : ViewModel() {
      * (the occurrence id is derived from rule and date), so running it early
      * cannot double up with the pass that runs on the next sync.
      */
-    fun saveRecurring(draft: RuleDraft, createdBy: String, onSaved: () -> Unit) {
+    fun saveRecurring(draft: RuleDraft, createdBy: String, onSaved: (LocalDate) -> Unit) {
         viewModelScope.launch {
             repository.addRecurringRule(
                 kind = draft.kind,
@@ -259,7 +284,11 @@ class AddViewModel(private val repository: MonyxRepository) : ViewModel() {
             )
             repository.materializeRecurring()
             _state.value = nextEntry(_state.value.kind, accounts.value)
-            onSaved()
+            // The rule's FIRST occurrence, which is the row the household can
+            // point at — a rule anchored in the past fills in every occurrence
+            // through today, and the one it was asked for is the one it starts
+            // on.
+            onSaved(draft.startsOn)
         }
     }
 

@@ -66,6 +66,7 @@ import com.monyx.ui.settings.RecurringEditor
 import com.monyx.ui.settings.RuleSeed
 import com.monyx.ui.theme.Palette
 import kotlinx.coroutines.launch
+import java.time.LocalDate
 
 /**
  * The keypad, first thing. Type the amount, tap a category, tap save. Account,
@@ -120,7 +121,8 @@ fun AddScreen(
      * to sit directly above it is gone, and the 62dp is the category grid's.
      */
     saveSlot: AddSaveSlot,
-    onSaved: () -> Unit,
+    /** Handed the day the row landed on. See [AddViewModel.save]. */
+    onSaved: (LocalDate) -> Unit,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val accounts by viewModel.accounts.collectAsStateWithLifecycle()

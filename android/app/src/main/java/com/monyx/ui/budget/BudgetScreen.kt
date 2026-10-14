@@ -22,10 +22,14 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Sort
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Checkbox
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -98,12 +102,19 @@ private data class EditTarget(
 fun BudgetScreen(
     initialCategoryId: String? = null,
     initialPeriod: String? = null,
-    onOpenCategoryTransactions: (String, String) -> Unit,
+    /**
+     * The category's rows: its id, the month, and the account every figure here
+     * is counted from. See [BudgetViewModel.budgetAccountId] — the ledger has to
+     * be narrowed the same way the bar was.
+     */
+    onOpenCategoryTransactions: (String, String, String?) -> Unit,
     /** Pull-to-refresh. See [SyncPullToRefresh]. */
     onSyncRequested: () -> Unit = {},
 ) {
     val app = LocalContext.current.applicationContext as MonyxApp
-    val viewModel: BudgetViewModel = viewModel(factory = BudgetViewModel.factory(app.repository, app.selectedMonth))
+    val viewModel: BudgetViewModel = viewModel(
+        factory = BudgetViewModel.factory(app.repository, app.selectedMonth, app.budgetPreferences),
+    )
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
@@ -112,6 +123,8 @@ fun BudgetScreen(
     val availableToAdd by viewModel.availableToAdd.collectAsStateWithLifecycle()
 
     val plan by viewModel.plan.collectAsStateWithLifecycle()
+    val sort by viewModel.sort.collectAsStateWithLifecycle()
+    val countedAccountId by viewModel.budgetAccountId.collectAsStateWithLifecycle()
 
     var editTarget by remember { mutableStateOf<EditTarget?>(null) }
     var showAddPicker by remember { mutableStateOf(false) }
@@ -190,13 +203,23 @@ fun BudgetScreen(
                         }
                     }
                 } else {
+                    // Above the rows and below the plan, where it reads as a
+                    // property of the list rather than of the month. Not shown
+                    // at all for an empty budget: there is nothing to order, and
+                    // the control would be the only thing on the screen that
+                    // worked.
+                    item {
+                        SortRow(sort = sort, onSelect = viewModel::setSort)
+                    }
                     items(budgetUsage, key = { it.categoryId }) { usage ->
                         BudgetRow(
                             usage = usage,
                             onEdit = {
                                 editTarget = EditTarget(usage.categoryId, usage.name, usage.icon, usage.color, usage.limitMinor)
                             },
-                            onOpenTransactions = { onOpenCategoryTransactions(usage.categoryId, period) },
+                            onOpenTransactions = {
+                                onOpenCategoryTransactions(usage.categoryId, period, countedAccountId)
+                            },
                         )
                     }
                 }
@@ -283,6 +306,55 @@ fun BudgetScreen(
                 editTarget = EditTarget(category.id, category.name, category.icon, category.color, null)
             },
         )
+    }
+}
+
+/**
+ * Which order the limits are in, and the menu that changes it.
+ *
+ * A menu rather than a row of chips: four orders is more words than fit across a
+ * phone, only one of them is ever in force, and the one in force is worth
+ * naming on screen — a bare icon would leave a list that is not in the
+ * household's own order with nothing on it saying why. It sits at the end of the
+ * row, like every other control in the app that modifies the list below it.
+ */
+@Composable
+private fun SortRow(sort: BudgetSort, onSelect: (BudgetSort) -> Unit) {
+    var open by remember { mutableStateOf(false) }
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.End,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box {
+            TextButton(onClick = { open = true }) {
+                Icon(
+                    Icons.AutoMirrored.Filled.Sort,
+                    contentDescription = stringResource(R.string.budget_sort),
+                    modifier = Modifier.size(18.dp),
+                )
+                Spacer(Modifier.width(8.dp))
+                Text(stringResource(sort.labelRes))
+            }
+            DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+                BudgetSort.entries.forEach { option ->
+                    DropdownMenuItem(
+                        text = { Text(stringResource(option.labelRes)) },
+                        onClick = {
+                            open = false
+                            onSelect(option)
+                        },
+                        trailingIcon = {
+                            // The same tick this app uses for "this one is
+                            // chosen" in every other picker.
+                            if (option == sort) {
+                                Icon(Icons.Filled.Check, contentDescription = null)
+                            }
+                        },
+                    )
+                }
+            }
+        }
     }
 }
 

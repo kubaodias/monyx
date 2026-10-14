@@ -492,6 +492,29 @@ object Dates {
     fun windowEnd(period: String, today: LocalDate = today()): LocalDate =
         if (periodOf(today) == period) today else lastDayOf(period)
 
+    /**
+     * The day an entry started from [period] should be dated: today while that
+     * month is the one running, otherwise the same day of the month inside it.
+     *
+     * For the keypad, which is opened from a screen that is already pointed at a
+     * month — see MonyxNav. Somebody reading September and reaching for Dodaj is
+     * entering something that happened in September, and the keypad arriving on
+     * today's date would file it in the month they are not looking at.
+     *
+     * The same day of the month rather than its first or its last: the 1st and
+     * the 30th are both edges, where a row lands in a neighbouring month if the
+     * date is nudged, and neither is more likely to be right than the day the
+     * calendar is already on. Clamped, so the 31st of a month with thirty days
+     * is the 30th. Nothing here is a guess the household cannot see — the date
+     * sits on a chip above the keys and reads as a date rather than as "Dziś"
+     * precisely when it is not today.
+     */
+    fun dayInPeriod(period: String, today: LocalDate = today()): LocalDate {
+        if (periodOf(today) == period) return today
+        val last = lastDayOf(period)
+        return last.withDayOfMonth(minOf(today.dayOfMonth, last.dayOfMonth))
+    }
+
     fun startOfDayMillis(date: LocalDate): Long =
         date.atStartOfDay(ZONE).toInstant().toEpochMilli()
 }

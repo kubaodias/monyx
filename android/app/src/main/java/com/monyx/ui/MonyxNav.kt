@@ -279,6 +279,14 @@ private fun MainScaffold(
     // And which category, reported the same way and used by the same button.
     var txViewingCategoryId by remember { mutableStateOf<String?>(null) }
 
+    // The overview's own narrowing: the one account its figures are under, or
+    // null for the household. Reported up from the screen like the two above,
+    // and used by the same button and by every jump out of that screen — a
+    // slice tapped while one account is selected is a question about that
+    // account's money, and the ledger it opens has to agree with the pie it
+    // was tapped on.
+    var overviewAccountId by remember { mutableStateOf<String?>(null) }
+
     // Bumped by every jump in, and a key on the screen's LaunchedEffect. Without
     // it, asking for the SAME filter twice is not a change and does nothing:
     // open an account's ledger, clear the chip by hand to compare, tap the same
@@ -417,6 +425,32 @@ private fun MainScaffold(
                                     // the keypad cannot offer is ignored there.
                                     txViewingCategoryId?.let(addViewModel::pickUpCategory)
                                 }
+                                // And the overview's account strip, which is
+                                // the same statement made on a different
+                                // screen. Guarded the same way: the strip can
+                                // be left pointing at an archived account that
+                                // still counts, and a new row must not land in
+                                // one of those.
+                                if (route == Destinations.OVERVIEW) {
+                                    overviewAccountId
+                                        ?.takeIf { id -> addViewModel.accounts.value.any { it.id == id } }
+                                        ?.let(addViewModel::selectAccount)
+                                }
+                                // The month, from wherever they were standing:
+                                // one selection shared by Overview, the ledger
+                                // and Budget, so this is the filter that is
+                                // ALWAYS set. The current month resolves to
+                                // today and changes nothing, which is the usual
+                                // path. See AddViewModel.pickUpMonth.
+                                //
+                                // Not when the keypad is already up. The tap is
+                                // then a tab you are standing on — the save
+                                // button has its own branch — and a date picked
+                                // by hand on this screen must not be quietly
+                                // put back to the month behind it.
+                                if (route != Destinations.ADD) {
+                                    addViewModel.pickUpMonth(app.selectedMonth.period.value)
+                                }
                                 selectTab(tab.route)
                             },
                             onHoldStart = {
@@ -492,8 +526,15 @@ private fun MainScaffold(
                     // entered is on screen as proof it landed. Both saves come
                     // through here: a repeating rule materialises its first
                     // occurrence before calling back, so there is a row to see.
-                    onSaved = {
+                    onSaved = { day ->
                         SyncWorker.enqueue(app)
+                        // To the month the row is IN, which is not always this
+                        // one: the keypad can be back-dated, and the proof only
+                        // works if the ledger it lands on is the ledger that
+                        // holds it. The month is shared with Overview and
+                        // Budget — see SelectedMonth — which is the same thing
+                        // the switcher at the top of all three does.
+                        app.selectedMonth.set(Dates.periodOf(day))
                         selectTab(Destinations.TRANSACTIONS)
                     },
                 )
@@ -501,20 +542,22 @@ private fun MainScaffold(
             composable(Destinations.OVERVIEW) {
                 OverviewScreen(
                     onOpenTransactions = { categoryId, period ->
-                        openTransactions(categoryId, period)
+                        openTransactions(categoryId, period, accountId = overviewAccountId)
                     },
                     // The month comes from the DAY, not from the screen: the
                     // daily chart reaches back over the turn of the month, and a
                     // tap on the 29th of last month has to take the ledger there
                     // rather than scroll a month that does not contain it.
-                    onOpenDay = { day ->
+                    onOpenDay = { day, categoryId ->
                         openTransactions(
-                            categoryId = null,
+                            categoryId = categoryId,
                             period = Dates.periodOfDateString(day),
                             day = day,
+                            accountId = overviewAccountId,
                         )
                     },
                     onSyncRequested = { SyncWorker.syncNow(context) },
+                    onAccountFilterChanged = { overviewAccountId = it },
                 )
             }
             composable(Destinations.TRANSACTIONS) {
@@ -548,8 +591,8 @@ private fun MainScaffold(
                 BudgetScreen(
                     initialCategoryId = budgetCategoryId,
                     initialPeriod = budgetPeriod,
-                    onOpenCategoryTransactions = { categoryId, period ->
-                        openTransactions(categoryId, period)
+                    onOpenCategoryTransactions = { categoryId, period, accountId ->
+                        openTransactions(categoryId, period, accountId = accountId)
                     },
                     onSyncRequested = { SyncWorker.syncNow(context) },
                 )

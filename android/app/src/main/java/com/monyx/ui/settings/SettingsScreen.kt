@@ -313,8 +313,8 @@ fun SettingsScreen(onOpenAccountTransactions: (accountId: String, period: String
                             accounts.mapTo(HashSet()) { Currency.of(it.entity.currency).code }
                         },
                         chosen = chosenCurrencies,
+                        onSetShown = viewModel::setCurrencyShown,
                         onAdd = viewModel::addCurrency,
-                        onRemove = viewModel::removeCurrency,
                     )
                 }
 

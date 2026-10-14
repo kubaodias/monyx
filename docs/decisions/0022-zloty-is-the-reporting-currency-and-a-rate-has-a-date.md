@@ -359,3 +359,35 @@ why a row could not be switched off; the list now simply has no remove button on
 those rows, which says the same thing in no words. Nine switches was also nine
 hypotheticals — the thing being chosen from was the app's capability, not the
 household's money.
+
+## Addendum, 2026-10-14: the switch comes back, greyed where it cannot be moved
+
+The remove button was the wrong half of the argument. What was wrong with the
+nine switches was the **prose**, not the switch: two lines of small print per
+locked row, explaining why it could not be turned off. Taking the switch away
+with the prose left a list where some rows carried a control and others carried
+nothing, and the ones with a control were 48dp tall while the ones without were
+24 — a column of currencies with gaps of two different sizes in it, which is how
+it was reported.
+
+So: a switch on every row, greyed on the two kinds that cannot move — złoty, and
+anything an account holds. A disabled switch says "not this one" in no words,
+which is what the prose was for, and every row is now the same height because
+every row holds the same control.
+
+The nine are back on the list for the same reason they have a switch: an off
+switch has to be somewhere to turn on again. What is **not** back is the idea
+that the list is the app's capability — `Currencies.listed` is the nine plus
+whatever the household typed in plus whatever its accounts hold, and
+`Currencies.offered` is still the subset the pickers show. Two questions, two
+functions, one screen.
+
+An added currency is on the list only while it is stored, so switching it off
+removes the entry and the row goes with it. There is nothing built in for it to
+fall back to — the symbol was stored beside the code — and the alternative was a
+second key remembering every code ever typed, which is a list that only grows
+and a second way to say "forget this one". The hint line at the top of the
+section says so. The chips that used to offer the rated currencies inside the
+add dialog are gone with the same argument: those nine are rows with switches
+now, and a shortcut to them beside the list would be a second control for the
+first one.

@@ -16,6 +16,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
 import java.time.YearMonth
 
 /**
@@ -113,6 +114,7 @@ fun overBudgetBand(spentMinor: Long, limitMinor: Long): BudgetBand = when {
 class BudgetViewModel(
     private val repository: MonyxRepository,
     private val selectedMonth: SelectedMonth,
+    private val preferences: BudgetPreferences,
 ) : ViewModel() {
 
     /** Shared with Overview and Transactions — see [SelectedMonth]. */
@@ -127,10 +129,43 @@ class BudgetViewModel(
     private val budgetAccounts: Flow<Set<String>> =
         repository.accounts().map(::budgetAccountIds)
 
+    /**
+     * The one account every figure on this screen counts, for the jump into the
+     * ledger — null while the list has not loaded, which reads as "every counted
+     * account" the way the queries read it.
+     *
+     * A budget row is the default account's spending against a limit — see
+     * [budgetAccountIds] — so a ledger opened from that row has to be narrowed
+     * the same way or it will not add up to the bar that was tapped. One euro
+     * card and one insurance premium is all it takes for the two to disagree by
+     * a figure nothing on either screen explains.
+     */
+    val budgetAccountId: StateFlow<String?> = budgetAccounts
+        .map { it.singleOrNull() }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+
+    /** How the list is ordered on this phone. See [BudgetSort]. */
+    val sort: StateFlow<BudgetSort> = preferences.sort
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), BudgetSort.Own)
+
+    /**
+     * The rows, in the chosen order.
+     *
+     * Sorted here rather than in SQL. Three of the four orders are arithmetic on
+     * the spend the query has just computed — one of them a ratio — and the
+     * query already carries a correlated subquery per row to get it; the rule is
+     * also the one thing on this screen worth a unit test, which it cannot have
+     * inside a @Query. See [sortedBudgets].
+     */
     val budgetUsage: StateFlow<List<BudgetUsage>> =
         combine(_period, budgetAccounts, ::Scope)
             .flatMapLatest { (p, accounts) -> repository.budgetUsage(p, accounts) }
+            .combine(preferences.sort, ::sortedBudgets)
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    fun setSort(sort: BudgetSort) {
+        viewModelScope.launch { preferences.setSort(sort) }
+    }
 
     /** The two things every query here is scoped by, so one flatMapLatest sees both. */
     private data class Scope(val period: String, val accounts: Set<String>)
@@ -227,8 +262,12 @@ class BudgetViewModel(
     }
 
     companion object {
-        fun factory(repository: MonyxRepository, selectedMonth: SelectedMonth) = viewModelFactory {
-            initializer { BudgetViewModel(repository, selectedMonth) }
+        fun factory(
+            repository: MonyxRepository,
+            selectedMonth: SelectedMonth,
+            preferences: BudgetPreferences,
+        ) = viewModelFactory {
+            initializer { BudgetViewModel(repository, selectedMonth, preferences) }
         }
     }
 }

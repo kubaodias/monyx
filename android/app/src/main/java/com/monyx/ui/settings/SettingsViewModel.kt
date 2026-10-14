@@ -118,8 +118,23 @@ class SettingsViewModel(private val app: MonyxApp) : ViewModel() {
         viewModelScope.launch { app.currencyPreferences.add(code, suffix) }
     }
 
-    fun removeCurrency(code: String) {
-        viewModelScope.launch { app.currencyPreferences.remove(code) }
+    /**
+     * What a switch on the Waluty list does.
+     *
+     * On stores the code with no symbol of its own, which is all one of the nine
+     * needs — see [com.monyx.data.Currencies.entry]. Off removes the entry
+     * outright, and for an added currency that is the end of it: the symbol was
+     * stored with the entry and the list only knows about codes it has been
+     * given.
+     */
+    fun setCurrencyShown(code: String, shown: Boolean) {
+        viewModelScope.launch {
+            if (shown) {
+                app.currencyPreferences.add(code, "")
+            } else {
+                app.currencyPreferences.remove(code)
+            }
+        }
     }
 
     private val _inviteState = MutableStateFlow<InviteUiState>(InviteUiState.Idle)

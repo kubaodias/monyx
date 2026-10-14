@@ -157,8 +157,29 @@ object Currencies {
     }
 
     /**
-     * Whether Settings must refuse to remove one: złoty, and anything an account
-     * holds. The row simply has no remove button — it used to carry a line of
+     * Every row Settings shows: the nine with rates, whatever has been typed in,
+     * and anything an account holds — switched on or off, which [offered]
+     * answers separately.
+     *
+     * The nine are always here. They are what the app can convert, they cost
+     * nothing to list, and a switch that is off has to stay on screen or there
+     * is no way back to it. An added currency is here only while it is stored:
+     * nothing built in remembers a code the household typed, so switching one
+     * off removes the entry and the row goes with it. See [CurrencyPreferences].
+     */
+    fun listed(entries: Set<String>?, inUse: Set<String> = emptySet()): List<Currency> {
+        val byCode = LinkedHashMap<String, Currency>()
+        Currency.KNOWN.forEach { byCode[it.code] = it }
+        parse(entries).forEach { byCode.getOrPut(it.code) { it } }
+        inUse.filter { Currency.isValidCode(it) }.forEach { code ->
+            byCode.getOrPut(code) { Currency.of(code) }
+        }
+        return ordered(byCode.values)
+    }
+
+    /**
+     * Whether Settings must refuse to switch one off: złoty, and anything an
+     * account holds. The switch is greyed — it used to carry a line of
      * explanation instead, which was two of the three texts on the screen and
      * said what a household already knows about its own accounts.
      */
