@@ -190,7 +190,7 @@
     <string name="settings_account_balance">Aktualne saldo</string>
     <string name="settings_account_currency">Waluta</string>
     <string name="settings_currencies">Waluty</string>
-    <string name="settings_currencies_hint">Włączone waluty są proponowane przy dodawaniu konta i przy zmianie waluty transakcji. Podsumowania zawsze są w złotych. Waluta dodana ręcznie znika z listy, gdy ją wyłączysz.</string>
+    <string name="settings_currencies_hint">Te waluty są proponowane przy dodawaniu konta i przy zmianie waluty transakcji. Podsumowania zawsze są w złotych. Waluta dodana ręcznie znika po wyłączeniu.</string>
     <string name="settings_currency_add">Dodaj walutę</string>
     <string name="settings_currency_code">Kod</string>
     <string name="settings_currency_symbol">Symbol</string>
