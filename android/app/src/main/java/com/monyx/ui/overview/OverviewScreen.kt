@@ -42,6 +42,7 @@ import androidx.compose.material.icons.filled.PieChart
 import androidx.compose.material.icons.filled.RemoveCircleOutline
 import androidx.compose.material.icons.filled.ShowChart
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.mutableStateOf
@@ -93,10 +94,29 @@ import java.time.LocalDate
 @Composable
 fun OverviewScreen(
     onOpenTransactions: (categoryId: String?, period: String?) -> Unit,
-    /** One day of the ledger, scrolled to. See the daily face of the breakdown. */
-    onOpenDay: (day: String) -> Unit = {},
+    /**
+     * One day of the ledger, scrolled to — and narrowed to one category when the
+     * day sheet's legend is what was tapped. See the daily face of the
+     * breakdown.
+     */
+    onOpenDay: (day: String, categoryId: String?) -> Unit = { _, _ -> },
     /** Pull-to-refresh. See [SyncPullToRefresh]. */
     onSyncRequested: () -> Unit = {},
+    /**
+     * Which single account this screen is narrowed to, reported upwards, or null
+     * when it is showing the household.
+     *
+     * Every figure above is already under that filter, so a tap on a slice has
+     * to open the same subset of the ledger and Dodaj has to start the next row
+     * on that account — and neither the ledger nor the navigation bar can see a
+     * filter that lives in this screen's preferences. Same answer, same reason,
+     * as TransactionsScreen's own report. See MonyxNav.
+     *
+     * One account or none. Two of five selected is a view the ledger has no
+     * filter for, and narrowing it to the first of them would be a different
+     * question answered without saying so.
+     */
+    onAccountFilterChanged: (String?) -> Unit = {},
 ) {
     val app = LocalContext.current.applicationContext as MonyxApp
     val viewModel: OverviewViewModel = viewModel(
@@ -108,6 +128,11 @@ fun OverviewScreen(
     val hidden by viewModel.hidden.collectAsStateWithLifecycle()
     val budgetHidden by viewModel.budgetHidden.collectAsStateWithLifecycle()
     val showsMonth by viewModel.showsMonth.collectAsStateWithLifecycle()
+
+    // Reported on every change, and on arrival: the buttons that need the answer
+    // are in the bottom bar, composed somewhere else entirely.
+    val soleAccountId = state.selectedAccountIds.singleOrNull()
+    LaunchedEffect(soleAccountId) { onAccountFilterChanged(soleAccountId) }
 
     Column(modifier = Modifier.fillMaxSize()) {
         // Pinned, like the identical control on Transactions. It names the month
@@ -510,7 +535,7 @@ private fun BreakdownCard(
     onToggleBudget: () -> Unit,
     onToggleAllHidden: () -> Unit,
     onCategoryClick: (String) -> Unit,
-    onDayClick: (String) -> Unit,
+    onDayClick: (day: String, categoryId: String?) -> Unit,
     onSelectMonth: (String) -> Unit,
     showsMonth: Boolean,
     onSelectAmountMode: (LegendAmount) -> Unit,
@@ -654,7 +679,7 @@ private fun DailyFace(
     hidden: Set<String>,
     onToggle: (String) -> Unit,
     onToggleAll: () -> Unit,
-    onDayClick: (String) -> Unit,
+    onDayClick: (day: String, categoryId: String?) -> Unit,
     /**
      * A legend row opens that category's ledger, as it does on the other two
      * faces. This face was the one that left the rows dead: the eye worked, the
@@ -725,9 +750,13 @@ private fun DailyFace(
             DaySheet(
                 day = day,
                 onDismiss = { openDay = null },
-                onOpenLedger = {
+                // Null from the button, a category from a line of the legend:
+                // "Zobacz transakcje" is the whole day, and tapping Jedzenie
+                // inside it is the same question about one part of it. The line
+                // was already drawn as something tappable and did nothing.
+                onOpenLedger = { categoryId ->
                     openDay = null
-                    onDayClick(date)
+                    onDayClick(date, categoryId)
                 },
             )
         }
@@ -747,7 +776,8 @@ private fun DailyFace(
 private fun DaySheet(
     day: DaySpend,
     onDismiss: () -> Unit,
-    onOpenLedger: () -> Unit,
+    /** The whole day with null, one of its categories with an id. */
+    onOpenLedger: (String?) -> Unit,
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -770,12 +800,12 @@ private fun DaySheet(
                         )
                     },
                     total = day.expenseMinor,
-                    onSliceClick = {},
+                    onSliceClick = onOpenLedger,
                 )
             }
         },
         confirmButton = {
-            TextButton(onClick = onOpenLedger) {
+            TextButton(onClick = { onOpenLedger(null) }) {
                 Text(stringResource(R.string.overview_day_open))
             }
         },

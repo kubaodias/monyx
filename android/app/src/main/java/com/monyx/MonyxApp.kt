@@ -10,6 +10,7 @@ import com.monyx.data.MonyxDatabase
 import com.monyx.data.MonyxRepository
 import com.monyx.sync.Session
 import com.monyx.ui.SelectedMonth
+import com.monyx.ui.budget.BudgetPreferences
 import com.monyx.ui.overview.ChartPreferences
 import com.monyx.update.Updater
 import kotlinx.coroutines.CoroutineScope
@@ -29,6 +30,9 @@ class MonyxApp : Application() {
 
     /** Which currencies this phone offers to pick from. Never synced. */
     val currencyPreferences by lazy { CurrencyPreferences(this) }
+
+    /** How this phone orders the budget list. Never synced. */
+    val budgetPreferences by lazy { BudgetPreferences(this) }
 
     /**
      * Held here because it has to outlive every ViewModel that reads it. Three

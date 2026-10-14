@@ -4,6 +4,7 @@ import com.monyx.data.Dates
 import com.monyx.ui.SelectedMonth
 import org.junit.Assert.assertEquals
 import org.junit.Test
+import java.time.LocalDate
 
 /**
  * One month, three tabs.
@@ -72,6 +73,43 @@ class SelectedMonthTest {
     fun `round tripping a period through the grid changes nothing`() {
         listOf("2024-01", "2025-06", "2026-10", "2026-12").forEach { period ->
             assertEquals(period, Dates.period(Dates.yearOf(period), Dates.monthOf(period)))
+        }
+    }
+
+    @Test
+    fun `the keypad opens on today while the month on screen is the running one`() {
+        // The usual path, and the one that must not change: Dodaj from the
+        // present month is Dodaj dated today, down to the hour it is saved at.
+        val today = LocalDate.of(2026, 10, 14)
+        assertEquals(today, Dates.dayInPeriod("2026-10", today))
+    }
+
+    @Test
+    fun `a month stepped back carries its own day to the keypad`() {
+        // Somebody reading September and reaching for Dodaj is entering
+        // something that happened in September. See AddViewModel.pickUpMonth.
+        assertEquals(
+            LocalDate.of(2026, 9, 14),
+            Dates.dayInPeriod("2026-09", LocalDate.of(2026, 10, 14)),
+        )
+    }
+
+    @Test
+    fun `a day the shorter month does not have lands on its last one`() {
+        assertEquals(
+            LocalDate.of(2026, 2, 28),
+            Dates.dayInPeriod("2026-02", LocalDate.of(2026, 1, 31)),
+        )
+    }
+
+    @Test
+    fun `a month chosen either side of this one stays inside itself`() {
+        // The one invariant that matters: whatever day comes back, it is in the
+        // month the screen was pointing at — otherwise the row lands outside
+        // the ledger that opens next.
+        listOf("2024-01", "2026-09", "2026-12", "2027-03").forEach { period ->
+            val date = Dates.dayInPeriod(period, LocalDate.of(2026, 10, 31))
+            assertEquals(period, Dates.periodOf(date))
         }
     }
 

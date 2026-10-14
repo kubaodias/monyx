@@ -130,6 +130,11 @@
     <string name="budget_cancel">Anuluj</string>
     <string name="budget_carries_forward">Limit obowiązuje też w kolejnych miesiącach</string>
     <string name="budget_view_transactions">Zobacz transakcje</string>
+    <string name="budget_sort">Kolejność</string>
+    <string name="budget_sort_own">Kolejność własna</string>
+    <string name="budget_sort_progress">Najbliżej limitu</string>
+    <string name="budget_sort_spent">Najwięcej wydane</string>
+    <string name="budget_sort_limit">Największy limit</string>
 
     <!-- Notifications. The server sends a key and its arguments; this file
          supplies the wording. Every placeholder is %1$s, never %d: getString()
@@ -185,9 +190,8 @@
     <string name="settings_account_balance">Aktualne saldo</string>
     <string name="settings_account_currency">Waluta</string>
     <string name="settings_currencies">Waluty</string>
-    <string name="settings_currencies_hint">Te waluty są proponowane przy dodawaniu konta i przy zmianie waluty transakcji. Podsumowania zawsze są w złotych.</string>
+    <string name="settings_currencies_hint">Włączone waluty są proponowane przy dodawaniu konta i przy zmianie waluty transakcji. Podsumowania zawsze są w złotych. Waluta dodana ręcznie znika z listy, gdy ją wyłączysz.</string>
     <string name="settings_currency_add">Dodaj walutę</string>
-    <string name="settings_currency_rated">Te mają kurs NBP, więc przeliczają się na złote:</string>
     <string name="settings_currency_code">Kod</string>
     <string name="settings_currency_symbol">Symbol</string>
     <string name="settings_currency_code_hint">Trzy litery, jak na wyciągu z banku.</string>

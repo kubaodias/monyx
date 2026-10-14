@@ -58,3 +58,42 @@ label, and "All time" is gone.
   lone grid cell reading "stycznia" is a month name in the wrong case.
 
 [0011]: 0011-one-month-switcher.md
+
+## Addendum, 2026-10-14: a filter is a statement, and it travels
+
+The month was the first thing the three screens shared. The rest of what a
+screen is narrowed to was still stuck to the screen it was set on, and every
+jump out of it quietly widened the question:
+
+- The **keypad** opened on today whatever month was on screen. Stepping back to
+  September to enter a receipt from September and reaching for Dodaj filed the
+  row in October, and then landed on a ledger — the September one — with nothing
+  in it to show for the entry. `AddViewModel.pickUpMonth` now takes the shared
+  period and `Dates.dayInPeriod` picks the day: today while the month is the
+  running one, otherwise the same day of the month, clamped. The usual path
+  through it changes nothing, and the date is on a chip above the keys, reading
+  as a date precisely when it is not today.
+- **Saving** goes to the month the row is in, not the one that happened to be
+  selected. A back-dated row used to be followed by a jump to a ledger that
+  could not contain it.
+- The **overview's account strip** did not travel at all. A pie slice tapped
+  with one account lit opened the whole household's ledger, so the rows did not
+  add up to the slice. The screen reports its narrowing up to `MonyxNav` the way
+  Transactions already reported its account and category chips, and a slice, a
+  day and Dodaj all carry it. One account or none: two of five selected is a
+  view the ledger has no filter for, and narrowing to the first of them would be
+  a different question answered silently.
+- A **budget row** counts the default account alone — that is what a limit
+  governs, see `budgetAccountIds` — and *Zobacz transakcje* opened the ledger
+  unnarrowed. One insurance premium is enough to make the list disagree with the
+  bar that was tapped. It now carries the account.
+- The **day sheet's legend** was drawn as something tappable, with a ripple, and
+  did nothing: `onSliceClick = {}`. The button on that sheet opens the day; a
+  line of its legend now opens that day for that category, which is the same
+  gesture the pie's legend has on the other face of the card.
+
+The rule behind all of it: a filter is somebody saying what they are looking at.
+Any button that opens another view of the same money has to carry what has
+already been said, and the pickups are guarded the same way — a category the
+keypad cannot offer or an archived account it cannot file to is ignored rather
+than guessed at.

@@ -301,6 +301,41 @@ class CurrencyTest {
         )
     }
 
+    // ------------------------------------------- what Settings lists
+
+    @Test
+    fun `every rated currency is a row in Settings, switched on or off`() {
+        // The switch list is back, so the nine have to be ON it whether or not
+        // they are chosen — a switch that is off still has to be somewhere to
+        // switch on again. Offered is the other question, asked separately.
+        val listed = Currencies.listed(null).map { it.code }
+        assertEquals(Currency.KNOWN.map { it.code }, listed)
+        assertEquals(listOf("PLN", "EUR"), Currencies.offered(null).map { it.code })
+    }
+
+    @Test
+    fun `an added currency is listed after the nine, with its symbol`() {
+        val listed = Currencies.listed(setOf("EUR", "THB=฿"))
+        assertEquals(Currency.KNOWN.map { it.code } + "THB", listed.map { it.code })
+        assertEquals("฿", listed.last().suffix)
+    }
+
+    @Test
+    fun `a currency only an account holds is still a row`() {
+        // Switched on and greyed: it cannot be switched off while an account is
+        // denominated in it, and it is the only record of what that symbol
+        // means. See [Currencies.locked].
+        val listed = Currencies.listed(emptySet(), inUse = setOf("THB"))
+        assertEquals(Currency.KNOWN.map { it.code } + "THB", listed.map { it.code })
+        assertTrue(Currencies.locked(Currency.of("THB"), setOf("THB")))
+    }
+
+    @Test
+    fun `nothing is listed twice however many ways it arrives`() {
+        val listed = Currencies.listed(setOf("EUR", "SEK"), inUse = setOf("EUR", "THB"))
+        assertEquals(listed.map { it.code }.distinct(), listed.map { it.code })
+    }
+
     // ------------------------------------- the ledger's rows and its total
 
     private fun row(kind: String, amountMinor: Long, currency: String, plnMinor: Long?) =

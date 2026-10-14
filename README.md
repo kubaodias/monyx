@@ -49,7 +49,10 @@ cannot answer says what is still missing instead — see
   over them as a red line so a month that went over is one you can see, or the
   last thirty-one days a day at a time. Tapping a bar moves the whole screen to
   that month; tapping a day opens what was bought on it, and the ledger for that
-  day is one more tap from there. The legend gives
+  day is one more tap from there — the whole day from the button, or one category
+  of it by tapping that line of the day's legend. Whatever the screen is narrowed
+  to goes with it: with one account lit in the strip, a slice, a day and Dodaj
+  all stay on that account. The legend gives
   each category's monthly average — over the months the ledger actually covers —
   or that one month's spending, whichever the card is set to — one switch, shared
   by both faces and remembered, and the legend re-sorts itself to match. The eye at the end of a row hides
@@ -78,22 +81,33 @@ cannot answer says what is still missing instead — see
   holding euro purchases is converted, not summed in cents. The category menu
   lists the families in the order they were dragged, spending and earning in
   separate blocks. Narrow it to one account or one category and the Dodaj button
-  starts the next transaction on that account, under that category. An archived account's rows are not
+  starts the next transaction on that account, under that category — and the
+  month goes with it from any of the three screens that share the switcher, so
+  stepping back to September and reaching for Dodaj dates the row in September
+  rather than today. Saving lands on the ledger for the month the row is
+  actually in. An archived account's rows are not
   in here at all: the way to ask about a finished account is its row in Settings,
   which opens this screen pinned to it.
 - **Budget** — what there is to spend this month, limits on main categories, and
   a warning before a limit is passed rather than after. A limit applies to the
   month you set it in and carries forward from there; changing it later changes
   that month alone, unless you tick the box that carries the new figure on. A limit of zero is a limit: it means nothing may go here, which is not
-  the same as having set none.
+  the same as having set none. The list is in the household's own category order
+  and can be re-ordered by what is closest to its limit, what has been spent, or
+  the size of the limit — a lens on one phone, remembered, never synced. Every
+  figure here counts the default account alone, which is what a limit governs,
+  and *Zobacz transakcje* opens the ledger narrowed the same way, so the rows add
+  up to the bar that was tapped.
 - **Settings** — accounts, categories (two levels, dragged into order),
   currencies, repeating rules, language, backup health, the update check and what
-  every release changed, a tab each. Currencies is the list this phone deals in
-  — złoty and the euro to begin with, anything else added by hand: a code and
-  the text to print after a figure. The nine with an NBP rate are offered as
-  chips in that dialog, because those are the ones that convert; anything else
-  keeps its own figures and stays out of the złoty totals. Złoty and whatever an
-  account holds have no remove button. Archiving an account takes it out of the summary as well: a finished
+  every release changed, a tab each. Currencies is a switch per row: the nine
+  with an NBP rate, plus anything added by hand — a code and the text to print
+  after a figure — and the switched-on ones are what the pickers offer. Złoty and
+  whatever an account holds are switched on and greyed out, which says they
+  cannot go without a line of prose saying it. An added currency is on the list
+  because somebody typed it, so switching it off removes it; the nine stay
+  whether they are on or off. A code with no NBP rate keeps its own figures and
+  stays out of the złoty totals, which the dialog says before it is added. Archiving an account takes it out of the summary as well: a finished
   account left counting is a balance inside every total with no chip anywhere to
   switch it off. The toggle stays on the row if it should go back in.
 
@@ -167,8 +181,9 @@ and any other three-letter code can be **added by hand** in Settings › Waluty,
 with the symbol to print after a figure. An added currency is stored, synced and
 shown like any other; it simply has no rate, so its rows keep their own figure
 and are left out of every złoty total — the same state a rated currency is in
-before its first rate has synced. A phone offers złoty, the euro and whatever
-it has added (which changes what the pickers list and nothing else); the
+before its first rate has synced. A phone offers złoty, whatever is switched on in
+Settings › Waluty and whatever an account holds (which changes what the pickers
+list and nothing else); the
 symbols for the added ones are a **local** preference, so until the other phone
 adds the same code it prints the code instead of the symbol. See
 [ADR 0022](docs/decisions/0022-zloty-is-the-reporting-currency-and-a-rate-has-a-date.md).
