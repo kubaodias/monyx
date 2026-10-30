@@ -131,7 +131,11 @@ cannot answer says what is still missing instead — see
   taking it out of the summary used to RAISE the household's total by the cost of
   the trip and drop that spending out of its month. An account that really holds
   money and is finished with is best taken to zero first — a transfer to wherever
-  the money went — because a pot with money left in it is not finished. See
+  the money went — because a pot with money left in it is not finished. A
+  per-trip account is a good model and wants one thing to work as it promises: a
+  transfer in, at the start of the trip or at the end. Funded, its expenses eat a
+  real pot instead of digging a hole, and its closing balance says whether the
+  trip stayed inside what was set aside for it. See
   [ADR 0023](docs/decisions/0023-archiving-hides-an-account-it-does-not-stop-counting-it.md).
 
 One month switcher, pinned above the scroll so it never leaves the screen, the

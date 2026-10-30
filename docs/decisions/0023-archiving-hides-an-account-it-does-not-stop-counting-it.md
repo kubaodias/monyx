@@ -89,8 +89,24 @@ changing the household's total.
   before it is archived — a transfer to wherever the money went. A pot with money
   left in it is not finished, and leaving it counted is then correct rather than
   convenient.
-- The honest alternative for a trip, left to the household: a trip is a
-  *category*, not an account. A per-trip account earns its keep when there is a
-  real pot behind it — a prepaid card, an envelope of cash — and not when the
-  spending comes off the everyday card, which is also why four of the World
-  Summit AI purchases were booked straight onto Portfel.
+
+## What a per-trip account is missing, and it is not its existence
+
+The first draft of this decision ended by proposing that a trip is a *category*
+rather than an account. The owner rejected that, and the rejection is the better
+reading of the model: a trip is a thing with a budget of its own, and an account
+is where that budget sits. Keep the accounts.
+
+What they are missing is a **transfer in**. Fund the account at the start of the
+trip — or at the end, settling it — and everything else falls out: the account
+holds a real pot, its expenses eat that pot rather than digging a hole, its
+closing balance says whether the trip stayed inside what was set aside for it,
+and archiving it is then a formality because the balance is zero. Unfunded, the
+account's balance is the household's own money spent, which is exactly the
+quantity the rule above was mishandling.
+
+One observation that is NOT a finding: four euro purchases on 8 October (gifts, a
+café, a mug — 46,75 €) sit on Portfel while the rest of that week sits on the
+trip account. That may be trip spending booked to the everyday card, or ordinary
+private shopping that happened to be abroad, and only the household knows which.
+It is recorded here as a thing to ask about, not as a mistake.
