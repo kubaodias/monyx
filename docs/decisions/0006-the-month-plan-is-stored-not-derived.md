@@ -117,9 +117,27 @@ the month has closed: a plan is written for a whole month, so on the third of it
 every household is nineteen thousand "below plan", and a card that says so every
 morning cries wolf about a month going exactly as intended.
 
-**How far the limits were passed, added up.** A different question from whether
-the month held — a month can come out level with three categories well over and
-three well under — and the one that matters when looking back. It counts a row
-only once the row itself is red, margin and all (see `overBudgetBand`), because
-a card announcing a category over its limit above a list where nothing is red is
-a figure nothing on screen explains.
+**How far the limits were passed, added up.** This one lasted one release. The
+argument for it was that a month can come out level with three categories well
+over and three well under; the owner's answer, after using it, is that this is
+exactly why the figure says little — the two sides roughly cancel — and the card
+was carrying more lines than it had questions. Removed in 0.29.1. Each row still
+says it for itself, which is where somebody looking at a category is looking.
+
+## Both figures lead, side by side (2026-10-31)
+
+The section above moved "left to spend" to the headline and left "left to plan"
+in a footnote. One release of use said that was half right: the planning figure
+is not a detail of the spending one, and a reader who wants it should not have
+to read a sentence of small print to find it.
+
+So the card leads with **both**, side by side, in the order the month is lived:
+what is left to spend on the left, what is left to plan on the right. Same size,
+same weight, neither the subtitle of the other. The right-hand figure keeps the
+colour rule it has had since this decision was written — zero is the goal, drawn
+as success, red when more has been handed out than exists. The bar stays with
+the left-hand figure and so measures spending.
+
+What that bought was room. Below the two figures there is now only the
+arithmetic behind them — the plan, what came in, last month's remainder, what
+has gone — and the footnote line is gone with the figure it carried.

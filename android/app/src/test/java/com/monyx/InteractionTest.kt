@@ -2,7 +2,6 @@ package com.monyx
 
 import androidx.compose.ui.graphics.Color
 import com.monyx.data.AccountEntity
-import com.monyx.data.BudgetUsage
 import com.monyx.data.MonyxRepository
 import com.monyx.sync.Rejection
 import com.monyx.sync.SyncEngine
@@ -12,9 +11,7 @@ import com.monyx.ui.add.AddViewModel
 import com.monyx.ui.add.EntryKind
 import com.monyx.ui.add.categoryMarkOf
 import com.monyx.ui.add.familyHasChildren
-import com.monyx.ui.budget.OverLimits
 import com.monyx.ui.budget.PlanState
-import com.monyx.ui.budget.overLimits
 import com.monyx.ui.overview.OverviewViewModel
 import com.monyx.ui.overview.PieSlice
 import com.monyx.ui.overview.sliceIdAt
@@ -489,57 +486,6 @@ class InteractionTest {
     @Test
     fun `an unplanned month has nothing to compare what arrived with`() {
         assertNull(PlanState("2026-08", hasPlan = false, incomeMinor = 2_000_00).incomeVsPlanMinor)
-    }
-
-    // ------------------------------------------- how far the limits were passed
-
-    private fun usage(id: String, limitMinor: Long, spentMinor: Long) = BudgetUsage(
-        categoryId = id,
-        name = id,
-        color = null,
-        icon = null,
-        parentId = null,
-        parentColor = null,
-        limitMinor = limitMinor,
-        spentMinor = spentMinor,
-    )
-
-    @Test
-    fun `over the limits adds up the limits that were passed, and counts them`() {
-        // The question a month you are looking back at has to answer: a month
-        // can come out level overall with half its categories well over.
-        val rows = listOf(
-            usage("food", limitMinor = 200_000, spentMinor = 230_000),  // 300 over
-            usage("rent", limitMinor = 2_000_000, spentMinor = 1_000_000),
-            usage("fun", limitMinor = 20_000, spentMinor = 45_000),     // 250 over
-        )
-        assertEquals(OverLimits(totalMinor = 55_000, count = 2), overLimits(rows))
-    }
-
-    @Test
-    fun `a limit passed by a rounding error is not announced`() {
-        // Four złoty over 1 650 leaves the row orange rather than red — see
-        // overBudgetBand — and a card announcing a category over its limit
-        // above a list where nothing is red is a figure nothing explains.
-        assertEquals(OverLimits(), overLimits(listOf(usage("food", limitMinor = 165_000, spentMinor = 165_400))))
-    }
-
-    @Test
-    fun `spending against a limit of nothing is over by the whole amount`() {
-        assertEquals(
-            OverLimits(totalMinor = 5_000, count = 1),
-            overLimits(listOf(usage("gifts", limitMinor = 0, spentMinor = 5_000))),
-        )
-    }
-
-    @Test
-    fun `a month where every limit held reports nothing at all`() {
-        val rows = listOf(
-            usage("food", limitMinor = 200_000, spentMinor = 199_999),
-            usage("gifts", limitMinor = 0, spentMinor = 0),
-        )
-        assertEquals(OverLimits(), overLimits(rows))
-        assertEquals(false, PlanState("2026-08").hasOverLimits)
     }
 
     @Test

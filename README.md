@@ -95,16 +95,15 @@ cannot answer says what is still missing instead — see
   that still counts keeps its rows in the list, because the month's figure counts
   them.
 - **Budget** — what is left to spend this month, limits on main categories, and
-  a warning before a limit is passed rather than after. The card leads with the
-  state, not the paperwork: how much is still there, or by how much the month
-  went over, with the bar underneath measuring spending against the month's
-  money. Under it, what the plan was, what actually came in — and by how much
-  that beat the plan, which is the line that explains how an account can still
-  hold money while the month reads red — what last month left behind, what has
-  gone, and how far the limits themselves were passed. A month that has ended
-  says "unspent" rather than offering money back. The two planning figures
-  (handed out, left to hand out) keep their exact values on one line at the
-  foot of the card. A limit applies to the
+  a warning before a limit is passed rather than after. The card leads with two
+  figures side by side: what is left to spend — or by how much the month went
+  over — and what is left to plan, the second one drawn as success at zero,
+  which is its goal. The bar belongs to the first and so measures spending
+  against the month's money. Under them, the arithmetic and nothing else: the
+  plan, what actually came in and by how much that beat the plan (the line that
+  explains how an account can still hold money while the month reads red), what
+  last month left behind, and what has gone. A month that has ended says
+  "unspent" rather than offering money back. A limit applies to the
   month you set it in and carries forward from there; changing it later changes
   that month alone, unless you tick the box that carries the new figure on. A limit of zero is a limit: it means nothing may go here, which is not
   the same as having set none. The list is in the household's own category order
