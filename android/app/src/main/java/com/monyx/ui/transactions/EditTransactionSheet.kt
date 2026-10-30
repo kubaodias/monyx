@@ -478,16 +478,14 @@ fun EditTransactionSheet(
                     colorOf = colorOf,
                     onSelect = {
                         categoryId = it
-                        // The keys stand down once they have done their job,
-                        // the same bargain the add screen makes: with an amount
-                        // already there the grid is what the screen is for.
-                        if (amountMinor > 0) {
-                            focusManager.clearFocus(force = true)
-                            keyboard?.hide()
-                            keypadUp = false
-                        } else {
-                            editAmount()
-                        }
+                        // The keys stay up, the same bargain the add screen
+                        // makes: one screen whichever order the taps arrive in,
+                        // with the family pinned above the note and the amount
+                        // still typeable. They used to stand down here once an
+                        // amount was in — and a row opened for editing always
+                        // has one, so this sheet only ever showed the half of
+                        // the behaviour the add screen showed second.
+                        editAmount()
                     },
                     footer = noteField,
                     // As on the add screen: with the keys or the keyboard up

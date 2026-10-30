@@ -71,7 +71,11 @@ cannot answer says what is still missing instead — see
   The family you pick rises into the slot beside the amount — circle and name —
   and leaves the grid, so the pair reads as the row being written however far
   the categories are scrolled. Picking a subcategory does not change it: the
-  line says "Rachunki" and the grid below says which of them.
+  line says "Rachunki" and the grid below says which of them. One screen
+  whichever order you work in: the tap on a family always pins its children
+  under the amount with the other families one scroll up, and the keys stay
+  under them for the figure, which is the thing most likely to want correcting.
+  The edit sheet does the same, because it is the same question.
 - **History** — the month, searchable, filtered by account, category and then
   subcategory, with any row that is not on the household's default account — the
   first one on the list — carrying that account's name in its own colour; pick a category and the rows are totalled above them, so "how much

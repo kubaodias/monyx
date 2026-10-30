@@ -114,11 +114,12 @@ import java.time.ZoneOffset
  * and every screen that shows this figure opens the keys when it is tapped.
  *
  * @param action a control on the left of the figure, or null for none. Null on
- *   the add screen — that screen's way out of the keypad is picking a category,
- *   which it is about to do anyway. The edit sheet passes the note button here,
- *   because a row opened for editing already HAS its category: tapping the
- *   amount there put the keys up over the note with nothing on screen that
- *   would take them down again, and a transfer has no grid to tap at all.
+ *   the add screen, where the way out of the keypad is the note field at the
+ *   foot of the grid — a pinned family leaves room for it, so there is always
+ *   something on screen that takes the keys down. (It used to be the category
+ *   tap; that tap keeps the keys now, so the note carries it alone.) The edit
+ *   sheet passes the note button here because a transfer has no grid to put a
+ *   note in at all.
  */
 @Composable
 internal fun AmountDisplay(
@@ -582,10 +583,11 @@ internal fun CategoryGrid(
      * now carries their family, the note at the bottom, and the space between
      * them left empty. The roots are still there — one scroll up.
      *
-     * False once the keypad stands down, which is what happens the moment an
-     * amount has been typed and a category tapped. The window is then tall
-     * enough for the roots AND the subcategories AND the note, so there is
-     * nothing to pin and no space to leave: everything is simply on screen.
+     * True throughout on the add screen, where one of the two inputs always has
+     * the bottom of the screen. It is still a parameter rather than an
+     * assumption because the window it describes is the caller's: the edit sheet
+     * has a transfer with no grid at all, and a tall window with everything on
+     * screen at once is a layout this grid has to keep being able to draw.
      */
     pinFamily: Boolean = false,
     /**
@@ -637,8 +639,7 @@ internal fun CategoryGrid(
     // pinned, the target is the last item, which is the end of the content —
     // and a lazy grid clamps at its own maximum scroll, so that is "show the
     // bottom" and never an overshoot. Where everything already fits the scroll
-    // has nowhere to go and does nothing, which is the case the moment the
-    // keypad stands down.
+    // has nowhere to go and does nothing.
     //
     // Re-pinned whenever the bottom of the screen changes hands, not only when
     // a family is opened — which is the bug this shape exists to fix. The

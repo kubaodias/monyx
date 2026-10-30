@@ -164,3 +164,41 @@ longer scroll it into view themselves while the grid is pinning. A pinned block
 already puts the note at the foot of the window it takes, so both effects were
 aiming at the same offset through each other, one animated and one not. They ask
 `familyHasChildren` first.
+
+## Addendum, 2026-10-30: two states, because one screen
+
+The table above has three input states, and the third one turned the add screen
+into two different screens depending on the order the same two taps arrived in.
+
+- **Amount, then category.** The keys stood down (state *Nothing*), the grid
+  took the whole window, and what filled it was every other family greyed out
+  with the chosen family's children somewhere below them.
+- **Category, then amount.** The keys stayed up, so the family block was pinned:
+  its children directly under the amount line that now carries the family, the
+  note at the foot, the other families one scroll up.
+
+Both were deliberate and the first one is argued for above — 236dp of keys that
+mean nothing once the amount is typed. What the argument missed is what the
+freed window gets filled with: a list of the families you did **not** pick,
+dimmed, between the amount and the subcategories you did. The owner, having used
+both: "szczerze to bardziej podoba mi się ten drugi widok więc poproszę ujednolić
+ten flow dodawania wydatków".
+
+So *Nothing* is gone. The keys are up unless the note is being typed, the family
+is always pinned, and the amount is always one tap from being corrected — which
+is worth more than the 236dp, because the amount is the field that gets fixed
+after the category is chosen, not before.
+
+Two consequences:
+
+- **The way out of the keypad is now the note field alone.** It used to be the
+  category tap. The field is always on screen — the pinned block leaves exactly
+  its height under the children, which is the whole point of the 2026-10-06
+  addendum — so there is still something to tap, and the amount line still needs
+  no dialpad glyph beside it.
+- **The edit sheet changed with it.** It made the same bargain ("the same
+  bargain the add screen makes", in its own comment), and a row opened for
+  editing always has an amount — so that sheet only ever showed the half of the
+  behaviour the add screen showed second. Two screens that ask "which category
+  is this" have to look the same; that is why the controls are shared in the
+  first place.
