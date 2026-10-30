@@ -10,12 +10,15 @@ import org.junit.Assert.assertNull
 import org.junit.Test
 
 /**
- * What archiving an account does to the other flag.
+ * What archiving an account does to the other flag: nothing.
  *
  * The two are orthogonal — `archived` is lifecycle, `excludedFromSummary` is
- * ownership — and a finished account that was still counted turned out to be
- * unreachable: the summary strip only offers open accounts, so its balance sat
- * inside every total with no chip anywhere to switch it off.
+ * ownership — and archiving used to flip the second one as well, to keep a
+ * finished holiday account out of the budget's carry-over. The carry-over is
+ * narrowed to the accounts the budget counts now, so that patch outlived its
+ * bug, and what it left behind was a switch nobody touched moving the
+ * household's total: this household's per-trip accounts are expense buckets
+ * nobody funded, so archiving one RAISED Bilans by what the trip had cost.
  */
 class AccountArchiveTest {
 
@@ -27,40 +30,54 @@ class AccountArchiveTest {
     )
 
     @Test
-    fun `archiving takes the account out of the summary`() {
+    fun `archiving hides the account and leaves the summary alone`() {
+        // The trip is over; what it cost is still the household's money. The
+        // account loses its chip, its place in the pickers and its rows in the
+        // ledger's month list — and keeps its balance inside Bilans.
         val archived = MonyxRepository.applyArchive(account(), archived = true)
         assertEquals(1, archived.archived)
-        assertEquals(1, archived.excludedFromSummary)
+        assertEquals(0, archived.excludedFromSummary)
     }
 
     /** An account already held outside the summary is simply left there. */
     @Test
     fun `archiving an already excluded account changes nothing else`() {
         val archived = MonyxRepository.applyArchive(account(outside = 1), archived = true)
+        assertEquals(1, archived.archived)
         assertEquals(1, archived.excludedFromSummary)
     }
 
     /**
-     * Un-archiving does NOT put it back in. Restoring the old value would mean
-     * storing it, and a schema change wipes every phone — see MonyxDatabase. The
-     * toggle is on the same row, one tap away.
+     * The flag is the household's to set, in either direction, and archiving is
+     * not a vote on it. Nothing to restore on the way back, because nothing was
+     * taken away — which is also the old asymmetry gone: archiving used to
+     * exclude and un-archiving deliberately did not re-include.
      */
     @Test
-    fun `un-archiving leaves it outside the summary`() {
-        val reopened = MonyxRepository.applyArchive(
+    fun `un-archiving leaves the flag exactly as it was`() {
+        val wasExcluded = MonyxRepository.applyArchive(
             account(outside = 1, archived = 1),
             archived = false,
         )
-        assertEquals(0, reopened.archived)
-        assertEquals(1, reopened.excludedFromSummary)
+        assertEquals(0, wasExcluded.archived)
+        assertEquals(1, wasExcluded.excludedFromSummary)
+
+        val wasCounted = MonyxRepository.applyArchive(account(archived = 1), archived = false)
+        assertEquals(0, wasCounted.archived)
+        assertEquals(0, wasCounted.excludedFromSummary)
     }
 
-    /** One that was never excluded stays counted when it comes back. */
     @Test
-    fun `un-archiving a counted account keeps it counted`() {
-        val reopened = MonyxRepository.applyArchive(account(archived = 1), archived = false)
-        assertEquals(0, reopened.archived)
-        assertEquals(0, reopened.excludedFromSummary)
+    fun `archiving and restoring is a round trip`() {
+        // The pair that used to lose something on the way: archive, restore,
+        // and the account came back counted differently from how it left.
+        val before = account()
+        val after = MonyxRepository.applyArchive(
+            MonyxRepository.applyArchive(before, archived = true),
+            archived = false,
+        )
+        assertEquals(before.archived, after.archived)
+        assertEquals(before.excludedFromSummary, after.excludedFromSummary)
     }
 
     /** Either way it is a local edit the sync has not carried yet. */

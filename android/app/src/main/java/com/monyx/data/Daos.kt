@@ -1000,21 +1000,33 @@ interface MonyxDao {
              -- rows could not add up to the balance shown above them.
              AND (:accountId  IS NULL OR t.accountId  = :accountId
                   OR (t.kind = 'transfer' AND t.transferAccountId = :accountId))
-             -- A finished account's rows are not part of the ledger any more.
-             -- Eighty purchases from a holiday that ended in August were still
-             -- landing in August's list, under the same running totals as the
+             -- An account that is put away — finished with AND held outside
+             -- the summary — is not part of the ledger any more. Eighty
+             -- purchases from a holiday that ended in August were still landing
+             -- in August's list, under the same running totals as the
              -- household's own spending, and no filter on the screen would take
-             -- them out. The way to ask about a finished account is its row in
-             -- Settings, which arrives here with :accountId already pinned to
-             -- it — so this clause stands down the moment one is set.
+             -- them out. The way to ask about it is its row in Settings, which
+             -- arrives here with :accountId already pinned to it — so this
+             -- clause stands down the moment one is set.
              --
-             -- Hidden only when NO open account is involved. A transfer has two
-             -- ends, and money that arrived in an open account has to stay
-             -- visible there or that account's rows stop adding up to its
-             -- balance.
+             -- BOTH flags, because archiving alone no longer means "stop
+             -- counting" (see MonyxRepository.applyArchive). An archived
+             -- account that is still counted has its spending inside the
+             -- month's figures on the overview, and a month whose figure counts
+             -- money the list below it refuses to show is the one shape every
+             -- total in this app is written to avoid. Hide it from the sums and
+             -- the list hides it too; count it and the rows are there to add up.
+             --
+             -- Hidden only when NO visible account is involved. A transfer has
+             -- two ends, and money that arrived in an account still in use has
+             -- to stay visible there or that account's rows stop adding up to
+             -- its balance.
              AND (:accountId IS NOT NULL
                   OR COALESCE(a.archived, 0) = 0
-                  OR (t.kind = 'transfer' AND COALESCE(ta.archived, 0) = 0))
+                  OR COALESCE(a.excludedFromSummary, 0) = 0
+                  OR (t.kind = 'transfer'
+                      AND (COALESCE(ta.archived, 0) = 0
+                           OR COALESCE(ta.excludedFromSummary, 0) = 0)))
              AND (:period = '' OR substr(t.occurredOn, 1, 7) = :period)
            ORDER BY t.occurredAt DESC, t.id DESC"""
     )

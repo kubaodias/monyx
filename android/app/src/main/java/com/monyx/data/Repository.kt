@@ -572,29 +572,46 @@ class MonyxRepository(private val dao: MonyxDao) {
         internal fun allAccounts(ids: Set<String>): Int = if (ids.isEmpty()) 1 else 0
 
         /**
-         * Archiving an account also takes it out of the summary.
+         * Archiving an account puts it away. It does not decide whether the
+         * money counts.
          *
          * The two flags are orthogonal by design — `archived` is lifecycle,
-         * `excludedFromSummary` is ownership — and they stay orthogonal. This is
-         * about which way the default falls when someone sets only the first.
+         * `excludedFromSummary` is ownership — and archiving used to flip the
+         * second one too. The case it was patching: a holiday account that
+         * ended in August rode along invisibly in the budget's carry-over for
+         * weeks, and the strip offers no chip for a finished account, so there
+         * was nothing on screen to switch it off with.
          *
-         * An account is archived when it is finished with. A finished account
-         * still counted is then a balance inside every total with no chip
-         * anywhere to switch it off, because the strip only offers open
-         * accounts: a holiday that ended in August rode along invisibly in the
-         * carry-over for weeks, and the only way to find it was to re-open the
-         * account. Archiving says "stop counting this"; nothing else on the row
-         * was going to say it.
+         * Both halves of that have since been answered somewhere better. The
+         * carry-over is narrowed to the accounts the budget actually counts —
+         * the default one — so no finished account can reach it (see
+         * BudgetViewModel.plan). And the overview carries archived-but-counted
+         * accounts along with its filters on purpose.
          *
-         * Un-archiving deliberately does NOT put it back. The flag it would have
-         * to restore is gone — remembering it needs a column, and a schema
-         * change wipes every phone here (see MonyxDatabase). Leaving it off is
-         * the safe direction, and the toggle sits on the same row.
+         * What was left was a switch nobody touched silently moving Bilans, on
+         * a confirmation that says "nothing already recorded on it changes".
+         * Worse, it moved it the WRONG way for the accounts this household
+         * keeps: every per-trip account here is an expense bucket nobody ever
+         * funded, so its balance is negative — what the trip cost, taken from a
+         * card no transfer names. Archiving one raised the household's total by
+         * the cost of the trip and took the trip's spending out of its month.
+         *
+         * So: archiving hides, and only hides. The account stops being offered
+         * when adding, loses its chip, and its rows leave the ledger's own
+         * month list — see MonyxDao.transactions, which hides on both flags for
+         * the same reason this function now touches only one. Whether its money
+         * is part of the household's figures stays the one switch that says so,
+         * in the editor, where it can be read and changed.
+         *
+         * An account that holds real money and is finished with should be taken
+         * to zero before it is archived — a transfer to wherever the money
+         * actually went. A pot with money left in it is not finished, and an
+         * unfunded bucket's negative balance is the household's money too,
+         * spent.
          */
         internal fun applyArchive(entity: AccountEntity, archived: Boolean): AccountEntity =
             entity.copy(
                 archived = if (archived) 1 else 0,
-                excludedFromSummary = if (archived) 1 else entity.excludedFromSummary,
                 pending = 1,
                 rejected = 0,
             )

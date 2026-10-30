@@ -128,7 +128,9 @@ fun AccountsSection(
     onOpenTransactions: (accountId: String, period: String?) -> Unit,
 ) {
     var deleting by remember { mutableStateOf<AccountEntity?>(null) }
-    var archiving by remember { mutableStateOf<AccountEntity?>(null) }
+    // The whole row, not its entity: the confirmation names the balance that
+    // is about to stay in the summary, and only the row knows it.
+    var archiving by remember { mutableStateOf<AccountRow?>(null) }
 
     var archivedExpanded by remember { mutableStateOf(false) }
 
@@ -171,7 +173,7 @@ fun AccountsSection(
                     muted = false,
                     onOpenTransactions = onOpenTransactions,
                     onEdit = { onOpenEditor(AccountSeed.of(row)) },
-                    onArchive = { archiving = row.entity },
+                    onArchive = { archiving = row },
                     onRestore = null,
                     onDelete = { deleting = row.entity },
                 )
@@ -187,7 +189,7 @@ fun AccountsSection(
                     muted = true,
                     onOpenTransactions = onOpenTransactions,
                     onEdit = { onOpenEditor(AccountSeed.of(row)) },
-                    onArchive = { archiving = row.entity },
+                    onArchive = { archiving = row },
                     onRestore = null,
                     onDelete = { deleting = row.entity },
                 )
@@ -221,10 +223,29 @@ fun AccountsSection(
         }
     }
 
-    archiving?.let { entity ->
+    archiving?.let { row ->
+        val entity = row.entity
+        // What archiving does, and — when there is a balance to say it about —
+        // what it deliberately does NOT do. Archiving used to switch the
+        // account out of the summary on the quiet, which made the first
+        // sentence of this dialog false: a trip account's whole cost left the
+        // household's total the moment the trip was filed away. It no longer
+        // does, so the dialog can now say where that money stands, in the
+        // account's own currency, and name the switch that moves it.
+        val balance = if (entity.excludedFromSummary == 0 && row.balanceMinor != 0L) {
+            stringResource(
+                R.string.settings_archive_account_balance,
+                Money.formatIn(row.balanceMinor, Currency.of(entity.currency)),
+            )
+        } else {
+            null
+        }
         ConfirmDialog(
             title = stringResource(R.string.settings_archive),
-            message = stringResource(R.string.settings_archive_account_confirm, entity.name),
+            message = listOfNotNull(
+                stringResource(R.string.settings_archive_account_confirm, entity.name),
+                balance,
+            ).joinToString("\n\n"),
             confirmLabel = stringResource(R.string.settings_archive),
             onConfirm = {
                 onArchive(entity, true)

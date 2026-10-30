@@ -264,6 +264,7 @@
     <string name="settings_unarchive">Restore</string>
     <string name="settings_archived_accounts">Archived</string>
     <string name="settings_archive_account_confirm">Archive “%1$s”? It stops being offered when adding a transaction. Nothing already recorded on it changes.</string>
+    <string name="settings_archive_account_balance">Its balance of %1$s keeps counting in the summary, and so does everything it has spent. Switch off “Include in the summary” on the account if it should not.</string>
     <string name="settings_delete_account_confirm">Delete account \"%1$s\"?</string>
     <string name="settings_delete_category_confirm">Delete category \"%1$s\"?</string>
     <string name="settings_icon">Icon</string>
