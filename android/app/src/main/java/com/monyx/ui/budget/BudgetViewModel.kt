@@ -6,6 +6,7 @@ import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.monyx.data.BudgetUsage
 import com.monyx.data.CategoryEntity
+import com.monyx.data.Dates
 import com.monyx.data.MonyxRepository
 import com.monyx.data.budgetAccountIds
 import com.monyx.ui.SelectedMonth
@@ -42,6 +43,33 @@ data class PlanState(
     val hasPlan: Boolean = false,
     val assignedMinor: Long = 0,
     val spentMinor: Long = 0,
+    /**
+     * What has actually arrived this month, on the accounts this screen counts.
+     *
+     * Not a figure anything else on the card is computed from — the plan is a
+     * stored number and stays one, see ADR 0006. It is here because the card
+     * had no answer to the one question somebody asks when it disagrees with
+     * the account balance: the balance can still be comfortable while "left to
+     * spend" is red, and the whole of that gap is income the plan never
+     * assumed. A plan of 22 483,98 against 24 431,00 that came in is 1 947,02
+     * of real money the month was not planning on, and until it was on screen
+     * the two figures looked like a bug.
+     */
+    val incomeMinor: Long = 0,
+    /**
+     * How far the category limits were passed, added up, and how many were —
+     * see [overLimits]. Zero and nothing when every limit held.
+     */
+    val overLimitMinor: Long = 0,
+    val overLimitCount: Int = 0,
+    /**
+     * True once the whole month is behind us.
+     *
+     * Only the wording turns on this, but the wording matters: "left to spend"
+     * on a month that ended is an offer that cannot be taken. What a closed
+     * month has is spending that did or did not stay inside its means.
+     */
+    val closed: Boolean = false,
     /**
      * What last month left behind in the accounts it was paid from: their
      * combined balance on its last day. Negative when the month ended in the
@@ -82,6 +110,63 @@ data class PlanState(
     val leftToSpendMinor: Long? get() = if (hasPlan) availableMinor - spentMinor else null
     val hasCarryOver: Boolean get() = carryOverAccounts.isNotEmpty()
     val overAssigned: Boolean get() = (leftToAssignMinor ?: 0) < 0
+
+    /**
+     * How far past the month's money the spending went — null while it is still
+     * inside it, and null on a month with no plan to be outside of.
+     *
+     * The same figure as a negative [leftToSpendMinor], as a size. A row of this
+     * screen has said "przekroczono o 40 zł" since the first version; the card
+     * above them said "pozostało do wydania −767,74", which is the same
+     * sentence with the reader doing the sign.
+     */
+    val overspentMinor: Long? get() = leftToSpendMinor?.takeIf { it < 0 }?.let { -it }
+
+    /**
+     * What came in against what the plan assumed — null on an unplanned month.
+     *
+     * Positive is money the month was not counting on. See [incomeMinor] for
+     * why the card shows it at all.
+     */
+    val incomeVsPlanMinor: Long? get() = if (hasPlan) incomeMinor - plannedMinor else null
+
+    /**
+     * The same difference, but only where it is worth a line on the card.
+     *
+     * Money over the plan is news the day it lands. Money under it is not, until
+     * the month has ended — a plan is written for a whole month, so on the third
+     * of it every household on earth is "19 000 below plan", and a card that
+     * says so every morning cries wolf about a month going exactly as intended.
+     * Once the month is closed the same figure is a verdict, and then it belongs
+     * on screen.
+     */
+    val incomeNoteMinor: Long? get() = incomeVsPlanMinor?.takeIf { it > 0 || (it < 0 && closed) }
+
+    val hasOverLimits: Boolean get() = overLimitCount > 0
+}
+
+/** [overLimits]'s answer: how much over, across how many limits. */
+data class OverLimits(val totalMinor: Long = 0, val count: Int = 0)
+
+/**
+ * How far the month's limits were passed, added up over the rows that passed
+ * them.
+ *
+ * Counts a row only once it is actually [BudgetBand.Over] — the same test the
+ * row's own colour uses, margin and all. That makes the total slightly smaller
+ * than "spent minus limit, everywhere it is positive": four złoty over 1 650 is
+ * inside the margin and is left out. The alternative is a card announcing a
+ * category over its limit above a list where no row is red, and a figure
+ * nothing on screen explains is worse than a figure that is 4 zł polite.
+ *
+ * A limit of nothing with spending against it is over by the whole amount,
+ * which is what [overBudgetBand] already says about it.
+ */
+fun overLimits(rows: List<BudgetUsage>): OverLimits {
+    val over = rows
+        .filter { overBudgetBand(it.spentMinor, it.limitMinor) == BudgetBand.Over }
+        .map { it.spentMinor - it.limitMinor }
+    return OverLimits(totalMinor = over.sum(), count = over.size)
 }
 
 /**
@@ -193,12 +278,18 @@ class BudgetViewModel(
                 repository.monthTotals(p, accounts),
                 carryOver,
             ) { planRow, usage, totals, carried ->
+                val over = overLimits(usage)
                 PlanState(
                     period = p,
                     plannedMinor = planRow?.plannedMinor ?: 0,
                     hasPlan = planRow != null,
                     assignedMinor = usage.sumOf { it.limitMinor },
                     spentMinor = totals.expenseMinor,
+                    incomeMinor = totals.incomeMinor,
+                    overLimitMinor = over.totalMinor,
+                    overLimitCount = over.count,
+                    // Both are 'yyyy-MM', so this is the month comparison.
+                    closed = p < Dates.currentPeriod(),
                     carryOverMinor = carried.sumOf { it.balanceMinor },
                     carryOverAccounts = carried.map { it.name },
                 )

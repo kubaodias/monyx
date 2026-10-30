@@ -56,6 +56,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
@@ -359,17 +360,41 @@ private fun SortRow(sort: BudgetSort, onSelect: (BudgetSort) -> Unit) {
 }
 
 /**
- * The month on one card: what there is, what has been handed out, what is left
- * to hand out — and, underneath, how much of it has actually gone.
+ * The month on one card: how much there is still to spend, and what that figure
+ * is made of.
  *
- * "Left to assign" is the headline because it is the number that tells you
- * whether the plan is finished. Zero is the goal, not a warning.
+ * "Left to assign" used to be the headline, for the reason ADR 0006 gives: it is
+ * the figure that says whether the PLAN is finished, and zero is its goal. What
+ * it does not say is anything about the month. A household reading this card in
+ * the fourth week has finished planning and is asking one question — is there
+ * money — and the answer to that was the fifth of five small lines, in the same
+ * weight as "assigned to categories", under a headline reading 0,00 in the
+ * colour of success.
+ *
+ * So the state leads and the plan follows. What is left to spend is the
+ * headline, the bar under it is the month's spending rather than its
+ * assignments, and the two planning figures keep their exact values in one
+ * small line at the foot of the card. Nothing was dropped; the order says which
+ * question the screen is for.
+ *
+ * Two things the headline does rather than print a negative: it says "over by"
+ * the way every row of the list below it has always said it, and on a month
+ * that has ended it says "unspent" instead of offering money back out of a
+ * month nobody can spend in any more.
  */
 @Composable
 private fun PlanCard(plan: PlanState, onEditPlan: () -> Unit) {
-    val leftColor = when {
-        plan.overAssigned -> MaterialTheme.colorScheme.error
-        plan.hasPlan && plan.leftToAssignMinor == 0L -> MaterialTheme.colorScheme.primary
+    val overspent = plan.overspentMinor
+    val headlineLabel = when {
+        overspent != null -> stringResource(R.string.budget_plan_overspent)
+        plan.hasPlan && plan.closed -> stringResource(R.string.budget_plan_unspent)
+        else -> stringResource(R.string.budget_plan_left_to_spend)
+    }
+    val headlineColor = when {
+        overspent != null -> MaterialTheme.colorScheme.error
+        // A month that ended inside its means is this screen's good outcome,
+        // and it gets the colour "left to assign" used to take for zero.
+        plan.hasPlan && plan.closed -> MaterialTheme.colorScheme.primary
         else -> MaterialTheme.colorScheme.onSurface
     }
 
@@ -385,16 +410,22 @@ private fun PlanCard(plan: PlanState, onEditPlan: () -> Unit) {
             ) {
                 Column {
                     Text(
-                        text = stringResource(R.string.budget_plan_to_assign),
+                        text = headlineLabel,
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     Text(
-                        // An em dash, not a figure, while the month is unplanned.
-                        text = plan.leftToAssignMinor?.let { Money.formatWithCurrency(it) } ?: "—",
+                        // An em dash, not a figure, while the month is
+                        // unplanned. The size, not the sign: the word above
+                        // says which way it points.
+                        text = when {
+                            !plan.hasPlan -> "—"
+                            overspent != null -> Money.formatWithCurrency(overspent)
+                            else -> Money.formatWithCurrency(plan.leftToSpendMinor ?: 0)
+                        },
                         style = MaterialTheme.typography.headlineMedium,
                         fontWeight = FontWeight.SemiBold,
-                        color = leftColor,
+                        color = headlineColor,
                     )
                 }
                 IconButton(onClick = onEditPlan) {
@@ -416,26 +447,28 @@ private fun PlanCard(plan: PlanState, onEditPlan: () -> Unit) {
             }
 
             Spacer(Modifier.height(12.dp))
-            // How much of the month's money has been handed out to categories.
-            // Against what is available, not against the plan — a bar reading
-            // 82% under a headline reading -541,58 is the bar contradicting the
-            // figure it sits beneath. Capped at 1f: over-assigning is shown by
-            // the red headline, not by a bar drawing past its own end.
+            // How much of the month's money has gone — the bar belongs to the
+            // headline above it, so it measures spending now that the headline
+            // does. Against what is available, not against the plan: a bar
+            // reading 82% under a headline reading -767,74 is the bar
+            // contradicting the figure it sits beneath. Capped at 1f, because
+            // going over is said in red by the words, not by a bar drawing past
+            // its own end.
             //
             // A hole bigger than the plan leaves nothing to divide by, and then
-            // a full bar is the honest answer rather than an empty one: every
-            // złoty is claimed already. Nothing here may look calmer than the
+            // a full bar is the honest answer rather than an empty one: the
+            // month's money is gone. Nothing here may look calmer than the
             // state before it.
-            val assignedFraction = when {
+            val spentFraction = when {
                 plan.availableMinor > 0 ->
-                    (plan.assignedMinor.toFloat() / plan.availableMinor.toFloat()).coerceIn(0f, 1f)
-                plan.assignedMinor > 0 -> 1f
+                    (plan.spentMinor.toFloat() / plan.availableMinor.toFloat()).coerceIn(0f, 1f)
+                plan.spentMinor > 0 -> 1f
                 else -> 0f
             }
             LinearProgressIndicator(
-                progress = { assignedFraction },
+                progress = { spentFraction },
                 modifier = Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(4.dp)),
-                color = if (plan.overAssigned) {
+                color = if (overspent != null) {
                     MaterialTheme.colorScheme.error
                 } else {
                     MaterialTheme.colorScheme.primary
@@ -444,12 +477,25 @@ private fun PlanCard(plan: PlanState, onEditPlan: () -> Unit) {
 
             Spacer(Modifier.height(12.dp))
             PlanFigure(
-                label = stringResource(R.string.budget_plan_total),
+                label = stringResource(R.string.budget_plan_the_plan),
                 value = Money.formatWithCurrency(plan.plannedMinor),
             )
+            // What actually arrived, and how that compares with what the plan
+            // assumed. This is the line that reconciles the card with the
+            // account: a wallet holding 1 179,28 above a card saying 767,74 too
+            // much has gone is not a contradiction, it is 1 947,02 of income
+            // the plan never counted on, and that sentence was nowhere on the
+            // screen.
             PlanFigure(
-                label = stringResource(R.string.budget_plan_assigned),
-                value = Money.formatWithCurrency(plan.assignedMinor),
+                label = stringResource(R.string.budget_plan_income),
+                value = Money.formatWithCurrency(plan.incomeMinor),
+                hint = plan.incomeNoteMinor?.let { difference ->
+                    if (difference > 0) {
+                        stringResource(R.string.budget_plan_income_over, Money.format(difference))
+                    } else {
+                        stringResource(R.string.budget_plan_income_under, Money.format(-difference))
+                    }
+                },
             )
             if (plan.hasCarryOver) {
                 PlanFigure(
@@ -462,23 +508,63 @@ private fun PlanCard(plan: PlanState, onEditPlan: () -> Unit) {
             PlanFigure(
                 label = stringResource(R.string.budget_plan_spent),
                 value = Money.formatWithCurrency(plan.spentMinor),
-            )
-            val leftToSpend = plan.leftToSpendMinor ?: 0
-            PlanFigure(
-                label = stringResource(R.string.budget_plan_left_to_spend),
-                value = Money.formatWithCurrency(leftToSpend),
                 emphasis = true,
-                valueColor = if (leftToSpend < 0) MaterialTheme.colorScheme.error else null,
+            )
+            // By how much the limits themselves were passed, which is a
+            // different question from whether the month as a whole held: a month
+            // can come out level with three categories well over and three well
+            // under, and looking back at one is exactly when that is worth
+            // knowing. Only shown when something is over, so the card does not
+            // carry a line of zeroes all month.
+            if (plan.hasOverLimits) {
+                PlanFigure(
+                    label = stringResource(R.string.budget_plan_over_limits),
+                    value = Money.formatWithCurrency(plan.overLimitMinor),
+                    hint = pluralStringResource(
+                        R.plurals.budget_plan_over_limits_count,
+                        plan.overLimitCount,
+                        plan.overLimitCount,
+                    ),
+                    valueColor = MaterialTheme.colorScheme.error,
+                )
+            }
+
+            Spacer(Modifier.height(10.dp))
+            // The planning pair, exact as it always was and no longer first.
+            // Still red when more has been handed out than exists — that is a
+            // mistake in the plan itself, and demoting the figure must not
+            // silence it.
+            Text(
+                text = stringResource(
+                    R.string.budget_plan_assigned_hint,
+                    Money.formatWithCurrency(plan.assignedMinor),
+                    Money.formatWithCurrency(plan.leftToAssignMinor ?: 0),
+                ),
+                style = MaterialTheme.typography.bodySmall,
+                color = if (plan.overAssigned) {
+                    MaterialTheme.colorScheme.error
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                },
             )
         }
     }
 }
 
+/**
+ * One figure of the card, with an optional second line under it.
+ *
+ * The [hint] carries what the figure means rather than another figure — "1
+ * 947,02 over the plan", "in three categories". It hangs under the amount and
+ * right-aligned with it, so the column of amounts stays a column and the
+ * explanation does not push the label into an ellipsis.
+ */
 @Composable
 private fun PlanFigure(
     label: String,
     value: String,
     emphasis: Boolean = false,
+    hint: String? = null,
     valueColor: androidx.compose.ui.graphics.Color? = null,
 ) {
     Row(
@@ -495,13 +581,22 @@ private fun PlanFigure(
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.weight(1f, fill = false).padding(end = 12.dp),
         )
-        Text(
-            text = value,
-            softWrap = false,
-            style = MaterialTheme.typography.bodyMedium.copy(fontFeatureSettings = "tnum"),
-            fontWeight = if (emphasis) FontWeight.SemiBold else FontWeight.Normal,
-            color = valueColor ?: MaterialTheme.colorScheme.onSurface,
-        )
+        Column(horizontalAlignment = Alignment.End) {
+            Text(
+                text = value,
+                softWrap = false,
+                style = MaterialTheme.typography.bodyMedium.copy(fontFeatureSettings = "tnum"),
+                fontWeight = if (emphasis) FontWeight.SemiBold else FontWeight.Normal,
+                color = valueColor ?: MaterialTheme.colorScheme.onSurface,
+            )
+            if (hint != null) {
+                Text(
+                    text = hint,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
     }
 }
 

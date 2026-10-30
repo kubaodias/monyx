@@ -88,8 +88,17 @@ cannot answer says what is still missing instead — see
   actually in. An archived account's rows are not
   in here at all: the way to ask about a finished account is its row in Settings,
   which opens this screen pinned to it.
-- **Budget** — what there is to spend this month, limits on main categories, and
-  a warning before a limit is passed rather than after. A limit applies to the
+- **Budget** — what is left to spend this month, limits on main categories, and
+  a warning before a limit is passed rather than after. The card leads with the
+  state, not the paperwork: how much is still there, or by how much the month
+  went over, with the bar underneath measuring spending against the month's
+  money. Under it, what the plan was, what actually came in — and by how much
+  that beat the plan, which is the line that explains how an account can still
+  hold money while the month reads red — what last month left behind, what has
+  gone, and how far the limits themselves were passed. A month that has ended
+  says "unspent" rather than offering money back. The two planning figures
+  (handed out, left to hand out) keep their exact values on one line at the
+  foot of the card. A limit applies to the
   month you set it in and carries forward from there; changing it later changes
   that month alone, unless you tick the box that carries the new figure on. A limit of zero is a limit: it means nothing may go here, which is not
   the same as having set none. The list is in the household's own category order

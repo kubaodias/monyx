@@ -77,3 +77,49 @@ copy, because that is the one every other phone is looking at. The orphaned loca
 rows are left alone rather than deleted: they are harmless once the read is
 correct, and a migration that guesses which of two rows to destroy is a worse
 risk than a stale row nothing reads.
+
+## Which of the two figures leads (2026-10-30)
+
+Above says "two figures on the card, deliberately not one", and left "left to
+assign" as the headline because zero is the goal of planning. That was the right
+pair and the wrong order.
+
+Planning a month happens once, in an hour, at its start. Reading the card
+happens every day of the rest of it, and the question then is never whether the
+plan is finished — it is whether there is money. That answer was the fifth of
+five small lines, in the same weight as "assigned to categories", under a
+headline showing 0,00 in the colour of success. A household asked the obvious
+question out loud: Portfel says 1 179,28 is left, the budget says −767,74, how
+do those two relate.
+
+So **left to spend is the headline**, printed as a size with the word above it
+carrying the direction — "przekroczono o 767,74", which is how every category
+row in the list below has always said it. The bar under it moved from
+assignment to spending, because a bar belongs to the figure it sits beneath. The
+planning pair keeps both exact values on one small line at the foot of the card,
+still red when more has been handed out than exists. Nothing was dropped and no
+arithmetic changed; the order now says which question the screen is for.
+
+Two additions came out of the same question.
+
+**What actually came in, against what the plan assumed.** This is the line that
+reconciles the card with the account, and the household's own numbers are the
+case for it: a plan of 22 483,98, income of 24 431,00, spending of 18 122,74 on
+a Portfel that closed September 5 128,98 in the red. "Left to spend" is −767,74
+while the wallet still holds 1 179,28, and the entire difference — 1 947,02 — is
+income the plan never assumed. Both figures were right and the screen said
+nothing that made them agree. Income still does not *derive* anything here; the
+decision above stands, and it earns its place by being the thing a stored plan
+can be wrong about.
+
+Money **over** the plan is shown the day it lands. Money **under** it only once
+the month has closed: a plan is written for a whole month, so on the third of it
+every household is nineteen thousand "below plan", and a card that says so every
+morning cries wolf about a month going exactly as intended.
+
+**How far the limits were passed, added up.** A different question from whether
+the month held — a month can come out level with three categories well over and
+three well under — and the one that matters when looking back. It counts a row
+only once the row itself is red, margin and all (see `overBudgetBand`), because
+a card announcing a category over its limit above a list where nothing is red is
+a figure nothing on screen explains.
