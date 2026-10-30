@@ -2,6 +2,7 @@ package com.monyx
 
 import androidx.compose.ui.graphics.Color
 import com.monyx.data.AccountEntity
+import com.monyx.data.BudgetUsage
 import com.monyx.data.MonyxRepository
 import com.monyx.sync.Rejection
 import com.monyx.sync.SyncEngine
@@ -11,7 +12,9 @@ import com.monyx.ui.add.AddViewModel
 import com.monyx.ui.add.EntryKind
 import com.monyx.ui.add.categoryMarkOf
 import com.monyx.ui.add.familyHasChildren
+import com.monyx.ui.budget.OverLimits
 import com.monyx.ui.budget.PlanState
+import com.monyx.ui.budget.overLimits
 import com.monyx.ui.overview.OverviewViewModel
 import com.monyx.ui.overview.PieSlice
 import com.monyx.ui.overview.sliceIdAt
@@ -415,6 +418,128 @@ class InteractionTest {
             .copy(carryOverMinor = -1_111_86, carryOverAccounts = listOf("Portfel"))
         val assignedVsSpent = state.spentMinor - state.assignedMinor
         assertEquals(assignedVsSpent, state.leftToAssignMinor!! - state.leftToSpendMinor!!)
+    }
+
+    @Test
+    fun `the headline says how far over, not how negative`() {
+        // The card leads with this figure now, and it is printed as a size with
+        // the word above it carrying the direction — the way every category row
+        // in the list below has always put it.
+        val over = plan(planned = 600_00, assigned = 0, spent = 625_00)
+        assertEquals(-25_00L, over.leftToSpendMinor)
+        assertEquals(25_00L, over.overspentMinor)
+    }
+
+    @Test
+    fun `a month still inside its means has no overspend to report`() {
+        assertNull(plan(planned = 600_00, assigned = 0, spent = 400_00).overspentMinor)
+        // Level to the grosz is inside it: nothing has been passed.
+        assertNull(plan(planned = 600_00, assigned = 0, spent = 600_00).overspentMinor)
+    }
+
+    @Test
+    fun `an unplanned month is not overspent, however much has gone`() {
+        // Same rule as the two figures above: with no plan there is nothing to
+        // be over, and the card shows an em dash rather than an alarm.
+        assertNull(PlanState("2026-08", hasPlan = false, spentMinor = 520_300).overspentMinor)
+    }
+
+    @Test
+    fun `income against the plan is what reconciles the card with the account`() {
+        // October 2026, both figures off the phone: the plan was 22 483,98,
+        // 24 431,00 came in, 18 122,74 went out, and Portfel closed September
+        // 5 128,98 in the red. "Left to spend" is -767,74 while the account
+        // itself still holds 1 179,28 — which reads as a contradiction until
+        // the card says that 1 947,02 of what arrived was never in the plan.
+        val october = plan(planned = 22_483_98, assigned = 0, spent = 18_122_74)
+            .copy(
+                incomeMinor = 24_431_00,
+                carryOverMinor = -5_128_98,
+                carryOverAccounts = listOf("Portfel"),
+            )
+        assertEquals(-767_74L, october.leftToSpendMinor)
+        assertEquals(1_947_02L, october.incomeVsPlanMinor)
+        val inTheAccountToday = october.carryOverMinor + october.incomeMinor - october.spentMinor
+        assertEquals(1_179_28L, inTheAccountToday)
+        // The whole of the gap, and nothing else in it.
+        assertEquals(october.incomeVsPlanMinor, inTheAccountToday - october.leftToSpendMinor!!)
+    }
+
+    @Test
+    fun `a month short of its plan says so in the other direction, once it is over`() {
+        val lean = plan(planned = 20_000_00, assigned = 0, spent = 5_000_00).copy(incomeMinor = 18_500_00)
+        assertEquals(-1_500_00L, lean.incomeVsPlanMinor)
+        // Not while it is still running: on the third of the month every
+        // household is thousands "below plan", and saying so daily is noise.
+        assertNull(lean.incomeNoteMinor)
+        assertEquals(-1_500_00L, lean.copy(closed = true).incomeNoteMinor)
+    }
+
+    @Test
+    fun `money over the plan is worth saying the day it lands`() {
+        val over = plan(planned = 20_000_00, assigned = 0).copy(incomeMinor = 21_000_00)
+        assertEquals(1_000_00L, over.incomeNoteMinor)
+    }
+
+    @Test
+    fun `income exactly on plan is not a note`() {
+        assertNull(plan(planned = 20_000_00, assigned = 0).copy(incomeMinor = 20_000_00, closed = true).incomeNoteMinor)
+    }
+
+    @Test
+    fun `an unplanned month has nothing to compare what arrived with`() {
+        assertNull(PlanState("2026-08", hasPlan = false, incomeMinor = 2_000_00).incomeVsPlanMinor)
+    }
+
+    // ------------------------------------------- how far the limits were passed
+
+    private fun usage(id: String, limitMinor: Long, spentMinor: Long) = BudgetUsage(
+        categoryId = id,
+        name = id,
+        color = null,
+        icon = null,
+        parentId = null,
+        parentColor = null,
+        limitMinor = limitMinor,
+        spentMinor = spentMinor,
+    )
+
+    @Test
+    fun `over the limits adds up the limits that were passed, and counts them`() {
+        // The question a month you are looking back at has to answer: a month
+        // can come out level overall with half its categories well over.
+        val rows = listOf(
+            usage("food", limitMinor = 200_000, spentMinor = 230_000),  // 300 over
+            usage("rent", limitMinor = 2_000_000, spentMinor = 1_000_000),
+            usage("fun", limitMinor = 20_000, spentMinor = 45_000),     // 250 over
+        )
+        assertEquals(OverLimits(totalMinor = 55_000, count = 2), overLimits(rows))
+    }
+
+    @Test
+    fun `a limit passed by a rounding error is not announced`() {
+        // Four złoty over 1 650 leaves the row orange rather than red — see
+        // overBudgetBand — and a card announcing a category over its limit
+        // above a list where nothing is red is a figure nothing explains.
+        assertEquals(OverLimits(), overLimits(listOf(usage("food", limitMinor = 165_000, spentMinor = 165_400))))
+    }
+
+    @Test
+    fun `spending against a limit of nothing is over by the whole amount`() {
+        assertEquals(
+            OverLimits(totalMinor = 5_000, count = 1),
+            overLimits(listOf(usage("gifts", limitMinor = 0, spentMinor = 5_000))),
+        )
+    }
+
+    @Test
+    fun `a month where every limit held reports nothing at all`() {
+        val rows = listOf(
+            usage("food", limitMinor = 200_000, spentMinor = 199_999),
+            usage("gifts", limitMinor = 0, spentMinor = 0),
+        )
+        assertEquals(OverLimits(), overLimits(rows))
+        assertEquals(false, PlanState("2026-08").hasOverLimits)
     }
 
     @Test
