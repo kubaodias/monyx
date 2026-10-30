@@ -56,7 +56,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
@@ -371,11 +370,12 @@ private fun SortRow(sort: BudgetSort, onSelect: (BudgetSort) -> Unit) {
  * weight as "assigned to categories", under a headline reading 0,00 in the
  * colour of success.
  *
- * So the state leads and the plan follows. What is left to spend is the
- * headline, the bar under it is the month's spending rather than its
- * assignments, and the two planning figures keep their exact values in one
- * small line at the foot of the card. Nothing was dropped; the order says which
- * question the screen is for.
+ * So the state leads and the plan follows — side by side, and in that order:
+ * what is left to SPEND on the left, what is left to PLAN on the right. Two
+ * headlines rather than one and a footnote, because they are the two questions
+ * this card exists to answer and neither is a detail of the other; the lines
+ * underneath are then only the arithmetic behind them. The bar belongs to the
+ * left figure, which is why it measures spending.
  *
  * Two things the headline does rather than print a negative: it says "over by"
  * the way every row of the list below it has always said it, and on a month
@@ -405,29 +405,35 @@ private fun PlanCard(plan: PlanState, onEditPlan: () -> Unit) {
         Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Column {
-                    Text(
-                        text = headlineLabel,
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    Text(
-                        // An em dash, not a figure, while the month is
-                        // unplanned. The size, not the sign: the word above
-                        // says which way it points.
-                        text = when {
-                            !plan.hasPlan -> "—"
-                            overspent != null -> Money.formatWithCurrency(overspent)
-                            else -> Money.formatWithCurrency(plan.leftToSpendMinor ?: 0)
-                        },
-                        style = MaterialTheme.typography.headlineMedium,
-                        fontWeight = FontWeight.SemiBold,
-                        color = headlineColor,
-                    )
-                }
+                HeadlineFigure(
+                    label = headlineLabel,
+                    // An em dash, not a figure, while the month is unplanned.
+                    // The size, not the sign: the word above says which way it
+                    // points.
+                    value = when {
+                        !plan.hasPlan -> "—"
+                        overspent != null -> Money.formatWithCurrency(overspent)
+                        else -> Money.formatWithCurrency(plan.leftToSpendMinor ?: 0)
+                    },
+                    color = headlineColor,
+                    modifier = Modifier.weight(1f),
+                )
+                // The plan on paper, beside the month as it is going. Zero here
+                // is the goal and is drawn as success, which is the rule this
+                // figure has carried since ADR 0006 — it is the figure's own
+                // meaning and does not change by moving.
+                HeadlineFigure(
+                    label = stringResource(R.string.budget_plan_to_assign),
+                    value = plan.leftToAssignMinor?.let { Money.formatWithCurrency(it) } ?: "—",
+                    color = when {
+                        plan.overAssigned -> MaterialTheme.colorScheme.error
+                        plan.hasPlan && plan.leftToAssignMinor == 0L -> MaterialTheme.colorScheme.primary
+                        else -> MaterialTheme.colorScheme.onSurface
+                    },
+                    modifier = Modifier.weight(1f),
+                )
                 IconButton(onClick = onEditPlan) {
                     Icon(
                         Icons.Filled.Edit,
@@ -448,8 +454,8 @@ private fun PlanCard(plan: PlanState, onEditPlan: () -> Unit) {
 
             Spacer(Modifier.height(12.dp))
             // How much of the month's money has gone — the bar belongs to the
-            // headline above it, so it measures spending now that the headline
-            // does. Against what is available, not against the plan: a bar
+            // figure on the left above it, so it measures spending rather than
+            // assignment. Against what is available, not against the plan: a bar
             // reading 82% under a headline reading -767,74 is the bar
             // contradicting the figure it sits beneath. Capped at 1f, because
             // going over is said in red by the words, not by a bar drawing past
@@ -510,44 +516,40 @@ private fun PlanCard(plan: PlanState, onEditPlan: () -> Unit) {
                 value = Money.formatWithCurrency(plan.spentMinor),
                 emphasis = true,
             )
-            // By how much the limits themselves were passed, which is a
-            // different question from whether the month as a whole held: a month
-            // can come out level with three categories well over and three well
-            // under, and looking back at one is exactly when that is worth
-            // knowing. Only shown when something is over, so the card does not
-            // carry a line of zeroes all month.
-            if (plan.hasOverLimits) {
-                PlanFigure(
-                    label = stringResource(R.string.budget_plan_over_limits),
-                    value = Money.formatWithCurrency(plan.overLimitMinor),
-                    hint = pluralStringResource(
-                        R.plurals.budget_plan_over_limits_count,
-                        plan.overLimitCount,
-                        plan.overLimitCount,
-                    ),
-                    valueColor = MaterialTheme.colorScheme.error,
-                )
-            }
-
-            Spacer(Modifier.height(10.dp))
-            // The planning pair, exact as it always was and no longer first.
-            // Still red when more has been handed out than exists — that is a
-            // mistake in the plan itself, and demoting the figure must not
-            // silence it.
-            Text(
-                text = stringResource(
-                    R.string.budget_plan_assigned_hint,
-                    Money.formatWithCurrency(plan.assignedMinor),
-                    Money.formatWithCurrency(plan.leftToAssignMinor ?: 0),
-                ),
-                style = MaterialTheme.typography.bodySmall,
-                color = if (plan.overAssigned) {
-                    MaterialTheme.colorScheme.error
-                } else {
-                    MaterialTheme.colorScheme.onSurfaceVariant
-                },
-            )
         }
+    }
+}
+
+/**
+ * One of the card's two leading figures.
+ *
+ * Both at the same size and weight, because neither is the subtitle of the
+ * other, and `softWrap = false` on the figure: two amounts and a pencil across a
+ * phone is tight, and a figure that wraps mid-number is worse than one that is
+ * clipped — the lines below carry the same arithmetic either way.
+ */
+@Composable
+private fun HeadlineFigure(
+    label: String,
+    value: String,
+    color: androidx.compose.ui.graphics.Color,
+    modifier: Modifier = Modifier,
+) {
+    Column(modifier = modifier.padding(end = 8.dp)) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        Text(
+            text = value,
+            softWrap = false,
+            style = MaterialTheme.typography.headlineSmall.copy(fontFeatureSettings = "tnum"),
+            fontWeight = FontWeight.SemiBold,
+            color = color,
+        )
     }
 }
 

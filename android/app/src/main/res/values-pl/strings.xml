@@ -106,6 +106,7 @@
     <string name="transactions_delete_confirm_message">Tej operacji nie można cofnąć.</string>
 
     <!-- Budget -->
+    <string name="budget_plan_to_assign">Do zaplanowania</string>
     <string name="budget_plan_edit">Plan na ten miesiąc</string>
     <string name="budget_plan_remove">Usuń plan</string>
     <string name="budget_plan_none">Brak planu. Ustal, ile masz do wydania w tym miesiącu.</string>
@@ -119,13 +120,6 @@
     <string name="budget_plan_income">Wpłynęło</string>
     <string name="budget_plan_income_over">%1$s ponad plan</string>
     <string name="budget_plan_income_under">%1$s poniżej planu</string>
-    <string name="budget_plan_over_limits">Ponad limity</string>
-    <plurals name="budget_plan_over_limits_count">
-        <item quantity="one">w %1$d kategorii</item>
-        <item quantity="few">w %1$d kategoriach</item>
-        <item quantity="many">w %1$d kategoriach</item>
-        <item quantity="other">w %1$d kategorii</item>
-    </plurals>
     <string name="budget_plan_assigned_hint">Już przypisane: %1$s · do zaplanowania: %2$s</string>
     <string name="budget_empty">Nie ustawiono jeszcze żadnych limitów</string>
     <string name="budget_set_limit">Ustaw limit</string>

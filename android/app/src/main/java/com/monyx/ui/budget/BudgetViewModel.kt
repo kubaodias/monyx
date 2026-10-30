@@ -57,12 +57,6 @@ data class PlanState(
      */
     val incomeMinor: Long = 0,
     /**
-     * How far the category limits were passed, added up, and how many were —
-     * see [overLimits]. Zero and nothing when every limit held.
-     */
-    val overLimitMinor: Long = 0,
-    val overLimitCount: Int = 0,
-    /**
      * True once the whole month is behind us.
      *
      * Only the wording turns on this, but the wording matters: "left to spend"
@@ -141,33 +135,13 @@ data class PlanState(
      * on screen.
      */
     val incomeNoteMinor: Long? get() = incomeVsPlanMinor?.takeIf { it > 0 || (it < 0 && closed) }
-
-    val hasOverLimits: Boolean get() = overLimitCount > 0
 }
 
-/** [overLimits]'s answer: how much over, across how many limits. */
-data class OverLimits(val totalMinor: Long = 0, val count: Int = 0)
-
-/**
- * How far the month's limits were passed, added up over the rows that passed
- * them.
- *
- * Counts a row only once it is actually [BudgetBand.Over] — the same test the
- * row's own colour uses, margin and all. That makes the total slightly smaller
- * than "spent minus limit, everywhere it is positive": four złoty over 1 650 is
- * inside the margin and is left out. The alternative is a card announcing a
- * category over its limit above a list where no row is red, and a figure
- * nothing on screen explains is worse than a figure that is 4 zł polite.
- *
- * A limit of nothing with spending against it is over by the whole amount,
- * which is what [overBudgetBand] already says about it.
- */
-fun overLimits(rows: List<BudgetUsage>): OverLimits {
-    val over = rows
-        .filter { overBudgetBand(it.spentMinor, it.limitMinor) == BudgetBand.Over }
-        .map { it.spentMinor - it.limitMinor }
-    return OverLimits(totalMinor = over.sum(), count = over.size)
-}
+// How far the limits themselves were passed, added up, was a line on this card
+// in 0.29.0 and is gone in 0.29.1. The owner's reason is the right one: some
+// categories run over and others run under, the two roughly cancel, and the
+// card was carrying more lines than it had questions. Each row still says it
+// for itself. In git if it is ever wanted back.
 
 /**
  * How a limit is doing, for the colour the row is drawn in.
@@ -278,7 +252,6 @@ class BudgetViewModel(
                 repository.monthTotals(p, accounts),
                 carryOver,
             ) { planRow, usage, totals, carried ->
-                val over = overLimits(usage)
                 PlanState(
                     period = p,
                     plannedMinor = planRow?.plannedMinor ?: 0,
@@ -286,8 +259,6 @@ class BudgetViewModel(
                     assignedMinor = usage.sumOf { it.limitMinor },
                     spentMinor = totals.expenseMinor,
                     incomeMinor = totals.incomeMinor,
-                    overLimitMinor = over.totalMinor,
-                    overLimitCount = over.count,
                     // Both are 'yyyy-MM', so this is the month comparison.
                     closed = p < Dates.currentPeriod(),
                     carryOverMinor = carried.sumOf { it.balanceMinor },
