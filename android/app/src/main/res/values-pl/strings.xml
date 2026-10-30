@@ -261,6 +261,7 @@
     <string name="settings_unarchive">Przywróć</string>
     <string name="settings_archived_accounts">Archiwum</string>
     <string name="settings_archive_account_confirm">Zarchiwizować „%1$s”? Konto przestanie być proponowane przy dodawaniu transakcji. Zapisane już operacje pozostają bez zmian.</string>
+    <string name="settings_archive_account_balance">Saldo %1$s dalej wchodzi do Bilansu, a jego wydatki do sum miesiąca. Jeśli ma nie wchodzić, wyłącz w tym koncie „Uwzględniaj w podsumowaniu”.</string>
     <string name="settings_delete_account_confirm">Usunąć konto \"%1$s\"?</string>
     <string name="settings_delete_category_confirm">Usunąć kategorię \"%1$s\"?</string>
     <string name="settings_icon">Ikona</string>

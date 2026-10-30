@@ -89,9 +89,11 @@ cannot answer says what is still missing instead — see
   month goes with it from any of the three screens that share the switcher, so
   stepping back to September and reaching for Dodaj dates the row in September
   rather than today. Saving lands on the ledger for the month the row is
-  actually in. An archived account's rows are not
-  in here at all: the way to ask about a finished account is its row in Settings,
-  which opens this screen pinned to it.
+  actually in. The rows of an account that has been put away — archived *and*
+  held outside the summary — are not in here at all: the way to ask about one is
+  its row in Settings, which opens this screen pinned to it. An archived account
+  that still counts keeps its rows in the list, because the month's figure counts
+  them.
 - **Budget** — what is left to spend this month, limits on main categories, and
   a warning before a limit is passed rather than after. The card leads with the
   state, not the paperwork: how much is still there, or by how much the month
@@ -120,9 +122,17 @@ cannot answer says what is still missing instead — see
   cannot go without a line of prose saying it. An added currency is on the list
   because somebody typed it, so switching it off removes it; the nine stay
   whether they are on or off. A code with no NBP rate keeps its own figures and
-  stays out of the złoty totals, which the dialog says before it is added. Archiving an account takes it out of the summary as well: a finished
-  account left counting is a balance inside every total with no chip anywhere to
-  switch it off. The toggle stays on the row if it should go back in.
+  stays out of the złoty totals, which the dialog says before it is added.
+  Archiving an account only puts it away — out of the pickers, off the Overview's
+  strip, out of the ledger's month list — and says nothing about the money:
+  whether an account's balance and spending count is the one switch that says so,
+  *Uwzględniaj w podsumowaniu*, and archiving no longer touches it. A trip
+  account nobody funded carries what the trip cost as a negative balance, so
+  taking it out of the summary used to RAISE the household's total by the cost of
+  the trip and drop that spending out of its month. An account that really holds
+  money and is finished with is best taken to zero first — a transfer to wherever
+  the money went — because a pot with money left in it is not finished. See
+  [ADR 0023](docs/decisions/0023-archiving-hides-an-account-it-does-not-stop-counting-it.md).
 
 One month switcher, pinned above the scroll so it never leaves the screen, the
 same control in the same place on Summary, History and Budget: three views of one month, not three months. The arrows step to a
