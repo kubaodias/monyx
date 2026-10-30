@@ -91,25 +91,26 @@ import java.time.LocalDate
 /**
  * Which input the bottom of the screen is currently giving to.
  *
- * Only one of the two can be useful at a time, and neither is useful all of the
- * time. The keypad is 188dp of screen that means nothing once the amount is
- * typed, and it used to sit there through the category tap and under the note's
- * own keyboard — so the grid was scrolling four rows at a time in a window it
- * did not need to be sharing.
+ * Two states, and one of them is always on: the keys are up unless the note is
+ * being typed, whatever has already been filled in. There used to be a third —
+ * neither, the grid with the screen to itself — reached by tapping a category
+ * once an amount had been typed, and it made the screen behave in two different
+ * ways depending on the order the same two taps arrived in. Picking the category
+ * first kept the keys and gave the family a window of its own; typing the amount
+ * first took the keys away and left the whole grid up with every other root
+ * dimmed. The owner's verdict on the pair: the second one is the better screen,
+ * so make it the only one.
  *
- * The note FIELD is always on screen now; this is only about which keyboard is
- * up. Starting with the note is allowed — tapping it takes the keys down — and
- * so is starting with a category.
+ * The note FIELD is always on screen either way; this is only about which
+ * keyboard is up. Starting with the note is allowed — tapping it takes the keys
+ * down — and so is starting with a category.
  */
 private enum class Editing {
-    /** Typing the amount. */
+    /** Typing the amount; the keypad is up. */
     Amount,
 
     /** Typing the note; the system keyboard is up and the keypad is not. */
     Note,
-
-    /** Neither — the category grid has the screen to itself. */
-    Nothing,
 }
 @Composable
 fun AddScreen(
@@ -348,19 +349,18 @@ fun AddScreen(
             colorOf = colorOf,
             onSelect = {
                 viewModel.selectCategory(it)
-                // The keypad only stands down once it has done its job. With an
-                // amount already typed, the grid is what the screen is for and
-                // the keys are 236dp in its way. With no amount, picking the
-                // category first is somebody working in the other order — and
-                // taking the keys away at exactly the moment they are needed
-                // next would be the opposite of helping.
-                if (state.amountMinor > 0) {
-                    focusManager.clearFocus(force = true)
-                    keyboard?.hide()
-                    editing = Editing.Nothing
-                } else {
-                    editAmount()
-                }
+                // One answer whatever order the taps came in: the family rises
+                // to the amount line, its children take a window of their own
+                // under it, and the keys stay up. They used to stand down here
+                // if an amount had already been typed — the grid is what the
+                // screen is for, and 236dp of keys is in its way — but that
+                // made one screen into two, and the one it produced was the
+                // worse of them: every other root still listed and greyed, the
+                // subcategories somewhere below them, nothing to type an
+                // amount on. An amount is also the figure most likely to be
+                // corrected, and this way the keys for it are never more than
+                // where they already were.
+                editAmount()
             },
             // Last, below the subcategories, and always there: amount, note and
             // category can be filled in in any order. It lives INSIDE the grid
@@ -379,11 +379,12 @@ fun AddScreen(
                     onFocusChanged = { focused -> if (focused) editing = Editing.Note },
                 )
             },
-            // Anything at the bottom of the screen — the keys, or the note's
-            // own keyboard — leaves the grid too short to show a family below
-            // the roots, so the family takes a window of its own. See
-            // [CategoryGrid.pinFamily].
-            pinFamily = editing != Editing.Nothing,
+            // Always, on this screen. Something is always at the bottom of
+            // it — the keys, or the note's own keyboard — which leaves the grid
+            // too short to show a family below the roots, so the family takes a
+            // window of its own. See [CategoryGrid.pinFamily], which still asks,
+            // because the edit sheet has a transfer with no grid at all.
+            pinFamily = true,
             footerHeight = NoteFieldHeight,
             state = gridState,
             modifier = Modifier.weight(1f),
