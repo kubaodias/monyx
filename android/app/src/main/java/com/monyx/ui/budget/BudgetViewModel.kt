@@ -28,14 +28,15 @@ import java.time.YearMonth
  * not the ViewModel's (no Context is held here on purpose).
  */
 /**
- * The month's plan, as the screen needs it.
+ * The month's money, as the screen needs it.
  *
  * Two different questions, deliberately both answered — but against ONE pot.
  * "Left to assign" is about the plan on paper: has every złoty been given a
  * job. "Left to spend" is about the month as it actually went, and it counts
  * expenses in categories with no budget at all, because unbudgeted spending
  * empties the same pot. What they must never disagree about is how big the pot
- * is; see [availableMinor].
+ * is; see [availableMinor], which is where the stored plan stopped being the
+ * answer and became a floor under it.
  */
 data class PlanState(
     val period: String,
@@ -76,38 +77,61 @@ data class PlanState(
     val carryOverAccounts: List<String> = emptyList(),
 ) {
     /**
-     * The money this month actually has: the plan, less whatever last month
-     * ended up owing. Every other figure on the card divides or subtracts from
-     * this one.
+     * The larger of the two, plus last month's remainder — not the plan alone.
      *
-     * The carry-over used to be left out of "left to assign" and included only
-     * in "left to spend", which made them two different answers to how much
-     * money exists. On a month opening 4 186,58 in the red with 16 355 handed
-     * out against a 20 000 plan, "left to assign" read +3 645 — an invitation
-     * to plan money that was already spent — while the figure three lines below
-     * it was quietly counting the same hole. The shortfall is not a fact about
-     * spending; it is a claim on the pot, and it has to be taken off the top
-     * before anything is handed out.
+     * A stored plan cannot be wrong about money that has already landed. The
+     * household typed a round 22 000,00 for November; 24 450,00 arrived. The
+     * card then said 3 288,19 was left to hand out while 5 738,19 was really
+     * there, and the whole of the difference was already on screen one line
+     * below, as a hint beside "Wpłynęło" — the screen knew the right figure and
+     * subtracted it from itself.
+     *
+     * So the typed figure is a FORECAST: what the month expects before the
+     * money is in. It can only raise the pot, never lower it, which is the
+     * reason ADR 0006 refused derivation in the first place — "a plan that
+     * changes on its own is not a plan". Under the max rule nothing a household
+     * planned is ever taken away from it; the pot only catches up with reality.
+     * And once pay has landed the forecast is spent, so a month nobody planned
+     * at all still has a real pot — see [hasPot]. There is nothing to start.
+     *
+     * The carry-over is added to whichever figure wins. It used to be left out
+     * of "left to assign" and included only in "left to spend", which made them
+     * two different answers to how much money exists: a month opening 4 186,58
+     * in the red with 16 355 handed out against a 20 000 plan read +3 645 — an
+     * invitation to plan money that was already spent. A shortfall is not a
+     * fact about spending; it is a claim on the pot, taken off the top before
+     * anything is handed out.
      */
-    val availableMinor: Long get() = plannedMinor + carryOverMinor
+    val availableMinor: Long get() = maxOf(plannedMinor, incomeMinor) + carryOverMinor
 
     /**
-     * Null when the month has no plan, and that is not the same as zero.
+     * Whether this month has a pot to divide at all.
      *
-     * Subtracting assignments from a plan that does not exist produces a large
-     * red negative — categories carry their limits forward from earlier months,
-     * so an unplanned month starts out looking catastrophically over-assigned
-     * against a total of nothing. There is no answer to "how much is left to
-     * assign" until somebody says how much there is.
+     * A typed plan, or money that has actually arrived. Either is an answer to
+     * "how much is there"; neither being present is the only state where the
+     * card has nothing to say and shows em dashes. This is what retired the
+     * once-a-month ritual of opening a sheet to type a figure the app could
+     * already see on the account.
      */
-    val leftToAssignMinor: Long? get() = if (hasPlan) availableMinor - assignedMinor else null
-    val leftToSpendMinor: Long? get() = if (hasPlan) availableMinor - spentMinor else null
+    val hasPot: Boolean get() = hasPlan || incomeMinor > 0
+
+    /**
+     * Null when the month has no pot at all, and that is not the same as zero.
+     *
+     * Subtracting assignments from a pot that does not exist produces a large
+     * red negative — categories carry their limits forward from earlier months,
+     * so such a month starts out looking catastrophically over-assigned against
+     * a total of nothing. There is no answer to "how much is left to hand out"
+     * until either somebody says how much there is or some of it arrives.
+     */
+    val leftToAssignMinor: Long? get() = if (hasPot) availableMinor - assignedMinor else null
+    val leftToSpendMinor: Long? get() = if (hasPot) availableMinor - spentMinor else null
     val hasCarryOver: Boolean get() = carryOverAccounts.isNotEmpty()
     val overAssigned: Boolean get() = (leftToAssignMinor ?: 0) < 0
 
     /**
      * How far past the month's money the spending went — null while it is still
-     * inside it, and null on a month with no plan to be outside of.
+     * inside it, and null on a month with no pot to be outside of.
      *
      * The same figure as a negative [leftToSpendMinor], as a size. A row of this
      * screen has said "przekroczono o 40 zł" since the first version; the card
@@ -117,24 +141,20 @@ data class PlanState(
     val overspentMinor: Long? get() = leftToSpendMinor?.takeIf { it < 0 }?.let { -it }
 
     /**
-     * What came in against what the plan assumed — null on an unplanned month.
+     * The typed forecast, but only while it is still the figure doing the work.
      *
-     * Positive is money the month was not counting on. See [incomeMinor] for
-     * why the card shows it at all.
-     */
-    val incomeVsPlanMinor: Long? get() = if (hasPlan) incomeMinor - plannedMinor else null
-
-    /**
-     * The same difference, but only where it is worth a line on the card.
+     * Once what arrived has passed it, the forecast is a number nobody needs to
+     * read: the pot is income plus the carry-over and the two lines below say
+     * so. A line printing what the household typed, next to a larger figure it
+     * no longer explains, is the one line on this card that was an echo rather
+     * than an answer.
      *
-     * Money over the plan is news the day it lands. Money under it is not, until
-     * the month has ended — a plan is written for a whole month, so on the third
-     * of it every household on earth is "19 000 below plan", and a card that
-     * says so every morning cries wolf about a month going exactly as intended.
-     * Once the month is closed the same figure is a verdict, and then it belongs
-     * on screen.
+     * "What came in against what the plan assumed" used to be a line of its own
+     * (and a hint beside the income line, "1 947,02 ponad plan"). It is gone
+     * because there is nothing left to reconcile — the difference is IN the pot
+     * now instead of being printed next to it.
      */
-    val incomeNoteMinor: Long? get() = incomeVsPlanMinor?.takeIf { it > 0 || (it < 0 && closed) }
+    val forecastMinor: Long? get() = plannedMinor.takeIf { hasPlan && it > incomeMinor }
 }
 
 /**
@@ -147,11 +167,11 @@ data class PlanState(
  * once, in [PlanState.availableMinor], and this is the same arithmetic while the
  * number is still being pressed.
  *
- * It also carries what the month has actually received, because that is the one
- * question the sheet never answered and the whole reason somebody opens it: the
- * plan is a stored figure and nothing told you what figure to store. Offered,
- * not applied — income seeds the field, the way ADR 0006 has it, and never
- * derives the plan.
+ * It also carries what the month has actually received, for the same reason
+ * [PlanState.availableMinor] does: a figure being typed cannot make the pot
+ * smaller than the money already in the account. Type 15 000 in a month that
+ * received 24 450,00 and the sheet keeps answering 24 450,00 + the carry-over,
+ * which is the truth and is what the card behind it will show.
  */
 data class PlanDraft(
     val typedMinor: Long,
@@ -159,30 +179,22 @@ data class PlanDraft(
     val carryOverMinor: Long = 0,
     val incomeMinor: Long = 0,
 ) {
-    /** The pot the typed figure would make, carry-over included. */
-    val availableMinor: Long get() = typedMinor + carryOverMinor
+    /** The pot the typed figure would make: a floor under what arrived. */
+    val availableMinor: Long get() = maxOf(typedMinor, incomeMinor) + carryOverMinor
 
     /** What would still be unassigned, which is what the card will say. */
     val leftToAssignMinor: Long get() = availableMinor - assignedMinor
 
     /** Typing less than has already been handed out: a real mistake, said in red. */
     val short: Boolean get() = leftToAssignMinor < 0
-
-    /**
-     * What the sheet offers in one tap, or null when there is nothing to offer.
-     *
-     * What arrived this month, and only while it is not already the figure in
-     * the field — an offer to type the number already typed is a line of text
-     * that does nothing. Zero is no offer: early in the month, before anything
-     * has landed, "use 0,00" is the one suggestion that is never right (ADR
-     * 0006: a derived total reads near zero exactly when the plan is made).
-     *
-     * The carry-over is deliberately NOT added in. This figure goes into a field
-     * the app adds the carry-over to, so offering the sum would count it twice —
-     * the exact trap the sheet now spells out in a line of its own.
-     */
-    val suggestionMinor: Long? get() = incomeMinor.takeIf { it > 0 && it != typedMinor }
 }
+
+// A tappable "Wpłynęło w tym miesiącu: 24 450,00 · dotknij, aby wstawić" lived
+// here for one release, with a line beneath it explaining that the carry-over
+// was added separately. Both are gone: the max rule means income does not have
+// to be typed to count, so neither the offer nor the warning about taking it has
+// anything left to do. In git if the history is ever wanted.
+
 
 // How far the limits themselves were passed, added up, was a line on this card
 // in 0.29.0 and is gone in 0.29.1. The owner's reason is the right one: some
