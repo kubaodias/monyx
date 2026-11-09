@@ -910,19 +910,35 @@ private fun EditPlanDialog(
                 carryOverMinor = carryOverMinor,
                 incomeMinor = incomeMinor,
             )
-            Text(
-                text = stringResource(
-                    R.string.budget_plan_assigned_hint,
-                    Money.formatWithCurrency(assignedMinor),
-                    Money.formatWithCurrency(draft.leftToAssignMinor),
-                ),
-                style = MaterialTheme.typography.bodySmall,
-                color = if (draft.short) {
-                    MaterialTheme.colorScheme.error
-                } else {
-                    MaterialTheme.colorScheme.onSurfaceVariant
-                },
-            )
+            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(
+                    text = stringResource(
+                        R.string.budget_plan_assigned_hint,
+                        Money.formatWithCurrency(assignedMinor),
+                        Money.formatWithCurrency(draft.leftToAssignMinor),
+                    ),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = if (draft.short) {
+                        MaterialTheme.colorScheme.error
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    },
+                )
+                // Why the figures above stood still while keys were pressed.
+                // Only in this state: a month being planned before its pay has
+                // landed has no income to lose to, and then every key moves
+                // them. See [PlanDraft.belowIncome].
+                if (draft.belowIncome) {
+                    Text(
+                        text = stringResource(
+                            R.string.budget_plan_below_income,
+                            Money.formatWithCurrency(incomeMinor),
+                        ),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
         },
         // A month planned too early — before its income is known — has to be
         // able to go back to having no plan, not to a plan of zero.

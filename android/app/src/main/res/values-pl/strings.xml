@@ -117,7 +117,8 @@
     <string name="budget_plan_overspent">Przekroczono o</string>
     <string name="budget_plan_unspent">Niewydane</string>
     <string name="budget_plan_the_plan">Plan na miesiąc</string>
-    <string name="budget_plan_pot">Pula na miesiąc</string>
+    <string name="budget_plan_pot">Budżet na miesiąc</string>
+    <string name="budget_plan_below_income">Wpłynęło już %1$s — niższa prognoza nic nie zmieni.</string>
     <string name="budget_plan_income">Wpłynęło</string>
     <string name="budget_plan_assigned_hint">Rozdane %1$s · nierozdane %2$s</string>
     <string name="budget_empty">Nie ustawiono jeszcze żadnych limitów</string>

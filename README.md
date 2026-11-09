@@ -100,14 +100,15 @@ cannot answer says what is still missing instead — see
   over — and what has not been handed out yet, the second one drawn as success
   at zero, which is its goal. The bar belongs to the first and so measures
   spending against the month's money. Under them, the arithmetic and nothing
-  else: the month's money, then what came in and what last month left behind,
-  which add up to it, and what has gone. The month's money is the larger of what
+  else: the month's budget, then what came in and what last month left behind,
+  which add up to it, and what has gone. The month's budget is the larger of what
   came in and what you expected, plus last month's remainder — so a figure typed
   in advance can raise the month's pot but never make it poorer than the account
   already is, and a month nobody planned still shows real figures the moment pay
   lands. There is no ritual to start a month. Typing a figure is for planning
   ahead of the money, and the sheet that takes it says what is handed out and
-  what is not. A month that has ended says "unspent" rather than offering money
+  what is not — and says plainly when the figure being typed is below what has
+  already arrived, because then it changes nothing. A month that has ended says "unspent" rather than offering money
   back. A limit applies to the
   month you set it in and carries forward from there; changing it later changes
   that month alone, unless you tick the box that carries the new figure on. A limit of zero is a limit: it means nothing may go here, which is not
