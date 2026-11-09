@@ -278,6 +278,8 @@ fun BudgetScreen(
         EditPlanDialog(
             initialMinor = if (plan.hasPlan) plan.plannedMinor else planSuggestionMinor,
             assignedMinor = plan.assignedMinor,
+            carryOverMinor = plan.carryOverMinor,
+            incomeMinor = plan.incomeMinor,
             hasPlan = plan.hasPlan,
             onDismiss = { editingPlan = false },
             onClear = {
@@ -781,7 +783,9 @@ internal fun limitShare(fraction: Float): Float = (1f / fraction).coerceIn(0.04f
  * feel like two different calculators.
  *
  * [header] names what is being set — the category, with its icon, or the month.
- * [footnote] is re-evaluated on every key, so it can react to the figure.
+ * [footnote] is re-evaluated on every key, so it can react to the figure, and is
+ * handed a way to put a figure INTO the keypad — a sheet that can tell you what
+ * the right number is should not then make you type it.
  * [savable] gets the evaluated figure and whether a key has been pressed yet.
  */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -792,7 +796,7 @@ private fun BudgetAmountSheet(
     onDismiss: () -> Unit,
     onSave: (Long) -> Unit,
     header: @Composable () -> Unit,
-    footnote: @Composable (minor: Long) -> Unit,
+    footnote: @Composable (minor: Long, use: (Long) -> Unit) -> Unit,
     savable: (minor: Long, touched: Boolean) -> Boolean = { minor, _ -> minor >= 0 },
     extraAction: (@Composable () -> Unit)? = null,
 ) {
@@ -816,7 +820,14 @@ private fun BudgetAmountSheet(
                 modifier = Modifier.padding(horizontal = 20.dp),
             )
             AmountDisplay(amount = amount, onClick = {})
-            Box(modifier = Modifier.padding(horizontal = 20.dp)) { footnote(minor) }
+            Box(modifier = Modifier.padding(horizontal = 20.dp)) {
+                footnote(minor) { offered ->
+                    amount = AmountInput.ofMinor(offered)
+                    // Counts as typed: an offer taken is a figure chosen, and a
+                    // new plan has to be savable without pressing a key after it.
+                    touched = true
+                }
+            }
             Spacer(Modifier.height(12.dp))
             Keypad(
                 onKey = {
@@ -843,15 +854,31 @@ private fun BudgetAmountSheet(
 }
 
 /**
- * Setting the month's total. The already-assigned figure is shown alongside so
- * the number being typed can be judged against it without leaving the sheet —
- * typing less than you have already handed out is a real mistake, and it should
- * be visible while you make it, not after.
+ * Setting the month's total — and saying what there is to set it to.
+ *
+ * Three small lines under the keypad, and each one answers a question somebody
+ * asked out loud while looking at this sheet.
+ *
+ * **What came in**, tappable, because the plan is a stored figure (ADR 0006) and
+ * nothing on the screen used to say what to store. "I have already spent some
+ * and my pay has come in, and I cannot tell how much there is to plan" is the
+ * sheet's own fault: the household's money was two screens away.
+ *
+ * **What last month left**, because this field is not the pot. The app adds the
+ * carry-over on top of whatever is typed here, so a reader who adds it in
+ * himself plans the same money twice.
+ *
+ * **What is already handed out**, kept from the first version: typing less than
+ * you have assigned is a real mistake, and it belongs on screen while you make
+ * it rather than after. Now computed against the same pot the card uses — see
+ * [PlanDraft].
  */
 @Composable
 private fun EditPlanDialog(
     initialMinor: Long,
     assignedMinor: Long,
+    carryOverMinor: Long,
+    incomeMinor: Long,
     hasPlan: Boolean,
     onDismiss: () -> Unit,
     onSave: (Long) -> Unit,
@@ -865,20 +892,49 @@ private fun EditPlanDialog(
         header = {
             Text(stringResource(R.string.budget_plan_edit), style = MaterialTheme.typography.titleLarge)
         },
-        footnote = { minor ->
-            Text(
-                text = stringResource(
-                    R.string.budget_plan_assigned_hint,
-                    Money.formatWithCurrency(assignedMinor),
-                    Money.formatWithCurrency(minor - assignedMinor),
-                ),
-                style = MaterialTheme.typography.bodySmall,
-                color = if (minor < assignedMinor) {
-                    MaterialTheme.colorScheme.error
-                } else {
-                    MaterialTheme.colorScheme.onSurfaceVariant
-                },
+        footnote = { minor, use ->
+            val draft = PlanDraft(
+                typedMinor = minor,
+                assignedMinor = assignedMinor,
+                carryOverMinor = carryOverMinor,
+                incomeMinor = incomeMinor,
             )
+            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                draft.suggestionMinor?.let { suggestion ->
+                    Text(
+                        text = stringResource(
+                            R.string.budget_plan_income_offer,
+                            Money.formatWithCurrency(suggestion),
+                        ),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.fillMaxWidth().clickable { use(suggestion) },
+                    )
+                }
+                if (carryOverMinor != 0L) {
+                    Text(
+                        text = stringResource(
+                            R.string.budget_plan_carry_over_note,
+                            (if (carryOverMinor > 0) "+" else "") + Money.formatWithCurrency(carryOverMinor),
+                        ),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Text(
+                    text = stringResource(
+                        R.string.budget_plan_assigned_hint,
+                        Money.formatWithCurrency(assignedMinor),
+                        Money.formatWithCurrency(draft.leftToAssignMinor),
+                    ),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = if (draft.short) {
+                        MaterialTheme.colorScheme.error
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    },
+                )
+            }
         },
         // A month planned too early — before its income is known — has to be
         // able to go back to having no plan, not to a plan of zero.
@@ -935,7 +991,7 @@ private fun EditBudgetLimitDialog(
         // later months. That was true and it was not a choice — which is the
         // wrong shape for something this consequential. It is a choice now, and
         // the unticked box is the promise that only this month changes.
-        footnote = {
+        footnote = { _, _ ->
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier
