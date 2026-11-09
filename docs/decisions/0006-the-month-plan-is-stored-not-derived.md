@@ -141,3 +141,49 @@ the left-hand figure and so measures spending.
 What that bought was room. Below the two figures there is now only the
 arithmetic behind them — the plan, what came in, last month's remainder, what
 has gone — and the footnote line is gone with the figure it carried.
+
+## Where the figure comes from, said on the sheet that asks for it (2026-11-09)
+
+This decision's first section ends with income seeding the field: "a suggestion
+in an editable field rather than a number the screen asserts". For three months
+that suggestion was the *last plan made*, which is last month with a nudge — and
+a household that gets paid a different figure every month has nothing to nudge
+it with.
+
+The question that found it was asked on the ninth of a month: "some categories
+already have transactions, and I cannot tell on the budget screen how much there
+actually is to plan". The data behind it: Portfel closed October 387,19 to the
+good, 1 950,00 and 22 500,00 came in on the 6th and the 9th, 6 266,36 had already
+gone, nine limits added up to 19 099,00, and the plan was a round 22 000,00 typed
+by hand. Every ingredient of the answer was on the card — *Wpłynęło*, *Z
+poprzedniego miesiąca*, the limits — and the one screen that asks for the figure
+showed none of them. 24 450,00 had arrived against a plan of 22 000,00, so the
+card was quietly 2 450,00 pessimistic about a month going better than planned,
+and said so only in a hint beside *Wpłynęło*.
+
+So the plan sheet now says what there is to plan, in three small lines under the
+keypad:
+
+**What came in this month**, and tapping it types it. Still a suggestion and
+still not a derivation — the plan stays a stored figure, and the sheet is the one
+moment when offering income cannot mislead, because somebody is already looking
+at the field. It is not offered at 0,00: early in the month that is the one
+suggestion guaranteed to be wrong, which is the argument of the first section.
+
+**What last month left, added on top.** The figure in this field is not the pot;
+`plannedMinor + carryOverMinor` is. Anyone who reads "to spend this month" and
+adds the carry-over in himself plans the same money twice, and the offer above
+would have taught him to — so the offer is income alone and the line says where
+the rest comes from.
+
+**What is already assigned, against the same pot the card uses.** This line is
+from the first version and it was wrong by exactly the carry-over: the sheet
+computed `typed − assigned` while the card behind it computed `typed +
+carry-over − assigned`. Both were on screen at once, 387,19 apart. The pot is
+defined in one place now (`PlanState.availableMinor`, mirrored by `PlanDraft` for
+the figure still being pressed).
+
+What this does not change: already-spent money is still planned for. A plan
+covers the whole month including the part of it that has happened, which is why
+a month can be planned on its ninth day with nothing to undo — the limits count
+spending from the first.

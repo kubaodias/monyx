@@ -103,7 +103,10 @@ cannot answer says what is still missing instead — see
   plan, what actually came in and by how much that beat the plan (the line that
   explains how an account can still hold money while the month reads red), what
   last month left behind, and what has gone. A month that has ended says
-  "unspent" rather than offering money back. A limit applies to the
+  "unspent" rather than offering money back. Setting the plan shows what there
+  is to set it to: what has come in this month, in one tap, what last month left
+  behind — added on top of the figure you type, not part of it — and what is
+  already handed out, against the same pot the card counts. A limit applies to the
   month you set it in and carries forward from there; changing it later changes
   that month alone, unless you tick the box that carries the new figure on. A limit of zero is a limit: it means nothing may go here, which is not
   the same as having set none. The list is in the household's own category order

@@ -137,6 +137,53 @@ data class PlanState(
     val incomeNoteMinor: Long? get() = incomeVsPlanMinor?.takeIf { it > 0 || (it < 0 && closed) }
 }
 
+/**
+ * The figure being typed into the plan sheet, against the month it is for.
+ *
+ * The sheet used to answer "left to plan" as `typed − assigned`, while the card
+ * behind it answered `typed + carry-over − assigned`. Both were on screen at
+ * once and they disagreed by the carry-over: a month opening 387,19 to the good
+ * showed 2 901,00 under the keypad and 3 288,19 on the card. The pot is defined
+ * once, in [PlanState.availableMinor], and this is the same arithmetic while the
+ * number is still being pressed.
+ *
+ * It also carries what the month has actually received, because that is the one
+ * question the sheet never answered and the whole reason somebody opens it: the
+ * plan is a stored figure and nothing told you what figure to store. Offered,
+ * not applied — income seeds the field, the way ADR 0006 has it, and never
+ * derives the plan.
+ */
+data class PlanDraft(
+    val typedMinor: Long,
+    val assignedMinor: Long,
+    val carryOverMinor: Long = 0,
+    val incomeMinor: Long = 0,
+) {
+    /** The pot the typed figure would make, carry-over included. */
+    val availableMinor: Long get() = typedMinor + carryOverMinor
+
+    /** What would still be unassigned, which is what the card will say. */
+    val leftToAssignMinor: Long get() = availableMinor - assignedMinor
+
+    /** Typing less than has already been handed out: a real mistake, said in red. */
+    val short: Boolean get() = leftToAssignMinor < 0
+
+    /**
+     * What the sheet offers in one tap, or null when there is nothing to offer.
+     *
+     * What arrived this month, and only while it is not already the figure in
+     * the field — an offer to type the number already typed is a line of text
+     * that does nothing. Zero is no offer: early in the month, before anything
+     * has landed, "use 0,00" is the one suggestion that is never right (ADR
+     * 0006: a derived total reads near zero exactly when the plan is made).
+     *
+     * The carry-over is deliberately NOT added in. This figure goes into a field
+     * the app adds the carry-over to, so offering the sum would count it twice —
+     * the exact trap the sheet now spells out in a line of its own.
+     */
+    val suggestionMinor: Long? get() = incomeMinor.takeIf { it > 0 && it != typedMinor }
+}
+
 // How far the limits themselves were passed, added up, was a line on this card
 // in 0.29.0 and is gone in 0.29.1. The owner's reason is the right one: some
 // categories run over and others run under, the two roughly cancel, and the

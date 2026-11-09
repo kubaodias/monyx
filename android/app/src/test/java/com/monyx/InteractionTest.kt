@@ -11,6 +11,7 @@ import com.monyx.ui.add.AddViewModel
 import com.monyx.ui.add.EntryKind
 import com.monyx.ui.add.categoryMarkOf
 import com.monyx.ui.add.familyHasChildren
+import com.monyx.ui.budget.PlanDraft
 import com.monyx.ui.budget.PlanState
 import com.monyx.ui.overview.OverviewViewModel
 import com.monyx.ui.overview.PieSlice
@@ -498,6 +499,64 @@ class InteractionTest {
         assertEquals(-500_00L, underwater.availableMinor)
         assertEquals(-500_00L, underwater.leftToAssignMinor)
         assertEquals(true, underwater.overAssigned)
+    }
+
+    // ------------------------------------------- planning a month, in the sheet
+
+    // November 2026, off the phone: Portfel closed October 387,19 to the good,
+    // 24 450,00 has come in (800+ on the 6th, pay on the 9th), nine limits add
+    // up to 19 099,00, and the plan says a round 22 000,00 somebody typed.
+    private fun november(typed: Long = 22_000_00) = PlanDraft(
+        typedMinor = typed,
+        assignedMinor = 19_099_00,
+        carryOverMinor = 387_19,
+        incomeMinor = 24_450_00,
+    )
+
+    @Test
+    fun `the sheet and the card count the same pot`() {
+        // The defect: the sheet said `typed - assigned` and the card said
+        // `typed + carry-over - assigned`, both on screen at once, 387,19 apart.
+        val draft = november()
+        assertEquals(22_387_19L, draft.availableMinor)
+        assertEquals(3_288_19L, draft.leftToAssignMinor)
+        val card = plan(planned = 22_000_00, assigned = 19_099_00)
+            .copy(carryOverMinor = 387_19, carryOverAccounts = listOf("Portfel"))
+        assertEquals(card.leftToAssignMinor, draft.leftToAssignMinor)
+    }
+
+    @Test
+    fun `the sheet offers what the month has actually received`() {
+        assertEquals(24_450_00L, november().suggestionMinor)
+    }
+
+    @Test
+    fun `the offer is income alone, because the app adds the carry-over itself`() {
+        // Taking the offer must not plan the 387,19 twice: it goes into a field
+        // the carry-over is added to, so the pot comes out at 24 837,19 and the
+        // genuinely unassigned figure at 5 738,19 — 2 450,00 more than the round
+        // plan showed, which is exactly the income it never assumed.
+        val taken = november(typed = november().suggestionMinor!!)
+        assertEquals(24_837_19L, taken.availableMinor)
+        assertEquals(5_738_19L, taken.leftToAssignMinor)
+    }
+
+    @Test
+    fun `nothing has arrived yet, so there is nothing to offer`() {
+        // The first of the month, before pay lands. "Use 0,00" is the one
+        // suggestion that is never right — see ADR 0006 on derived totals.
+        assertNull(november().copy(incomeMinor = 0).suggestionMinor)
+    }
+
+    @Test
+    fun `no offer to type the figure that is already there`() {
+        assertNull(november(typed = 24_450_00).suggestionMinor)
+    }
+
+    @Test
+    fun `typing less than has already been handed out says so in red`() {
+        assertEquals(true, november(typed = 15_000_00).short)
+        assertEquals(false, november().short)
     }
 
     // ------------------------------------------------- what the server kept

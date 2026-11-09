@@ -121,6 +121,8 @@
     <string name="budget_plan_income_over">%1$s ponad plan</string>
     <string name="budget_plan_income_under">%1$s poniżej planu</string>
     <string name="budget_plan_assigned_hint">Już przypisane: %1$s · do zaplanowania: %2$s</string>
+    <string name="budget_plan_income_offer">Wpłynęło w tym miesiącu: %1$s · dotknij, aby wstawić</string>
+    <string name="budget_plan_carry_over_note">Z poprzedniego miesiąca, doliczane osobno: %1$s</string>
     <string name="budget_empty">Nie ustawiono jeszcze żadnych limitów</string>
     <string name="budget_set_limit">Ustaw limit</string>
     <string name="budget_edit_limit">Zmień limit</string>
