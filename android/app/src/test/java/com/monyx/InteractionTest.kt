@@ -565,11 +565,25 @@ class InteractionTest {
     }
 
     @Test
-    fun `typing less than has arrived changes nothing`() {
+    fun `typing less than has arrived changes nothing, and the sheet says so`() {
         // Which is why the field can be called a forecast and nothing else: it
-        // is only ever read when it beats the account.
-        assertEquals(november(typed = 15_000_00).availableMinor, november().availableMinor)
-        assertEquals(false, november(typed = 15_000_00).short)
+        // is only ever read when it beats the account. Reported from the phone
+        // within the hour of shipping the max rule — "if I change it I don't
+        // see it changing anything in the budget" — so the state that looks
+        // like a dead control has to carry a sentence of its own.
+        val lower = november(typed = 15_000_00)
+        assertEquals(november().availableMinor, lower.availableMinor)
+        assertEquals(false, lower.short)
+        assertEquals(true, lower.belowIncome)
+    }
+
+    @Test
+    fun `a forecast that is doing work needs no explanation`() {
+        // Above what arrived, and in the month this sheet is actually for: one
+        // nothing has landed in yet. Every keypress moves the figures, so the
+        // line would be noise.
+        assertEquals(false, november(typed = 30_000_00).belowIncome)
+        assertEquals(false, november(typed = 15_000_00, income = 0).belowIncome)
     }
 
     @Test

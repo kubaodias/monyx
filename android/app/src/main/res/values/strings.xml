@@ -118,7 +118,8 @@
     <string name="budget_plan_overspent">Over by</string>
     <string name="budget_plan_unspent">Unspent</string>
     <string name="budget_plan_the_plan">This month\'s plan</string>
-    <string name="budget_plan_pot">The month\'s money</string>
+    <string name="budget_plan_pot">The month\'s budget</string>
+    <string name="budget_plan_below_income">%1$s has already come in — a lower forecast changes nothing.</string>
     <string name="budget_plan_income">Came in</string>
     <string name="budget_plan_assigned_hint">Handed out %1$s · unassigned %2$s</string>
     <string name="budget_empty">No limits set yet</string>

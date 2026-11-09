@@ -187,6 +187,20 @@ data class PlanDraft(
 
     /** Typing less than has already been handed out: a real mistake, said in red. */
     val short: Boolean get() = leftToAssignMinor < 0
+
+    /**
+     * True when the figure being typed is below what the month already
+     * received, so pressing keys moves nothing at all.
+     *
+     * The max rule's one bad moment, and it was reported from the phone within
+     * the hour: "if I change the forecast I don't see it changing anything".
+     * It is correct — a forecast cannot make the month poorer than the account
+     * already is — but a control that silently ignores what is typed into it
+     * owes the reader a sentence. The sheet prints one, in this state only; the
+     * planning-ahead case it exists for has no income yet, and there every
+     * keypress moves the figures.
+     */
+    val belowIncome: Boolean get() = typedMinor < incomeMinor
 }
 
 // A tappable "Wpłynęło w tym miesiącu: 24 450,00 · dotknij, aby wstawić" lived

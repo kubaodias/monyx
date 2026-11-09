@@ -254,3 +254,23 @@ has arrived, scoped to the accounts this screen counts, and the repository's
 suggestion is the fallback for a month nothing has landed in yet, which is the
 one case where repeating last month is a sensible guess.
 
+### Two notes from the first hour of use
+
+**The figure is called „Budżet na miesiąc", not „Pula na miesiąc".** The
+household's own word, offered as a question — *couldn't it just say Budżet?* —
+and it is right: nothing else on screen claims that word for something else. A
+category's cap is „Limit" everywhere it appears, so the only other uses are the
+tab and the link to it from the Overview. The tab being called Budżet and its
+first line saying how big the budget is reads as a screen agreeing with itself.
+"Pula" was a word chosen for a technical distinction nobody outside this file
+needs to make.
+
+**A forecast below what arrived now says so.** The max rule's one bad moment,
+reported from the phone within the hour: "if I change *Zakładam, że wpłynie* I
+don't see it changing anything". It is correct — a forecast cannot make the
+month poorer than the account already is — but a control that silently ignores
+what is typed into it owes the reader a sentence, so the sheet prints one:
+„Wpłynęło już 24 450,00 zł — niższa prognoza nic nie zmieni." In this state
+only. The case the sheet exists for is a month whose pay has not landed, and
+there every keypress moves every figure.
+
