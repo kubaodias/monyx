@@ -107,23 +107,20 @@
     <string name="transactions_delete_confirm_message">This cannot be undone.</string>
 
     <!-- Budget -->
-    <string name="budget_plan_to_assign">Left to plan</string>
+    <string name="budget_plan_to_assign">Unassigned</string>
     <string name="budget_plan_edit">Plan for this month</string>
     <string name="budget_plan_remove">Remove plan</string>
-    <string name="budget_plan_none">No plan yet. Set how much there is to spend this month.</string>
-    <string name="budget_plan_total">To spend this month</string>
+    <string name="budget_plan_none">Nothing has come in this month yet. To plan ahead of it, type what you expect.</string>
+    <string name="budget_plan_total">Expected to come in</string>
     <string name="budget_plan_carry_over">From last month</string>
     <string name="budget_plan_spent">Spent</string>
     <string name="budget_plan_left_to_spend">Left to spend</string>
     <string name="budget_plan_overspent">Over by</string>
     <string name="budget_plan_unspent">Unspent</string>
     <string name="budget_plan_the_plan">This month\'s plan</string>
+    <string name="budget_plan_pot">The month\'s money</string>
     <string name="budget_plan_income">Came in</string>
-    <string name="budget_plan_income_over">%1$s over the plan</string>
-    <string name="budget_plan_income_under">%1$s under the plan</string>
-    <string name="budget_plan_assigned_hint">Already assigned: %1$s · left to plan: %2$s</string>
-    <string name="budget_plan_income_offer">Came in this month: %1$s · tap to use it</string>
-    <string name="budget_plan_carry_over_note">From last month, added on top: %1$s</string>
+    <string name="budget_plan_assigned_hint">Handed out %1$s · unassigned %2$s</string>
     <string name="budget_empty">No limits set yet</string>
     <string name="budget_set_limit">Set a limit</string>
     <string name="budget_edit_limit">Change limit</string>

@@ -97,16 +97,18 @@ cannot answer says what is still missing instead — see
 - **Budget** — what is left to spend this month, limits on main categories, and
   a warning before a limit is passed rather than after. The card leads with two
   figures side by side: what is left to spend — or by how much the month went
-  over — and what is left to plan, the second one drawn as success at zero,
-  which is its goal. The bar belongs to the first and so measures spending
-  against the month's money. Under them, the arithmetic and nothing else: the
-  plan, what actually came in and by how much that beat the plan (the line that
-  explains how an account can still hold money while the month reads red), what
-  last month left behind, and what has gone. A month that has ended says
-  "unspent" rather than offering money back. Setting the plan shows what there
-  is to set it to: what has come in this month, in one tap, what last month left
-  behind — added on top of the figure you type, not part of it — and what is
-  already handed out, against the same pot the card counts. A limit applies to the
+  over — and what has not been handed out yet, the second one drawn as success
+  at zero, which is its goal. The bar belongs to the first and so measures
+  spending against the month's money. Under them, the arithmetic and nothing
+  else: the month's money, then what came in and what last month left behind,
+  which add up to it, and what has gone. The month's money is the larger of what
+  came in and what you expected, plus last month's remainder — so a figure typed
+  in advance can raise the month's pot but never make it poorer than the account
+  already is, and a month nobody planned still shows real figures the moment pay
+  lands. There is no ritual to start a month. Typing a figure is for planning
+  ahead of the money, and the sheet that takes it says what is handed out and
+  what is not. A month that has ended says "unspent" rather than offering money
+  back. A limit applies to the
   month you set it in and carries forward from there; changing it later changes
   that month alone, unless you tick the box that carries the new figure on. A limit of zero is a limit: it means nothing may go here, which is not
   the same as having set none. The list is in the household's own category order

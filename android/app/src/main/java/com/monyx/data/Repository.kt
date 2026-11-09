@@ -324,9 +324,15 @@ class MonyxRepository(private val dao: MonyxDao) {
     }
 
     /**
-     * What to put in the field when a month has no plan yet: the last plan made,
-     * else what actually came in last month. Both beat a blank field — planning
-     * a month is nearly always last month with a nudge.
+     * The fallback figure for a month that has no plan AND no income yet: the
+     * last plan made, else what came in last month. Both beat a blank field for
+     * a month being planned ahead of its money.
+     *
+     * Not the first choice any more. A month that has received something opens
+     * on that instead — see BudgetScreen, which reads it from the plan state so
+     * that it is scoped to the accounts the budget counts. Offering 23 431,00
+     * from a closed October while November's own 24 450,00 sat two lines below
+     * it was two suggestions from two different months in one sheet.
      */
     suspend fun suggestedPlanMinor(period: String): Long =
         dao.previousPlannedMinor(period)

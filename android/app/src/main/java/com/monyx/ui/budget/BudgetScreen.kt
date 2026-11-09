@@ -276,7 +276,18 @@ fun BudgetScreen(
 
     if (editingPlan) {
         EditPlanDialog(
-            initialMinor = if (plan.hasPlan) plan.plannedMinor else planSuggestionMinor,
+            // What a month with no plan opens on: whatever has already arrived,
+            // scoped to the accounts this screen counts. The repository's
+            // suggestion — the last plan made — is the fallback for a month
+            // nothing has landed in yet, which is the one case where repeating
+            // last month is a sensible guess. Offering 23 431,00 from a closed
+            // October while 24 450,00 sat in November's own income was two
+            // suggestions from two different months in one sheet.
+            initialMinor = when {
+                plan.hasPlan -> plan.plannedMinor
+                plan.incomeMinor > 0 -> plan.incomeMinor
+                else -> planSuggestionMinor
+            },
             assignedMinor = plan.assignedMinor,
             carryOverMinor = plan.carryOverMinor,
             incomeMinor = plan.incomeMinor,
@@ -389,14 +400,14 @@ private fun PlanCard(plan: PlanState, onEditPlan: () -> Unit) {
     val overspent = plan.overspentMinor
     val headlineLabel = when {
         overspent != null -> stringResource(R.string.budget_plan_overspent)
-        plan.hasPlan && plan.closed -> stringResource(R.string.budget_plan_unspent)
+        plan.hasPot && plan.closed -> stringResource(R.string.budget_plan_unspent)
         else -> stringResource(R.string.budget_plan_left_to_spend)
     }
     val headlineColor = when {
         overspent != null -> MaterialTheme.colorScheme.error
         // A month that ended inside its means is this screen's good outcome,
         // and it gets the colour "left to assign" used to take for zero.
-        plan.hasPlan && plan.closed -> MaterialTheme.colorScheme.primary
+        plan.hasPot && plan.closed -> MaterialTheme.colorScheme.primary
         else -> MaterialTheme.colorScheme.onSurface
     }
 
@@ -415,7 +426,7 @@ private fun PlanCard(plan: PlanState, onEditPlan: () -> Unit) {
                     // The size, not the sign: the word above says which way it
                     // points.
                     value = when {
-                        !plan.hasPlan -> "—"
+                        !plan.hasPot -> "—"
                         overspent != null -> Money.formatWithCurrency(overspent)
                         else -> Money.formatWithCurrency(plan.leftToSpendMinor ?: 0)
                     },
@@ -431,7 +442,7 @@ private fun PlanCard(plan: PlanState, onEditPlan: () -> Unit) {
                     value = plan.leftToAssignMinor?.let { Money.formatWithCurrency(it) } ?: "—",
                     color = when {
                         plan.overAssigned -> MaterialTheme.colorScheme.error
-                        plan.hasPlan && plan.leftToAssignMinor == 0L -> MaterialTheme.colorScheme.primary
+                        plan.hasPot && plan.leftToAssignMinor == 0L -> MaterialTheme.colorScheme.primary
                         else -> MaterialTheme.colorScheme.onSurface
                     },
                     modifier = Modifier.weight(1f),
@@ -444,7 +455,7 @@ private fun PlanCard(plan: PlanState, onEditPlan: () -> Unit) {
                 }
             }
 
-            if (!plan.hasPlan) {
+            if (!plan.hasPot) {
                 Spacer(Modifier.height(6.dp))
                 Text(
                     text = stringResource(R.string.budget_plan_none),
@@ -484,26 +495,29 @@ private fun PlanCard(plan: PlanState, onEditPlan: () -> Unit) {
             )
 
             Spacer(Modifier.height(12.dp))
+            // The pot itself, and then where it came from. This line used to
+            // print what the household had TYPED, which is the only figure on
+            // the card that was an echo rather than an answer — and it was
+            // 2 837,19 smaller than the money actually in play, with the
+            // difference printed two lines below as a hint. The pot leads now
+            // and the two lines under it add up to it.
             PlanFigure(
-                label = stringResource(R.string.budget_plan_the_plan),
-                value = Money.formatWithCurrency(plan.plannedMinor),
+                label = stringResource(R.string.budget_plan_pot),
+                value = Money.formatWithCurrency(plan.availableMinor),
+                emphasis = true,
             )
-            // What actually arrived, and how that compares with what the plan
-            // assumed. This is the line that reconciles the card with the
-            // account: a wallet holding 1 179,28 above a card saying 767,74 too
-            // much has gone is not a contradiction, it is 1 947,02 of income
-            // the plan never counted on, and that sentence was nowhere on the
-            // screen.
+            // The forecast, while it is still the figure doing the work: before
+            // pay lands, the pot IS what somebody typed, and then it has to be
+            // readable. Once income has passed it, it is a number with no job.
+            plan.forecastMinor?.let { forecast ->
+                PlanFigure(
+                    label = stringResource(R.string.budget_plan_the_plan),
+                    value = Money.formatWithCurrency(forecast),
+                )
+            }
             PlanFigure(
                 label = stringResource(R.string.budget_plan_income),
                 value = Money.formatWithCurrency(plan.incomeMinor),
-                hint = plan.incomeNoteMinor?.let { difference ->
-                    if (difference > 0) {
-                        stringResource(R.string.budget_plan_income_over, Money.format(difference))
-                    } else {
-                        stringResource(R.string.budget_plan_income_under, Money.format(-difference))
-                    }
-                },
             )
             if (plan.hasCarryOver) {
                 PlanFigure(
@@ -516,7 +530,6 @@ private fun PlanCard(plan: PlanState, onEditPlan: () -> Unit) {
             PlanFigure(
                 label = stringResource(R.string.budget_plan_spent),
                 value = Money.formatWithCurrency(plan.spentMinor),
-                emphasis = true,
             )
         }
     }
@@ -854,24 +867,22 @@ private fun BudgetAmountSheet(
 }
 
 /**
- * Setting the month's total — and saying what there is to set it to.
+ * Typing a forecast: what the month is expected to receive, before it has.
  *
- * Three small lines under the keypad, and each one answers a question somebody
- * asked out loud while looking at this sheet.
+ * This sheet is no longer how a month gets its figures — income does that by
+ * arriving — so it is open only when somebody wants to plan ahead of the money,
+ * and it is down to one line under the keypad: what is handed out and what is
+ * not, against the same pot the card counts ([PlanDraft], which applies the
+ * same max rule to the figure still being pressed). Typing less than you have
+ * already assigned is a real mistake and goes red while you make it.
  *
- * **What came in**, tappable, because the plan is a stored figure (ADR 0006) and
- * nothing on the screen used to say what to store. "I have already spent some
- * and my pay has come in, and I cannot tell how much there is to plan" is the
- * sheet's own fault: the household's money was two screens away.
- *
- * **What last month left**, because this field is not the pot. The app adds the
- * carry-over on top of whatever is typed here, so a reader who adds it in
- * himself plans the same money twice.
- *
- * **What is already handed out**, kept from the first version: typing less than
- * you have assigned is a real mistake, and it belongs on screen while you make
- * it rather than after. Now computed against the same pot the card uses — see
- * [PlanDraft].
+ * Three lines lived here for one release — a tappable "what came in", a note
+ * that the carry-over is added separately, and this one. The first two were
+ * answers to a question the max rule stopped anybody needing to ask: income
+ * counts whether or not it is typed, so there is nothing to offer and nothing
+ * to warn about double-counting. Typing a figure BELOW what arrived now changes
+ * nothing at all, which is the honest behaviour and the reason the field can
+ * carry a modest name.
  */
 @Composable
 private fun EditPlanDialog(
@@ -892,49 +903,26 @@ private fun EditPlanDialog(
         header = {
             Text(stringResource(R.string.budget_plan_edit), style = MaterialTheme.typography.titleLarge)
         },
-        footnote = { minor, use ->
+        footnote = { minor, _ ->
             val draft = PlanDraft(
                 typedMinor = minor,
                 assignedMinor = assignedMinor,
                 carryOverMinor = carryOverMinor,
                 incomeMinor = incomeMinor,
             )
-            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                draft.suggestionMinor?.let { suggestion ->
-                    Text(
-                        text = stringResource(
-                            R.string.budget_plan_income_offer,
-                            Money.formatWithCurrency(suggestion),
-                        ),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.fillMaxWidth().clickable { use(suggestion) },
-                    )
-                }
-                if (carryOverMinor != 0L) {
-                    Text(
-                        text = stringResource(
-                            R.string.budget_plan_carry_over_note,
-                            (if (carryOverMinor > 0) "+" else "") + Money.formatWithCurrency(carryOverMinor),
-                        ),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                Text(
-                    text = stringResource(
-                        R.string.budget_plan_assigned_hint,
-                        Money.formatWithCurrency(assignedMinor),
-                        Money.formatWithCurrency(draft.leftToAssignMinor),
-                    ),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = if (draft.short) {
-                        MaterialTheme.colorScheme.error
-                    } else {
-                        MaterialTheme.colorScheme.onSurfaceVariant
-                    },
-                )
-            }
+            Text(
+                text = stringResource(
+                    R.string.budget_plan_assigned_hint,
+                    Money.formatWithCurrency(assignedMinor),
+                    Money.formatWithCurrency(draft.leftToAssignMinor),
+                ),
+                style = MaterialTheme.typography.bodySmall,
+                color = if (draft.short) {
+                    MaterialTheme.colorScheme.error
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                },
+            )
         },
         // A month planned too early — before its income is known — has to be
         // able to go back to having no plan, not to a plan of zero.

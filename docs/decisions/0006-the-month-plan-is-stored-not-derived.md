@@ -187,3 +187,70 @@ What this does not change: already-spent money is still planned for. A plan
 covers the whole month including the part of it that has happened, which is why
 a month can be planned on its ninth day with nothing to undo — the limits count
 spending from the first.
+
+## The stored figure is a floor, not the pot (2026-11-09, later the same day)
+
+The section above shipped three explanatory lines into the plan sheet. The
+household read them and said, in one sentence, that the screen had become
+over-complicated and he was getting lost in it. Four reviewers were asked for
+simpler exits, independently, and they agreed on three things: the carry-over
+defect was worth fixing, two of the three new lines were not information about
+money but documentation of a field's arithmetic, and nobody was willing to
+defend typing the figure by hand at all.
+
+One of them found the sentence this decision had been avoiding for three
+addenda. **The pot already changes on its own.** `availableMinor` was
+`plannedMinor + carryOverMinor`, and the carry-over is last month's closing
+balance, read live from `accountBalancesThrough`. Half the pot has been derived
+since September. Everything patched since — the reconciling income line, the
+"1 947,02 ponad plan" hint, the 387,19 disagreement between the sheet and the
+card — is downstream of refusing to say that out loud.
+
+So:
+
+    availableMinor = max(plannedMinor, incomeMinor) + carryOverMinor
+
+**What the stored figure now is.** A forecast: what the month expects before the
+money is in. It can only ever RAISE the pot, which is what makes this compatible
+with the paragraph this decision opens with. The objection there was never
+really to derivation — it was that a figure somebody had finished planning
+against must not move underneath them. Under a maximum, nothing a household
+planned is ever taken away; the pot only catches up with reality. The field is
+labelled for what it is, „Zakładam, że wpłynie", and it is the one place the
+word "plan" still earns its keep: planning December in November is exactly what
+a stored figure is for, and nothing else can do it.
+
+**What this deletes.** *Income against the plan* as a concept — the difference
+now lives IN the pot instead of being printed beside it, so `incomeVsPlanMinor`,
+`incomeNoteMinor`, both hint strings, the tappable offer and the carry-over note
+are all gone. The card's „Plan na miesiąc" line, which printed what somebody had
+typed, becomes „Pula na miesiąc", which prints what there is — and the two lines
+under it, what came in and what last month left, now add up to it. The typed
+forecast returns as a line only while it is still the figure doing the work.
+Every figure on the card is an answer; none is an echo.
+
+**What this retires.** The once-a-month ritual. `hasPot` is `hasPlan ||
+incomeMinor > 0`, so a month nobody has planned still shows real figures the
+moment pay lands — no banner, no "start the month" button, no sheet to open. The
+household's question was "how do I start making the budget", and the better
+answer than teaching the ritual was to delete it: the month starts itself when
+money arrives. A card of em dashes is now reserved for a month with neither a
+plan nor a single złoty in, which is the only state where there is honestly
+nothing to say.
+
+**The price, stated.** A one-off `kind='income'` row inflates the pot and cannot
+be typed back down — a repaid loan, or the 1 000,00 "Zwrot za AMS" that settled a
+work trip. Transfers are already not income ([0022](0022-zloty-is-the-reporting-currency-and-a-rate-has-a-date.md)
+scopes what counts; `monthTotals` counts `kind='income'` alone), so this is
+rare, and it is money that really did arrive and really can be spent. The escape
+hatch is the one that was already there: *Usuń plan* now means "let the month be
+whatever came in".
+
+Also fixed, and the reason the sheet opened on a stale figure at all:
+`suggestedPlanMinor` offered the newest earlier plan — 23 431,00 from a closed
+October — while November's own income sat at 24 450,00 two lines below it. Two
+suggestions from two different months in one sheet. The sheet now opens on what
+has arrived, scoped to the accounts this screen counts, and the repository's
+suggestion is the fallback for a month nothing has landed in yet, which is the
+one case where repeating last month is a sensible guess.
+

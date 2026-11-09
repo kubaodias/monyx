@@ -443,50 +443,87 @@ class InteractionTest {
     }
 
     @Test
-    fun `income against the plan is what reconciles the card with the account`() {
-        // October 2026, both figures off the phone: the plan was 22 483,98,
-        // 24 431,00 came in, 18 122,74 went out, and Portfel closed September
-        // 5 128,98 in the red. "Left to spend" is -767,74 while the account
-        // itself still holds 1 179,28 — which reads as a contradiction until
-        // the card says that 1 947,02 of what arrived was never in the plan.
+    fun `the pot catches up with the account once money has arrived`() {
+        // October 2026, every figure off the phone: the plan was 22 483,98,
+        // 24 431,00 came in, 18 122,74 went out, Portfel closed September
+        // 5 128,98 in the red. Against the plan alone "left to spend" read
+        // -767,74 while the account itself held 1 179,28, and the card had to
+        // grow a line explaining that 1 947,02 of what arrived was never in the
+        // plan. Against max(plan, income) it simply reads the account.
         val october = plan(planned = 22_483_98, assigned = 0, spent = 18_122_74)
             .copy(
                 incomeMinor = 24_431_00,
                 carryOverMinor = -5_128_98,
                 carryOverAccounts = listOf("Portfel"),
             )
-        assertEquals(-767_74L, october.leftToSpendMinor)
-        assertEquals(1_947_02L, october.incomeVsPlanMinor)
+        assertEquals(19_302_02L, october.availableMinor)
+        assertEquals(1_179_28L, october.leftToSpendMinor)
         val inTheAccountToday = october.carryOverMinor + october.incomeMinor - october.spentMinor
-        assertEquals(1_179_28L, inTheAccountToday)
-        // The whole of the gap, and nothing else in it.
-        assertEquals(october.incomeVsPlanMinor, inTheAccountToday - october.leftToSpendMinor!!)
+        assertEquals("the figure the household asked about", inTheAccountToday, october.leftToSpendMinor)
     }
 
     @Test
-    fun `a month short of its plan says so in the other direction, once it is over`() {
-        val lean = plan(planned = 20_000_00, assigned = 0, spent = 5_000_00).copy(incomeMinor = 18_500_00)
-        assertEquals(-1_500_00L, lean.incomeVsPlanMinor)
-        // Not while it is still running: on the third of the month every
-        // household is thousands "below plan", and saying so daily is noise.
-        assertNull(lean.incomeNoteMinor)
-        assertEquals(-1_500_00L, lean.copy(closed = true).incomeNoteMinor)
+    fun `money that arrived is a floor under the plan, never a ceiling`() {
+        // November 2026: a round 22 000,00 typed, 24 450,00 actually in. The
+        // typed figure cannot make the month poorer than it is.
+        val november = plan(planned = 22_000_00, assigned = 19_099_00, spent = 6_266_36)
+            .copy(
+                incomeMinor = 24_450_00,
+                carryOverMinor = 387_19,
+                carryOverAccounts = listOf("Portfel"),
+            )
+        assertEquals(24_837_19L, november.availableMinor)
+        assertEquals(5_738_19L, november.leftToAssignMinor)
+        assertEquals(18_570_83L, november.leftToSpendMinor)
     }
 
     @Test
-    fun `money over the plan is worth saying the day it lands`() {
-        val over = plan(planned = 20_000_00, assigned = 0).copy(incomeMinor = 21_000_00)
-        assertEquals(1_000_00L, over.incomeNoteMinor)
+    fun `a forecast bigger than what has landed still leads`() {
+        // The first week of a month: 30 000 expected, 2 000 in. Planning ahead
+        // of the money is the whole reason the stored figure survives, and the
+        // max rule must not quietly reduce it to what has arrived so far.
+        val early = plan(planned = 30_000_00, assigned = 0).copy(incomeMinor = 2_000_00)
+        assertEquals(30_000_00L, early.availableMinor)
+        assertEquals(30_000_00L, early.forecastMinor)
     }
 
     @Test
-    fun `income exactly on plan is not a note`() {
-        assertNull(plan(planned = 20_000_00, assigned = 0).copy(incomeMinor = 20_000_00, closed = true).incomeNoteMinor)
+    fun `a forecast the month has overtaken is not shown`() {
+        // Nothing left for the line to say: the pot is income plus the
+        // carry-over, and the two lines beneath it add up to it.
+        assertNull(plan(planned = 22_000_00, assigned = 0).copy(incomeMinor = 24_450_00).forecastMinor)
     }
 
     @Test
-    fun `an unplanned month has nothing to compare what arrived with`() {
-        assertNull(PlanState("2026-08", hasPlan = false, incomeMinor = 2_000_00).incomeVsPlanMinor)
+    fun `a month nobody planned still has a pot once money arrives`() {
+        // The ritual this retires: a card of em dashes on the ninth of a month
+        // with pay in the account, because nobody had opened a sheet to type a
+        // figure the app could already see.
+        val unplanned = PlanState(
+            "2026-11",
+            hasPlan = false,
+            assignedMinor = 19_099_00,
+            spentMinor = 6_266_36,
+            incomeMinor = 24_450_00,
+            carryOverMinor = 387_19,
+            carryOverAccounts = listOf("Portfel"),
+        )
+        assertEquals(true, unplanned.hasPot)
+        assertEquals(24_837_19L, unplanned.availableMinor)
+        assertEquals(5_738_19L, unplanned.leftToAssignMinor)
+        assertNull("nothing typed, so nothing to print as a forecast", unplanned.forecastMinor)
+    }
+
+    @Test
+    fun `a month with neither a plan nor any income has no answer`() {
+        // The one state that still shows em dashes, and the only honest one:
+        // limits carry forward, so without a pot the card would read thousands
+        // over-assigned against a total of nothing.
+        val empty = PlanState("2026-12", hasPlan = false, assignedMinor = 19_099_00)
+        assertEquals(false, empty.hasPot)
+        assertNull(empty.leftToAssignMinor)
+        assertNull(empty.leftToSpendMinor)
+        assertEquals(false, empty.overAssigned)
     }
 
     @Test
@@ -506,57 +543,50 @@ class InteractionTest {
     // November 2026, off the phone: Portfel closed October 387,19 to the good,
     // 24 450,00 has come in (800+ on the 6th, pay on the 9th), nine limits add
     // up to 19 099,00, and the plan says a round 22 000,00 somebody typed.
-    private fun november(typed: Long = 22_000_00) = PlanDraft(
+    private fun november(typed: Long = 22_000_00, income: Long = 24_450_00) = PlanDraft(
         typedMinor = typed,
         assignedMinor = 19_099_00,
         carryOverMinor = 387_19,
-        incomeMinor = 24_450_00,
+        incomeMinor = income,
     )
 
     @Test
     fun `the sheet and the card count the same pot`() {
-        // The defect: the sheet said `typed - assigned` and the card said
-        // `typed + carry-over - assigned`, both on screen at once, 387,19 apart.
+        // The defect this guards: the sheet said `typed - assigned` while the
+        // card behind it said `typed + carry-over - assigned`, both on screen
+        // at once, 387,19 apart. It now applies the card's rule, max included.
         val draft = november()
-        assertEquals(22_387_19L, draft.availableMinor)
-        assertEquals(3_288_19L, draft.leftToAssignMinor)
+        assertEquals(24_837_19L, draft.availableMinor)
+        assertEquals(5_738_19L, draft.leftToAssignMinor)
         val card = plan(planned = 22_000_00, assigned = 19_099_00)
-            .copy(carryOverMinor = 387_19, carryOverAccounts = listOf("Portfel"))
+            .copy(incomeMinor = 24_450_00, carryOverMinor = 387_19, carryOverAccounts = listOf("Portfel"))
         assertEquals(card.leftToAssignMinor, draft.leftToAssignMinor)
+        assertEquals(card.availableMinor, draft.availableMinor)
     }
 
     @Test
-    fun `the sheet offers what the month has actually received`() {
-        assertEquals(24_450_00L, november().suggestionMinor)
+    fun `typing less than has arrived changes nothing`() {
+        // Which is why the field can be called a forecast and nothing else: it
+        // is only ever read when it beats the account.
+        assertEquals(november(typed = 15_000_00).availableMinor, november().availableMinor)
+        assertEquals(false, november(typed = 15_000_00).short)
     }
 
     @Test
-    fun `the offer is income alone, because the app adds the carry-over itself`() {
-        // Taking the offer must not plan the 387,19 twice: it goes into a field
-        // the carry-over is added to, so the pot comes out at 24 837,19 and the
-        // genuinely unassigned figure at 5 738,19 — 2 450,00 more than the round
-        // plan showed, which is exactly the income it never assumed.
-        val taken = november(typed = november().suggestionMinor!!)
-        assertEquals(24_837_19L, taken.availableMinor)
-        assertEquals(5_738_19L, taken.leftToAssignMinor)
+    fun `a forecast above what arrived moves the figures as it is typed`() {
+        val ambitious = november(typed = 30_000_00)
+        assertEquals(30_387_19L, ambitious.availableMinor)
+        assertEquals(11_288_19L, ambitious.leftToAssignMinor)
     }
 
     @Test
-    fun `nothing has arrived yet, so there is nothing to offer`() {
-        // The first of the month, before pay lands. "Use 0,00" is the one
-        // suggestion that is never right — see ADR 0006 on derived totals.
-        assertNull(november().copy(incomeMinor = 0).suggestionMinor)
-    }
-
-    @Test
-    fun `no offer to type the figure that is already there`() {
-        assertNull(november(typed = 24_450_00).suggestionMinor)
-    }
-
-    @Test
-    fun `typing less than has already been handed out says so in red`() {
-        assertEquals(true, november(typed = 15_000_00).short)
-        assertEquals(false, november().short)
+    fun `typing less than has been handed out says so in red`() {
+        // Only when there is no income to cover it — a month being planned
+        // before its pay lands, which is the one time this sheet is opened.
+        val lean = november(typed = 15_000_00, income = 0)
+        assertEquals(-3_711_81L, lean.leftToAssignMinor)
+        assertEquals(true, lean.short)
+        assertEquals(false, november(income = 0).short)
     }
 
     // ------------------------------------------------- what the server kept
