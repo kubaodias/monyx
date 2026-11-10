@@ -187,7 +187,7 @@ monyx/
 ```sh
 cd server
 npm install
-npm test          # 137 tests: sync, auth, budgets, voice, notes, releases, rates
+npm test          # 143 tests: sync, auth, budgets, voice, notes, releases, rates
 npm run typecheck
 telnyx-edge ship  # deploy
 ```
