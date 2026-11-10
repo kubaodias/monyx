@@ -327,3 +327,22 @@ card. With the preposition it is a task and not a property of an expense, so the
 line reads „Zaplanowane 20 355,00 · do zaplanowania 4 482,19" — which also
 returns the name this figure carried for three months.
 
+
+### The right edge belongs to the figures (2026-11-10)
+
+The column shipped in 0.29.5 and the household's first sentence about it was
+„wyrównanie jest złe i ucina, jak np. 'budżet na miesi...'". Both halves had one
+cause: the label was laid out with `weight(1f, fill = false)` next to a
+`weight(1f)` spacer, so the free space split in two. The longest label was cut
+off with room to spare, and the slack the shorter labels did not claim was left
+standing — putting each row's amount at its own x. A column whose digits do not
+stand under each other is not a sum; it is a list that merely looks like one.
+Exactly one weighted child, and it is the label: the amount is measured first, at
+whatever it needs, and gives way to nothing.
+
+The same rule then settled where the pencil lives. The leading figure was
+left-aligned with a 48 dp icon button beside it, which meant the one number
+answering the column ended 48 dp short of every term in it. The figure is now
+right-aligned on the card's edge like the terms, and the way into the editor sits
+in the left margin, in space that was empty anyway. An affordance can move; the
+answer cannot leave the column it answers.
