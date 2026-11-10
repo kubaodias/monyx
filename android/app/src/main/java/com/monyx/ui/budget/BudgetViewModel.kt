@@ -130,6 +130,28 @@ data class PlanState(
     val overAssigned: Boolean get() = (leftToAssignMinor ?: 0) < 0
 
     /**
+     * Whether being over is worth an alarm, for the two figures that can be.
+     *
+     * The rows under this card have drawn the distinction since 0.21: [over] is
+     * a FACT and says itself in words, `seriouslyOver` is the ALARM and gets the
+     * colour — one per cent of the limit, because a 1 650 zł limit missed by
+     * four złoty is not the same event as one missed by four hundred, and
+     * painting both red taught the eye to skip red. See [overBudgetBand].
+     *
+     * The card had no such distinction and turned red on the first grosz. On a
+     * month whose limits were being filled in to the last grosz that meant
+     * 24 837,97 handed out against 24 837,19 — over by 78 grosze — lighting up
+     * exactly as loudly as a month 3 000 zł overdrawn. Same rule as the rows
+     * now, from the same function, so there is one rule and not two.
+     *
+     * Both are false on a month with no pot: nothing to be over.
+     */
+    val seriouslyOverspent: Boolean
+        get() = hasPot && overBudgetBand(spentMinor, availableMinor) == BudgetBand.Over
+    val seriouslyOverAssigned: Boolean
+        get() = hasPot && overBudgetBand(assignedMinor, availableMinor) == BudgetBand.Over
+
+    /**
      * How far past the month's money the spending went — null while it is still
      * inside it, and null on a month with no pot to be outside of.
      *

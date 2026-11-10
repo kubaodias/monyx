@@ -120,6 +120,7 @@
     <string name="budget_plan_below_income">Wpłynęło już %1$s — niższa prognoza nic nie zmieni.</string>
     <string name="budget_plan_income">Wpłynęło</string>
     <string name="budget_plan_assigned_hint">Zaplanowane %1$s · do zaplanowania %2$s</string>
+    <string name="budget_plan_assigned_over">Zaplanowane %1$s · %2$s ponad budżet</string>
     <string name="budget_plan_income_so_far">wpłynęło do tej pory %1$s</string>
     <string name="budget_empty">Nie ustawiono jeszcze żadnych limitów</string>
     <string name="budget_set_limit">Ustaw limit</string>

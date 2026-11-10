@@ -121,6 +121,7 @@
     <string name="budget_plan_below_income">%1$s has already come in — a lower forecast changes nothing.</string>
     <string name="budget_plan_income">Came in</string>
     <string name="budget_plan_assigned_hint">Planned %1$s · left to plan %2$s</string>
+    <string name="budget_plan_assigned_over">Planned %1$s · %2$s over budget</string>
     <string name="budget_plan_income_so_far">%1$s in so far</string>
     <string name="budget_empty">No limits set yet</string>
     <string name="budget_set_limit">Set a limit</string>

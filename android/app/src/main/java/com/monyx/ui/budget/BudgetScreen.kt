@@ -419,7 +419,14 @@ private fun PlanCard(plan: PlanState, onEditPlan: () -> Unit) {
         else -> stringResource(R.string.budget_plan_left_to_spend)
     }
     val headlineColor = when {
-        overspent != null -> MaterialTheme.colorScheme.error
+        // Red is reserved for an overshoot worth acting on. The word above the
+        // figure still says "przekroczono o 0,78" either way — that is a fact,
+        // and the rows below have separated the fact from the alarm since 0.21.
+        plan.seriouslyOverspent -> MaterialTheme.colorScheme.error
+        // Over by a rounding error lands in the same amber as 80–100%, never in
+        // the neutral colour: the escalation has to stay monotone, and a month
+        // a hair past its money cannot read calmer than one at 95% of it.
+        overspent != null -> MaterialTheme.colorScheme.tertiary
         // A month that ended inside its means is this screen's good outcome,
         // and it gets the colour "left to assign" used to take for zero.
         plan.hasPot && plan.closed -> MaterialTheme.colorScheme.primary
@@ -510,27 +517,45 @@ private fun PlanCard(plan: PlanState, onEditPlan: () -> Unit) {
             LinearProgressIndicator(
                 progress = { spentFraction },
                 modifier = Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(4.dp)),
-                color = if (overspent != null) {
-                    MaterialTheme.colorScheme.error
-                } else {
-                    MaterialTheme.colorScheme.primary
+                // The same three bands a row draws, and in the same colours:
+                // red past the alarm threshold, amber from 80% to it, primary
+                // below. The card had two bands and the row three, which is how
+                // a card could be shouting above a list of rows all saying they
+                // were fine.
+                color = when {
+                    plan.seriouslyOverspent -> MaterialTheme.colorScheme.error
+                    spentFraction >= 0.8f -> MaterialTheme.colorScheme.tertiary
+                    else -> MaterialTheme.colorScheme.primary
                 },
             )
             Spacer(Modifier.height(12.dp))
             // Planning, in one line, at the foot of the card: the branch off
             // the subtotal that the column above cannot carry. Red when more
             // has been handed out than the month has.
+            val leftToAssign = plan.leftToAssignMinor ?: 0
             Text(
-                text = stringResource(
-                    R.string.budget_plan_assigned_hint,
-                    Money.formatWithCurrency(plan.assignedMinor),
-                    Money.formatWithCurrency(plan.leftToAssignMinor ?: 0),
-                ),
-                style = MaterialTheme.typography.bodySmall,
-                color = if (plan.overAssigned) {
-                    MaterialTheme.colorScheme.error
+                text = if (plan.overAssigned) {
+                    // "do zaplanowania -0,78 zł" made the reader do the sign, in
+                    // the one place on this card where a minus is not an
+                    // operator. Said as a size, the way a row has always said
+                    // "przekroczono o".
+                    stringResource(
+                        R.string.budget_plan_assigned_over,
+                        Money.formatWithCurrency(plan.assignedMinor),
+                        Money.formatWithCurrency(-leftToAssign),
+                    )
                 } else {
-                    MaterialTheme.colorScheme.onSurfaceVariant
+                    stringResource(
+                        R.string.budget_plan_assigned_hint,
+                        Money.formatWithCurrency(plan.assignedMinor),
+                        Money.formatWithCurrency(leftToAssign),
+                    )
+                },
+                style = MaterialTheme.typography.bodySmall,
+                color = when {
+                    plan.seriouslyOverAssigned -> MaterialTheme.colorScheme.error
+                    plan.overAssigned -> MaterialTheme.colorScheme.tertiary
+                    else -> MaterialTheme.colorScheme.onSurfaceVariant
                 },
             )
         }

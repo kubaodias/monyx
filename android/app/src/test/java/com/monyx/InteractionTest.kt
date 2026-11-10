@@ -11,8 +11,10 @@ import com.monyx.ui.add.AddViewModel
 import com.monyx.ui.add.EntryKind
 import com.monyx.ui.add.categoryMarkOf
 import com.monyx.ui.add.familyHasChildren
+import com.monyx.ui.budget.BudgetBand
 import com.monyx.ui.budget.PlanDraft
 import com.monyx.ui.budget.PlanState
+import com.monyx.ui.budget.overBudgetBand
 import com.monyx.ui.overview.OverviewViewModel
 import com.monyx.ui.overview.PieSlice
 import com.monyx.ui.overview.sliceIdAt
@@ -567,6 +569,63 @@ class InteractionTest {
         assertNull(empty.leftToAssignMinor)
         assertNull(empty.leftToSpendMinor)
         assertEquals(false, empty.overAssigned)
+    }
+
+    @Test
+    fun `78 grosze over the budget is not an alarm`() {
+        // The household's own case: the limits were being filled in to the last
+        // grosz and the ninth one tipped 24 837,97 over a 24 837,19 budget. The
+        // card lit up as loudly as a month three thousand overdrawn, while every
+        // row under it was drawing the same overshoot in amber.
+        val november = plan(planned = 22_000_00, assigned = 24_837_97, spent = 6_266_36)
+            .copy(
+                incomeMinor = 24_450_00,
+                carryOverMinor = 387_19,
+                carryOverAccounts = listOf("Portfel"),
+            )
+        assertEquals(24_837_19L, november.availableMinor)
+        assertEquals(-78L, november.leftToAssignMinor)
+        // Over is still a fact, and the line still says so, as a size.
+        assertEquals(true, november.overAssigned)
+        // It is the ALARM that is reserved for an overshoot worth acting on.
+        assertEquals(false, november.seriouslyOverAssigned)
+    }
+
+    @Test
+    fun `handing out hundreds more than the month has is`() {
+        val overdrawn = plan(planned = 24_450_00, assigned = 25_000_00, spent = 0)
+            .copy(incomeMinor = 24_450_00)
+        assertEquals(true, overdrawn.seriouslyOverAssigned)
+    }
+
+    @Test
+    fun `the same threshold governs spending, and it is the rows' own`() {
+        val base = plan(planned = 0, assigned = 0, spent = 0).copy(incomeMinor = 24_837_19)
+        // One per cent of 24 837,19 is 248,37. A hundred złoty past the month's
+        // money is over — the headline says "przekroczono o 100,00" — and it is
+        // amber, not red.
+        val hair = base.copy(spentMinor = 24_937_19)
+        assertEquals(100_00L, hair.overspentMinor)
+        assertEquals(false, hair.seriouslyOverspent)
+        // Three hundred is past the threshold, and the rows and the card agree
+        // on where that is because they ask the same function.
+        val serious = base.copy(spentMinor = 25_137_19)
+        assertEquals(300_00L, serious.overspentMinor)
+        assertEquals(true, serious.seriouslyOverspent)
+        assertEquals(
+            BudgetBand.Over,
+            overBudgetBand(serious.spentMinor, serious.availableMinor),
+        )
+    }
+
+    @Test
+    fun `a month with no pot has nothing to be over, loudly or quietly`() {
+        // Limits carry forward, so this month starts out with 19 099,00 handed
+        // out against a pot that does not exist. Neither flag may fire.
+        val empty = PlanState("2026-12", hasPlan = false, assignedMinor = 19_099_00, spentMinor = 500_00)
+        assertEquals(false, empty.overAssigned)
+        assertEquals(false, empty.seriouslyOverAssigned)
+        assertEquals(false, empty.seriouslyOverspent)
     }
 
     @Test
