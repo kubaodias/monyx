@@ -106,7 +106,6 @@
     <string name="transactions_delete_confirm_message">Tej operacji nie można cofnąć.</string>
 
     <!-- Budget -->
-    <string name="budget_plan_to_assign">Nierozdane</string>
     <string name="budget_plan_edit">Plan na ten miesiąc</string>
     <string name="budget_plan_remove">Usuń plan</string>
     <string name="budget_plan_none">Nic jeszcze nie wpłynęło w tym miesiącu. Jeśli chcesz zaplanować z góry, wpisz, ile się spodziewasz.</string>
@@ -120,7 +119,8 @@
     <string name="budget_plan_pot">Budżet na miesiąc</string>
     <string name="budget_plan_below_income">Wpłynęło już %1$s — niższa prognoza nic nie zmieni.</string>
     <string name="budget_plan_income">Wpłynęło</string>
-    <string name="budget_plan_assigned_hint">Rozdane %1$s · nierozdane %2$s</string>
+    <string name="budget_plan_assigned_hint">Zaplanowane %1$s · do zaplanowania %2$s</string>
+    <string name="budget_plan_income_so_far">wpłynęło do tej pory %1$s</string>
     <string name="budget_empty">Nie ustawiono jeszcze żadnych limitów</string>
     <string name="budget_set_limit">Ustaw limit</string>
     <string name="budget_edit_limit">Zmień limit</string>

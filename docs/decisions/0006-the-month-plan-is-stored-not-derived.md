@@ -274,3 +274,56 @@ what is typed into it owes the reader a sentence, so the sheet prints one:
 only. The case the sheet exists for is a month whose pay has not landed, and
 there every keypress moves every figure.
 
+## The card is a column sum (2026-11-09)
+
+The household's reading of the four figures under the headlines: couldn't it be
+a column, like primary-school arithmetic, with rules that total and separate at
+the same time. In the order the money arrives — what came in, plus what last
+month left, the budget, less what has gone.
+
+They are right, and the form is not decoration. The four lines were equal in
+weight and nothing on screen said which of them added up to which; two of them
+do, and a reader had to be told so in prose (this file) rather than shown.
+
+    Wpłynęło                   24 450,00
+  + Z poprzedniego miesiąca       387,19
+    ──────────────────────────────────────
+    Budżet na miesiąc          24 837,19
+  − Wydane                      6 424,33
+    ──────────────────────────────────────
+    Zostało do wydania
+    18 412,86
+
+Three things the form settled that the old layout had left open.
+
+**The first term must be the figure that won.** The pot is
+`max(forecast, income) + carry-over`, so in a month whose forecast still leads —
+December planned in November, 30 000 expected against 2 000 in — a column headed
+"Wpłynęło 2 000" simply would not add up to the total under the rule. So the
+first row is whichever figure the pot was taken from, with what has arrived so
+far as a sub-line beneath it. A column cannot lie about its own addends, which
+is the argument for drawing one.
+
+**The operator is structural, not a warning.** A month that closed in the red
+used to print "-5 128,98" in red, as if carrying a shortfall were an error. In a
+column it is a minus sign in its own slot, and the sum still works.
+
+**One figure leads, not two.** This reverses the 0.29.1 decision above, which
+put "left to plan" beside "left to spend" as an equal headline, and it is
+reversed for a reason the sum makes plain rather than a change of taste:
+spending and assigning are two branches off the SAME subtotal — both come off
+the budget, neither off the other. A column that subtracted one after the other
+would read as sequential arithmetic and produce nonsense. Planning is also a
+once-a-month act against a daily one, so it keeps a line rather than a headline,
+at the foot of the card, saying both halves at once.
+
+**And what that line is called.** „Rozdane / nierozdane" lasted one release. The
+household asked for „zaplanowane / niezaplanowane", their own verb, and the
+first half is now exactly that — but not the second: *niezaplanowane wydatki* is
+settled Polish for spending you did not foresee, and this screen HAS such
+spending (315,60 zł of November went to categories with no limit, and it eats
+precisely this pool). One word would have named two different things on one
+card. With the preposition it is a task and not a property of an expense, so the
+line reads „Zaplanowane 20 355,00 · do zaplanowania 4 482,19" — which also
+returns the name this figure carried for three months.
+

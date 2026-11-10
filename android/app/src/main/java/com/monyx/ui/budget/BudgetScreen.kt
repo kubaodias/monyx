@@ -372,23 +372,38 @@ private fun SortRow(sort: BudgetSort, onSelect: (BudgetSort) -> Unit) {
 }
 
 /**
- * The month on one card: how much there is still to spend, and what that figure
- * is made of.
+ * The month on one card, as a column sum.
  *
- * "Left to assign" used to be the headline, for the reason ADR 0006 gives: it is
- * the figure that says whether the PLAN is finished, and zero is its goal. What
- * it does not say is anything about the month. A household reading this card in
- * the fourth week has finished planning and is asking one question — is there
- * money — and the answer to that was the fifth of five small lines, in the same
- * weight as "assigned to categories", under a headline reading 0,00 in the
- * colour of success.
+ * The figures were four equal lines under two headlines, and nothing on screen
+ * said which of them added up. The household's own reading of it: "couldn't it
+ * be a column, like primary-school arithmetic, with rules that total and
+ * separate at the same time". They are right, and the form is not decoration —
+ * it is a claim the old layout was making silently and sometimes wrongly:
  *
- * So the state leads and the plan follows — side by side, and in that order:
- * what is left to SPEND on the left, what is left to PLAN on the right. Two
- * headlines rather than one and a footnote, because they are the two questions
- * this card exists to answer and neither is a detail of the other; the lines
- * underneath are then only the arithmetic behind them. The bar belongs to the
- * left figure, which is why it measures spending.
+ *     Wpłynęło                   24 450,00
+ *   + Z poprzedniego miesiąca       387,19
+ *     ──────────────────────────────────────
+ *     Budżet na miesiąc          24 837,19
+ *   − Wydane                      6 424,33
+ *     ──────────────────────────────────────
+ *     Zostało do wydania
+ *     18 412,86
+ *
+ * Writing it as a sum forced out one thing the card had been hiding. The pot is
+ * `max(forecast, income) + carry-over`, so in a month whose forecast still
+ * leads — December planned in November, 30 000 expected against 2 000 in — a
+ * column headed "Wpłynęło 2 000" would not add up to the total under the rule.
+ * The first term is therefore whichever figure WON, with what has arrived so
+ * far as a sub-line under it. A column cannot lie about its own addends.
+ *
+ * **One figure leads now, not two.** "Left to plan" was a headline beside this
+ * one since 0.29.1, deliberately, and it loses that place for a reason the sum
+ * makes plain: it is not the next step of this column. Spending and assigning
+ * are two branches off the SAME subtotal — both come off the budget, neither
+ * off the other — so a column that subtracted one after the other would read as
+ * arithmetic and produce nonsense. Planning happens once a month; the figure it
+ * needs is the small line at the foot of the card, where it says both halves at
+ * once, "zaplanowane … do zaplanowania …".
  *
  * Two things the headline does rather than print a negative: it says "over by"
  * the way every row of the list below it has always said it, and on a month
@@ -416,46 +431,8 @@ private fun PlanCard(plan: PlanState, onEditPlan: () -> Unit) {
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
     ) {
         Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                HeadlineFigure(
-                    label = headlineLabel,
-                    // An em dash, not a figure, while the month is unplanned.
-                    // The size, not the sign: the word above says which way it
-                    // points.
-                    value = when {
-                        !plan.hasPot -> "—"
-                        overspent != null -> Money.formatWithCurrency(overspent)
-                        else -> Money.formatWithCurrency(plan.leftToSpendMinor ?: 0)
-                    },
-                    color = headlineColor,
-                    modifier = Modifier.weight(1f),
-                )
-                // The plan on paper, beside the month as it is going. Zero here
-                // is the goal and is drawn as success, which is the rule this
-                // figure has carried since ADR 0006 — it is the figure's own
-                // meaning and does not change by moving.
-                HeadlineFigure(
-                    label = stringResource(R.string.budget_plan_to_assign),
-                    value = plan.leftToAssignMinor?.let { Money.formatWithCurrency(it) } ?: "—",
-                    color = when {
-                        plan.overAssigned -> MaterialTheme.colorScheme.error
-                        plan.hasPot && plan.leftToAssignMinor == 0L -> MaterialTheme.colorScheme.primary
-                        else -> MaterialTheme.colorScheme.onSurface
-                    },
-                    modifier = Modifier.weight(1f),
-                )
-                IconButton(onClick = onEditPlan) {
-                    Icon(
-                        Icons.Filled.Edit,
-                        contentDescription = stringResource(R.string.budget_plan_edit),
-                    )
-                }
-            }
-
             if (!plan.hasPot) {
+                HeadlineRow(headlineLabel, "—", headlineColor, onEditPlan)
                 Spacer(Modifier.height(6.dp))
                 Text(
                     text = stringResource(R.string.budget_plan_none),
@@ -465,19 +442,65 @@ private fun PlanCard(plan: PlanState, onEditPlan: () -> Unit) {
                 return@Column
             }
 
-            Spacer(Modifier.height(12.dp))
-            // How much of the month's money has gone — the bar belongs to the
-            // figure on the left above it, so it measures spending rather than
-            // assignment. Against what is available, not against the plan: a bar
-            // reading 82% under a headline reading -767,74 is the bar
-            // contradicting the figure it sits beneath. Capped at 1f, because
-            // going over is said in red by the words, not by a bar drawing past
-            // its own end.
-            //
-            // A hole bigger than the plan leaves nothing to divide by, and then
-            // a full bar is the honest answer rather than an empty one: the
-            // month's money is gone. Nothing here may look calmer than the
-            // state before it.
+            // The first term: whichever of the two the pot was taken from, so
+            // that the figures above the rule add up to the one below it.
+            val forecast = plan.forecastMinor
+            if (forecast == null) {
+                SumRow(
+                    label = stringResource(R.string.budget_plan_income),
+                    value = Money.formatWithCurrency(plan.incomeMinor),
+                )
+            } else {
+                SumRow(
+                    label = stringResource(R.string.budget_plan_total),
+                    value = Money.formatWithCurrency(forecast),
+                    hint = stringResource(
+                        R.string.budget_plan_income_so_far,
+                        Money.formatWithCurrency(plan.incomeMinor),
+                    ),
+                )
+            }
+            if (plan.carryOverMinor != 0L) {
+                // The sign is the operator, in its own slot, not a minus glued
+                // to a figure — which is what a month that closed in the red
+                // used to be: "-5 128,98" printed in red, as if a shortfall
+                // being carried were an error rather than a subtraction.
+                SumRow(
+                    sign = if (plan.carryOverMinor > 0) "+" else "−",
+                    label = stringResource(R.string.budget_plan_carry_over),
+                    value = Money.formatWithCurrency(kotlin.math.abs(plan.carryOverMinor)),
+                )
+            }
+            SumRule()
+            SumRow(
+                label = stringResource(R.string.budget_plan_pot),
+                value = Money.formatWithCurrency(plan.availableMinor),
+                emphasis = true,
+            )
+            SumRow(
+                sign = "−",
+                label = stringResource(R.string.budget_plan_spent),
+                value = Money.formatWithCurrency(plan.spentMinor),
+            )
+            SumRule()
+
+            Spacer(Modifier.height(14.dp))
+            HeadlineRow(
+                label = headlineLabel,
+                // The size, not the sign: the word above says which way it
+                // points.
+                value = Money.formatWithCurrency(overspent ?: plan.leftToSpendMinor ?: 0),
+                color = headlineColor,
+                onEditPlan = onEditPlan,
+            )
+            Spacer(Modifier.height(8.dp))
+            // How much of the month's money has gone. Against the whole pot,
+            // not against the forecast: a bar reading 82% under a headline
+            // reading -767,74 is the bar contradicting the figure it sits
+            // beneath. Capped at 1f, because going over is said in red by the
+            // words, not by a bar drawing past its own end — and a hole bigger
+            // than the pot leaves nothing to divide by, where a full bar is the
+            // honest answer rather than an empty one.
             val spentFraction = when {
                 plan.availableMinor > 0 ->
                     (plan.spentMinor.toFloat() / plan.availableMinor.toFloat()).coerceIn(0f, 1f)
@@ -493,101 +516,89 @@ private fun PlanCard(plan: PlanState, onEditPlan: () -> Unit) {
                     MaterialTheme.colorScheme.primary
                 },
             )
-
             Spacer(Modifier.height(12.dp))
-            // The pot itself, and then where it came from. This line used to
-            // print what the household had TYPED, which is the only figure on
-            // the card that was an echo rather than an answer — and it was
-            // 2 837,19 smaller than the money actually in play, with the
-            // difference printed two lines below as a hint. The pot leads now
-            // and the two lines under it add up to it.
-            PlanFigure(
-                label = stringResource(R.string.budget_plan_pot),
-                value = Money.formatWithCurrency(plan.availableMinor),
-                emphasis = true,
-            )
-            // The forecast, while it is still the figure doing the work: before
-            // pay lands, the pot IS what somebody typed, and then it has to be
-            // readable. Once income has passed it, it is a number with no job.
-            plan.forecastMinor?.let { forecast ->
-                PlanFigure(
-                    label = stringResource(R.string.budget_plan_the_plan),
-                    value = Money.formatWithCurrency(forecast),
-                )
-            }
-            PlanFigure(
-                label = stringResource(R.string.budget_plan_income),
-                value = Money.formatWithCurrency(plan.incomeMinor),
-            )
-            if (plan.hasCarryOver) {
-                PlanFigure(
-                    label = stringResource(R.string.budget_plan_carry_over),
-                    value = (if (plan.carryOverMinor > 0) "+" else "") +
-                        Money.formatWithCurrency(plan.carryOverMinor),
-                    valueColor = if (plan.carryOverMinor < 0) MaterialTheme.colorScheme.error else null,
-                )
-            }
-            PlanFigure(
-                label = stringResource(R.string.budget_plan_spent),
-                value = Money.formatWithCurrency(plan.spentMinor),
+            // Planning, in one line, at the foot of the card: the branch off
+            // the subtotal that the column above cannot carry. Red when more
+            // has been handed out than the month has.
+            Text(
+                text = stringResource(
+                    R.string.budget_plan_assigned_hint,
+                    Money.formatWithCurrency(plan.assignedMinor),
+                    Money.formatWithCurrency(plan.leftToAssignMinor ?: 0),
+                ),
+                style = MaterialTheme.typography.bodySmall,
+                color = if (plan.overAssigned) {
+                    MaterialTheme.colorScheme.error
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                },
             )
         }
     }
 }
 
 /**
- * One of the card's two leading figures.
+ * The card's one leading figure, with the way into the editor beside it.
  *
- * Both at the same size and weight, because neither is the subtitle of the
- * other, and `softWrap = false` on the figure: two amounts and a pencil across a
- * phone is tight, and a figure that wraps mid-number is worse than one that is
- * clipped — the lines below carry the same arithmetic either way.
+ * `softWrap = false` on the amount: a figure that wraps mid-number is worse than
+ * one that is clipped, and the column above carries the same arithmetic either
+ * way.
  */
 @Composable
-private fun HeadlineFigure(
+private fun HeadlineRow(
     label: String,
     value: String,
-    color: androidx.compose.ui.graphics.Color,
-    modifier: Modifier = Modifier,
+    color: Color,
+    onEditPlan: () -> Unit,
 ) {
-    Column(modifier = modifier.padding(end = 8.dp)) {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
-        Text(
-            text = value,
-            softWrap = false,
-            style = MaterialTheme.typography.headlineSmall.copy(fontFeatureSettings = "tnum"),
-            fontWeight = FontWeight.SemiBold,
-            color = color,
-        )
+    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                text = value,
+                softWrap = false,
+                style = MaterialTheme.typography.headlineSmall.copy(fontFeatureSettings = "tnum"),
+                fontWeight = FontWeight.SemiBold,
+                color = color,
+            )
+        }
+        IconButton(onClick = onEditPlan) {
+            Icon(Icons.Filled.Edit, contentDescription = stringResource(R.string.budget_plan_edit))
+        }
     }
 }
 
 /**
- * One figure of the card, with an optional second line under it.
+ * One line of the column: an operator, what it is, and how much.
  *
- * The [hint] carries what the figure means rather than another figure — "1
- * 947,02 over the plan", "in three categories". It hangs under the amount and
- * right-aligned with it, so the column of amounts stays a column and the
- * explanation does not push the label into an ellipsis.
+ * The operator sits in a fixed slot to the left of the label rather than beside
+ * the amount, so every digit in the card lines up under every other digit —
+ * which is the whole point of writing it as a sum. `tnum` does the rest.
  */
 @Composable
-private fun PlanFigure(
+private fun SumRow(
     label: String,
     value: String,
+    sign: String? = null,
     emphasis: Boolean = false,
     hint: String? = null,
-    valueColor: androidx.compose.ui.graphics.Color? = null,
 ) {
     Row(
         modifier = Modifier.fillMaxWidth().padding(vertical = 3.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.Top,
     ) {
+        Text(
+            text = sign ?: "",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.width(SignSlot),
+        )
         // The label gives way, never the figure: a long carry-over label
         // ellipsises instead of wrapping the amount onto a second line.
         Text(
@@ -598,13 +609,14 @@ private fun PlanFigure(
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.weight(1f, fill = false).padding(end = 12.dp),
         )
+        Spacer(Modifier.weight(1f))
         Column(horizontalAlignment = Alignment.End) {
             Text(
                 text = value,
                 softWrap = false,
                 style = MaterialTheme.typography.bodyMedium.copy(fontFeatureSettings = "tnum"),
                 fontWeight = if (emphasis) FontWeight.SemiBold else FontWeight.Normal,
-                color = valueColor ?: MaterialTheme.colorScheme.onSurface,
+                color = MaterialTheme.colorScheme.onSurface,
             )
             if (hint != null) {
                 Text(
@@ -614,6 +626,29 @@ private fun PlanFigure(
                 )
             }
         }
+    }
+}
+
+/** The width the operators get, so the labels start on the same x with or without one. */
+private val SignSlot = 14.dp
+
+/**
+ * The rule that totals and separates at once.
+ *
+ * Over the figures only, not across the card: full width reads as a section
+ * divider, and this is an underline in a notebook. Two thirds, so it clears the
+ * longest label this card has.
+ */
+@Composable
+private fun SumRule() {
+    Row(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+        Spacer(Modifier.weight(1f))
+        Box(
+            modifier = Modifier
+                .weight(2f)
+                .height(1.dp)
+                .background(MaterialTheme.colorScheme.outlineVariant),
+        )
     }
 }
 
