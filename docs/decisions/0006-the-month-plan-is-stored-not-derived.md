@@ -346,3 +346,23 @@ answering the column ended 48 dp short of every term in it. The figure is now
 right-aligned on the card's edge like the terms, and the way into the editor sits
 in the left margin, in space that was empty anyway. An affordance can move; the
 answer cannot leave the column it answers.
+
+### The assistant reads the same column (2026-11-10)
+
+The voice assistant had been handed `planned_minor` raw, as `planned="…"` on its
+`<month>` element, since before any of this. Asked what November's budget was it
+would have said 22 000,00 — the floor, 2 837,19 under the money the household
+actually had, with the phone on the table saying 24 837,19. One number on that
+document, and it was the one number that answers no question a caller asks.
+
+So `monthBudget()` in `server/src/voice.ts` is now the second implementation of
+this ADR, beside `PlanState` in `BudgetViewModel.kt`, and the digest carries the
+whole column in the order the card reads it. Three things had to move with it,
+and each was already a rule written down somewhere else: the figures count the
+default account alone (`budgetAccountIds`), the carry-over counts only an account
+the household actually spends from (`spendingAccountIds`), and the stored
+forecast is reported only while it still leads — a dead forecast read out loud is
+a wrong answer, not a smaller one.
+
+Two implementations of one rule is a cost, accepted here for the same reason
+`budgetStatuses` already pays it: the phone is not reachable from a phone call.

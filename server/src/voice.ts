@@ -200,9 +200,30 @@ export interface DigestData {
   expense_minor: number;
   planned_minor: number | null;
   previous_expense_minor: number;
+  /** The account the budget counts, by name — null when the household has none. */
+  budget_account: string | null;
+  /** What came in on THAT account this month, and what went out of it. */
+  budget_income_minor: number;
+  budget_expense_minor: number;
+  /** What that account closed the previous month at. See collectDigest. */
+  carry_over_minor: number;
   budgets: DigestBudget[];
   spending: DigestSpend[];
   recent: DigestTx[];
+}
+
+/** The Budget screen's column, as the assistant gets to read it. */
+export interface MonthBudget {
+  account: string;
+  income_minor: number;
+  carry_over_minor: number;
+  /** The stored forecast, present only while it is still bigger than income. */
+  forecast_minor: number | null;
+  budget_minor: number;
+  spent_minor: number;
+  left_to_spend_minor: number;
+  assigned_minor: number;
+  left_to_assign_minor: number;
 }
 
 function monthBounds(period: string): [string, string] {
@@ -303,6 +324,89 @@ export async function collectDigest(
     .bind(hh, period)
     .first<{ planned_minor: number }>();
 
+  // The Budget screen's column, computed here so the assistant can read out the
+  // same figures the household is looking at.
+  //
+  // THREE things make it different from <month> above, and all three are why
+  // quoting planned_minor as "the budget" was wrong:
+  //
+  //  1. It counts ONE account — the default one, the money everything is spent
+  //     from. Same rule as budgetStatuses(), stated in DefaultAccount.kt.
+  //  2. It adds what that account closed last month at, the carry-over, and
+  //     only when the account was actually spent from last month — a pot nobody
+  //     pays out of is not money that was there to spend (spendingAccountIds).
+  //  3. The stored plan is a FLOOR, not the pot: once more has arrived than was
+  //     forecast, the month is as rich as it is. See ADR 0006.
+  //
+  // Converted to złoty per transaction, like budgetStatuses and like the phone's
+  // ledger_pln view. For a złoty account — which the default one is here — this
+  // agrees with the phone to the grosz; for a foreign one the phone values the
+  // whole closing balance at one rate instead, the compromise budgets.ts
+  // already records.
+  const prevPeriod = previousPeriod(period);
+  const budgetMonth = await db
+    .prepare(
+      `WITH def AS (
+         SELECT a.id AS id, a.name AS name, a.initial_balance_minor AS opening
+           FROM accounts a
+          WHERE a.household_id = ?1 AND a.deleted = 0 AND a.archived = 0
+          ORDER BY a.excluded_from_summary, a.sort_order, a.name
+          LIMIT 1
+       ),
+       pln AS (
+         SELECT t.kind                AS kind,
+                t.account_id          AS account_id,
+                t.transfer_account_id AS transfer_account_id,
+                t.occurred_on         AS occurred_on,
+                CASE WHEN COALESCE(t.currency, 'PLN') = 'PLN' THEN t.amount_minor
+                     ELSE (t.amount_minor * (
+                             SELECT r.rate_micro FROM fx_rates r
+                              WHERE r.currency = t.currency
+                                AND r.effective_on <= t.occurred_on
+                              ORDER BY r.effective_on DESC LIMIT 1
+                          )) / 1000000
+                END                   AS pln_minor
+           FROM transactions t
+          WHERE t.household_id = ?1 AND t.deleted = 0
+       )
+       SELECT def.name AS account,
+              (SELECT COALESCE(SUM(CASE WHEN p.kind = 'income' THEN p.pln_minor ELSE 0 END), 0)
+                 FROM pln p
+                WHERE p.account_id = def.id
+                  AND substr(p.occurred_on, 1, 7) = ?2)            AS income_minor,
+              (SELECT COALESCE(SUM(CASE WHEN p.kind = 'expense' THEN p.pln_minor ELSE 0 END), 0)
+                 FROM pln p
+                WHERE p.account_id = def.id
+                  AND substr(p.occurred_on, 1, 7) = ?2)            AS expense_minor,
+              CASE WHEN EXISTS (
+                     SELECT 1 FROM pln p
+                      WHERE p.kind = 'expense'
+                        AND p.account_id = def.id
+                        AND substr(p.occurred_on, 1, 7) = ?3
+                        AND p.account_id NOT IN
+                            (SELECT id FROM accounts WHERE excluded_from_summary = 1))
+                   THEN def.opening
+                        + (SELECT COALESCE(SUM(CASE p.kind WHEN 'income' THEN p.pln_minor
+                                                           ELSE -p.pln_minor END), 0)
+                             FROM pln p
+                            WHERE p.account_id = def.id AND p.occurred_on <= ?4)
+                        + (SELECT COALESCE(SUM(p.pln_minor), 0)
+                             FROM pln p
+                            WHERE p.transfer_account_id = def.id
+                              AND p.kind = 'transfer'
+                              AND p.occurred_on <= ?4)
+                   ELSE 0
+              END                                                  AS carry_over_minor
+         FROM def`,
+    )
+    .bind(hh, period, prevPeriod, prevTo)
+    .first<{
+      account: string;
+      income_minor: number;
+      expense_minor: number;
+      carry_over_minor: number;
+    }>();
+
   // Rolled up to the root, the way a budget is: a limit on Home covers
   // Home > Repairs, so the spend that answers "how much on Home" must too.
   const { results: spending } = await db
@@ -369,6 +473,10 @@ export async function collectDigest(
     expense_minor: totalOf("expense"),
     planned_minor: plan?.planned_minor ?? null,
     previous_expense_minor: previous?.total ?? 0,
+    budget_account: budgetMonth?.account ?? null,
+    budget_income_minor: budgetMonth?.income_minor ?? 0,
+    budget_expense_minor: budgetMonth?.expense_minor ?? 0,
+    carry_over_minor: budgetMonth?.carry_over_minor ?? 0,
     budgets: budgets.map((b) => ({
       category: b.category_name,
       limit_minor: b.limit_minor,
@@ -380,6 +488,46 @@ export async function collectDigest(
       spent_minor: row.spent_minor,
     })),
     recent,
+  };
+}
+
+/**
+ * The month as the Budget screen states it, or null when there is nothing to
+ * state.
+ *
+ * This is PlanState in BudgetViewModel.kt, in TypeScript — the second
+ * implementation of ADR 0006's rule, and it exists because the assistant was
+ * quoting `planned_minor` as the budget. On a November where 22 000,00 was
+ * typed and 24 450,00 arrived, that answer was 2 837,19 short of the money the
+ * household actually had, and the phone on the table said so.
+ *
+ * - The pot is max(forecast, what arrived) + the carry-over. A figure somebody
+ *   typed cannot make the month poorer than it is, and cannot be taken away
+ *   while it is still ahead of the money.
+ * - The forecast is reported only while it LEADS. Once the month has overtaken
+ *   it, it is a dead number, and a dead number read out loud is a wrong answer.
+ * - Null when nothing was planned and nothing has come in: the card shows
+ *   dashes there, and the assistant should say it does not know rather than
+ *   quote a pot of zero that limits are already assigned against.
+ */
+export function monthBudget(data: DigestData): MonthBudget | null {
+  if (data.budget_account === null) return null;
+  const income = data.budget_income_minor;
+  const forecast = data.planned_minor;
+  if (forecast === null && income <= 0) return null;
+
+  const budget = Math.max(forecast ?? 0, income) + data.carry_over_minor;
+  const assigned = data.budgets.reduce((sum, b) => sum + b.limit_minor, 0);
+  return {
+    account: data.budget_account,
+    income_minor: income,
+    carry_over_minor: data.carry_over_minor,
+    forecast_minor: forecast !== null && forecast > income ? forecast : null,
+    budget_minor: budget,
+    spent_minor: data.budget_expense_minor,
+    left_to_spend_minor: budget - data.budget_expense_minor,
+    assigned_minor: assigned,
+    left_to_assign_minor: budget - assigned,
   };
 }
 
@@ -433,13 +581,34 @@ export function renderDigest(data: DigestData): string {
   }
   lines.push("  </accounts>");
 
+  // Every account, which is the question "how much came in this month".
   lines.push(
     `  <month income="${amount(data.income_minor)}" expense="${amount(data.expense_minor)}" net="${amount(
       data.income_minor - data.expense_minor,
-    )}"${
-      data.planned_minor === null ? "" : ` planned="${amount(data.planned_minor)}"`
-    } previous_month_expense="${amount(data.previous_expense_minor)}"/>`,
+    )}" previous_month_expense="${amount(data.previous_expense_minor)}"/>`,
   );
+
+  // And the budget's own column, which is the question "how much have we got".
+  // The attributes are in the order the card reads, top to bottom, so that an
+  // assistant reading them out in order says a sum that adds up:
+  // income (or forecast) + carry_over = budget, − spent = left_to_spend.
+  //
+  // `planned` used to sit on <month> above instead of all this, and it was the
+  // one number here that is NOT the answer to anything a caller asks.
+  const budget = monthBudget(data);
+  if (budget !== null) {
+    lines.push(
+      `  <month_budget${attr("account", budget.account)} income="${amount(budget.income_minor)}"${
+        budget.forecast_minor === null ? "" : ` forecast="${amount(budget.forecast_minor)}"`
+      } carry_over="${amount(budget.carry_over_minor)}" budget="${amount(
+        budget.budget_minor,
+      )}" spent="${amount(budget.spent_minor)}" left_to_spend="${amount(
+        budget.left_to_spend_minor,
+      )}" assigned="${amount(budget.assigned_minor)}" left_to_assign="${amount(
+        budget.left_to_assign_minor,
+      )}"/>`,
+    );
+  }
 
   if (data.budgets.length > 0) {
     lines.push("  <budgets>");

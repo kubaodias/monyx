@@ -15,6 +15,7 @@ import {
   collectDigest,
   escapeXml,
   findCaller,
+  monthBudget,
   newTicketId,
   normalizeMsisdn,
   parseAllowlist,
@@ -263,6 +264,127 @@ test("previousPeriod crosses the new year", () => {
   assert.equal(previousPeriod("2026-09"), "2026-08");
 });
 
+// ------------------------------------------------------- the budget's column
+
+/**
+ * November 2026 off the household's phone, in the fixture's month.
+ *
+ * A round 22 000,00 was typed into the plan, 24 450,00 actually came in, the
+ * account closed the previous month 387,19 to the good, 6 266,36 has gone out,
+ * and nine limits add up to 20 355,00. Every figure here is one somebody read
+ * off the card and asked about out loud.
+ */
+async function november(db: ReturnType<typeof forHousehold>, fake: FakeDb, typed: number | null) {
+  // 1 387,19 opening less a 1 000,00 July expense closes July at 387,19 — and
+  // the expense is also what makes Gotowka an account money is spent FROM,
+  // which is what admits its closing balance to the carry-over at all.
+  fake.db.exec("UPDATE accounts SET initial_balance_minor = 138719 WHERE id = 'acc1';");
+  fake.db.exec(
+    `INSERT INTO budgets (id, household_id, category_id, period, limit_minor, seq, deleted)
+     VALUES ('b1', 'hh1', 'cat1', '${PERIOD}', 2035500, 70, 0);`,
+  );
+  const income = {
+    table: "transactions",
+    row: {
+      id: "in1",
+      kind: "income",
+      amount_minor: 2_445_000,
+      account_id: "acc1",
+      category_id: null,
+      occurred_at: 1_756_000_000_000,
+      occurred_on: `${PERIOD}-09`,
+      created_by: "mem1",
+      created_at: 1_756_000_000_000,
+      deleted: 0,
+    },
+  };
+  const changes: unknown[] = [
+    expense("jul", 100_000, "cat1", "2026-07-14"),
+    income,
+    expense("t1", 626_636, "cat1", `${PERIOD}-06`),
+  ];
+  if (typed !== null) {
+    changes.push({
+      table: "month_plans",
+      row: { id: "p1", period: PERIOD, planned_minor: typed, deleted: 0 },
+    });
+  }
+  await push(db, changes as Parameters<typeof push>[1]);
+}
+
+test("the pot is what the month has, not what somebody typed", async () => {
+  const { fake, db } = setup();
+  await november(db, fake, 2_200_000);
+
+  const budget = monthBudget(await collectDigest(db, PERIOD, TODAY));
+  assert.ok(budget);
+  // The four figures the card shows, to the grosz: 24 837,19 budget,
+  // 18 570,83 left to spend, 20 355,00 planned out, 4 482,19 left to plan.
+  assert.equal(budget.account, "Gotowka");
+  assert.equal(budget.carry_over_minor, 38_719);
+  assert.equal(budget.budget_minor, 2_483_719);
+  assert.equal(budget.left_to_spend_minor, 1_857_083);
+  assert.equal(budget.assigned_minor, 2_035_500);
+  assert.equal(budget.left_to_assign_minor, 448_219);
+  // The typed figure is behind the money now, so it is not reported at all:
+  // 22 000,00 read out as "your budget" was the bug this answers.
+  assert.equal(budget.forecast_minor, null);
+});
+
+test("a forecast still ahead of the money leads, and is named as one", async () => {
+  const { fake, db } = setup();
+  await november(db, fake, 3_000_000);
+
+  const budget = monthBudget(await collectDigest(db, PERIOD, TODAY));
+  assert.ok(budget);
+  assert.equal(budget.forecast_minor, 3_000_000);
+  assert.equal(budget.budget_minor, 3_038_719);
+  assert.equal(budget.income_minor, 2_445_000);
+});
+
+test("a month nobody planned still has a pot once money has arrived", async () => {
+  const { fake, db } = setup();
+  await november(db, fake, null);
+
+  const budget = monthBudget(await collectDigest(db, PERIOD, TODAY));
+  assert.ok(budget);
+  assert.equal(budget.budget_minor, 2_483_719);
+  assert.equal(budget.forecast_minor, null);
+});
+
+test("the carry-over counts only an account the household spends from", async () => {
+  const { fake, db } = setup();
+  fake.db.exec("UPDATE accounts SET initial_balance_minor = 138719 WHERE id = 'acc1';");
+  await push(db, [expense("t1", 626_636, "cat1", `${PERIOD}-06`)]);
+
+  // Nothing was spent from Gotowka in July, so its closing balance is not money
+  // that was there to spend — same rule as spendingAccountIds on the phone.
+  const digest = await collectDigest(db, PERIOD, TODAY);
+  assert.equal(digest.carry_over_minor, 0);
+});
+
+test("the budget counts one account, where the month counts them all", async () => {
+  const { fake, db } = setup();
+  await push(db, [
+    expense("t1", 30_000, "cat1", `${PERIOD}-05`),
+    { table: "transactions", row: { ...expense("t2", 50_000, "cat1", `${PERIOD}-06`).row, account_id: "acc2" } },
+  ]);
+  const digest = await collectDigest(db, PERIOD, TODAY);
+  // An insurance premium leaving the other account is the month's spending, and
+  // is NOT what the limits govern. See budgetAccountIds in DefaultAccount.kt.
+  assert.equal(digest.expense_minor, 80_000);
+  assert.equal(digest.budget_expense_minor, 30_000);
+});
+
+test("a month with nothing planned and nothing in has no column at all", async () => {
+  const { db } = setup();
+  const digest = await collectDigest(db, PERIOD, TODAY);
+  assert.equal(monthBudget(digest), null);
+  // Rather than a pot of zero with 20 355,00 of limits assigned against it: the
+  // card shows a dash there, and the assistant has to say it does not know.
+  assert.ok(!renderDigest(digest).includes("<month_budget"));
+});
+
 // ------------------------------------------------------------------ rendering
 
 test("amounts render as a person would say them", () => {
@@ -294,6 +416,9 @@ test("the rendered digest is well-formed and carries the numbers", async () => {
   assert.match(xml, /<account name="Gotowka" balance="3900.00"\/>/);
   assert.match(xml, /<budget category="Jedzenie" limit="1000.00" spent="300.00" percent="30" remaining="700.00"\/>/);
   assert.match(xml, /<category name="Jedzenie" spent="300.00"\/>/);
+  // The raw plan used to ride along on <month> as planned="…", which is the one
+  // number on this document that answers no question a caller asks.
+  assert.ok(!xml.includes("planned="), "the stored forecast is not quoted as the budget");
   assert.match(xml, /<tx date="2026-08-05" kind="expense" amount="300.00" category="Jedzenie"/);
   assert.ok(xml.endsWith("</budget>"), "the document closes");
 
