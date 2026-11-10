@@ -366,3 +366,24 @@ a wrong answer, not a smaller one.
 
 Two implementations of one rule is a cost, accepted here for the same reason
 `budgetStatuses` already pays it: the phone is not reachable from a phone call.
+
+### Over is a fact; red is an alarm (2026-11-10)
+
+The rows under this card have separated those two since 0.21: a row 4 zł past a
+1 650 zł limit says „przekroczono o 4,20" in words and draws it in amber, because
+an alarm that fires for a rounding error is an alarm the eye learns to skip. One
+per cent of the limit is the threshold, and `overBudgetBand` is where it lives.
+
+The card had no such distinction and went red on the first grosz. The household
+found it the same day the column shipped, filling in limits to the last grosz:
+24 837,97 handed out against a 24 837,19 budget — over by 78 grosze — lit up
+exactly as loudly as a month 3 000 zł overdrawn, above a list of rows all saying
+they were fine. So both of the card's figures that can be over now ask the rows'
+own function, and red means the same thing everywhere on the screen.
+
+Two smaller things fell out of it. The bar had two bands where a row has three,
+so it jumped from primary straight to red with no amber in between; it now draws
+the rows' three. And the planning line said „do zaplanowania -0,78 zł" — the one
+place on a card built out of operators where a minus sign was not an operator but
+a sign the reader had to apply. It says the size instead: „Zaplanowane 24 837,97
+· 0,78 ponad budżet".
