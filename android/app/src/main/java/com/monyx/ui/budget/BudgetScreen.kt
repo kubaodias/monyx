@@ -433,7 +433,7 @@ private fun PlanCard(plan: PlanState, onEditPlan: () -> Unit) {
         Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
             if (!plan.hasPot) {
                 HeadlineRow(headlineLabel, "—", headlineColor, onEditPlan)
-                Spacer(Modifier.height(6.dp))
+                Spacer(Modifier.height(2.dp))
                 Text(
                     text = stringResource(R.string.budget_plan_none),
                     style = MaterialTheme.typography.bodyMedium,
@@ -484,7 +484,7 @@ private fun PlanCard(plan: PlanState, onEditPlan: () -> Unit) {
             )
             SumRule()
 
-            Spacer(Modifier.height(14.dp))
+            Spacer(Modifier.height(6.dp))
             HeadlineRow(
                 label = headlineLabel,
                 // The size, not the sign: the word above says which way it
@@ -538,11 +538,13 @@ private fun PlanCard(plan: PlanState, onEditPlan: () -> Unit) {
 }
 
 /**
- * The card's one leading figure, with the way into the editor beside it.
+ * The card's one leading figure: the last line of the column, in the size that
+ * says it is the answer.
  *
- * `softWrap = false` on the amount: a figure that wraps mid-number is worse than
- * one that is clipped, and the column above carries the same arithmetic either
- * way.
+ * It is right-aligned, like every term above it, because a result that does not
+ * end on the same x as the figures it was made from is not the bottom of a sum —
+ * it is a second, unrelated number. `softWrap = false` on the amount: a figure
+ * that wraps mid-number is worse than one that is clipped.
  */
 @Composable
 private fun HeadlineRow(
@@ -552,7 +554,14 @@ private fun HeadlineRow(
     onEditPlan: () -> Unit,
 ) {
     Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        Column(modifier = Modifier.weight(1f)) {
+        // The pencil goes in the margin, on the left. The right edge of this
+        // card belongs to the figures, and a 48dp touch target standing where
+        // the result ends would push the one figure that answers the column out
+        // of line with every term in it.
+        IconButton(onClick = onEditPlan) {
+            Icon(Icons.Filled.Edit, contentDescription = stringResource(R.string.budget_plan_edit))
+        }
+        Column(modifier = Modifier.weight(1f), horizontalAlignment = Alignment.End) {
             Text(
                 text = label,
                 style = MaterialTheme.typography.labelMedium,
@@ -567,9 +576,6 @@ private fun HeadlineRow(
                 fontWeight = FontWeight.SemiBold,
                 color = color,
             )
-        }
-        IconButton(onClick = onEditPlan) {
-            Icon(Icons.Filled.Edit, contentDescription = stringResource(R.string.budget_plan_edit))
         }
     }
 }
@@ -599,17 +605,25 @@ private fun SumRow(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.width(SignSlot),
         )
-        // The label gives way, never the figure: a long carry-over label
-        // ellipsises instead of wrapping the amount onto a second line.
+        // Exactly one weighted child, and it is the label. The amount is
+        // measured first, at whatever width it needs, and the label takes all
+        // the rest — so every figure in the card ends on the same x, which is
+        // the only reason to write it as a column at all.
+        //
+        // This was briefly `weight(1f, fill = false)` beside a `weight(1f)`
+        // spacer, and both halves of that were wrong: the free space split in
+        // two, so the longest label was cut to "Budżet na miesi…" with room to
+        // spare, and the slack the label did not use was left standing, putting
+        // each row's amount at a different x. The label still ellipsises when
+        // it genuinely cannot fit — it gives way, never the figure.
         Text(
             text = label,
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.weight(1f, fill = false).padding(end = 12.dp),
+            modifier = Modifier.weight(1f).padding(end = 12.dp),
         )
-        Spacer(Modifier.weight(1f))
         Column(horizontalAlignment = Alignment.End) {
             Text(
                 text = value,
