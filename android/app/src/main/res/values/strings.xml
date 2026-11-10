@@ -107,7 +107,6 @@
     <string name="transactions_delete_confirm_message">This cannot be undone.</string>
 
     <!-- Budget -->
-    <string name="budget_plan_to_assign">Unassigned</string>
     <string name="budget_plan_edit">Plan for this month</string>
     <string name="budget_plan_remove">Remove plan</string>
     <string name="budget_plan_none">Nothing has come in this month yet. To plan ahead of it, type what you expect.</string>
@@ -121,7 +120,8 @@
     <string name="budget_plan_pot">The month\'s budget</string>
     <string name="budget_plan_below_income">%1$s has already come in — a lower forecast changes nothing.</string>
     <string name="budget_plan_income">Came in</string>
-    <string name="budget_plan_assigned_hint">Handed out %1$s · unassigned %2$s</string>
+    <string name="budget_plan_assigned_hint">Planned %1$s · left to plan %2$s</string>
+    <string name="budget_plan_income_so_far">%1$s in so far</string>
     <string name="budget_empty">No limits set yet</string>
     <string name="budget_set_limit">Set a limit</string>
     <string name="budget_edit_limit">Change limit</string>

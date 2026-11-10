@@ -495,6 +495,49 @@ class InteractionTest {
     }
 
     @Test
+    fun `the column adds up when what arrived is the first term`() {
+        // The card is written as a sum, so the two rows above the rule have to
+        // make the figure below it with nothing hidden in between: what came
+        // in, plus what last month left, is the budget. The honesty of the
+        // layout is this equality, not the pixels.
+        val november = plan(planned = 22_000_00, assigned = 19_099_00, spent = 6_266_36)
+            .copy(
+                incomeMinor = 24_450_00,
+                carryOverMinor = 387_19,
+                carryOverAccounts = listOf("Portfel"),
+            )
+        assertNull("so the first row is the income", november.forecastMinor)
+        assertEquals(november.availableMinor, november.incomeMinor + november.carryOverMinor)
+        // And the column keeps going, down to the one big figure at its foot.
+        assertEquals(
+            november.leftToSpendMinor,
+            november.incomeMinor + november.carryOverMinor - november.spentMinor,
+        )
+    }
+
+    @Test
+    fun `the column adds up when the forecast is the first term`() {
+        // Same rule on a month the plan still leads: the first row is then the
+        // forecast, and it is the forecast that must make the budget - which is
+        // why the card prints what has arrived as a hint under it rather than
+        // as a row of its own. A row would be a term, and the sum would be
+        // 2 000,00 out.
+        val early = plan(planned = 30_000_00, assigned = 0, spent = 1_200_00)
+            .copy(
+                incomeMinor = 2_000_00,
+                carryOverMinor = 387_19,
+                carryOverAccounts = listOf("Portfel"),
+            )
+        val forecast = early.forecastMinor
+        assertEquals(30_000_00L, forecast)
+        assertEquals(early.availableMinor, forecast!! + early.carryOverMinor)
+        assertEquals(
+            early.leftToSpendMinor,
+            forecast + early.carryOverMinor - early.spentMinor,
+        )
+    }
+
+    @Test
     fun `a month nobody planned still has a pot once money arrives`() {
         // The ritual this retires: a card of em dashes on the ninth of a month
         // with pay in the account, because nobody had opened a sheet to type a

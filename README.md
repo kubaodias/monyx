@@ -95,14 +95,15 @@ cannot answer says what is still missing instead — see
   that still counts keeps its rows in the list, because the month's figure counts
   them.
 - **Budget** — what is left to spend this month, limits on main categories, and
-  a warning before a limit is passed rather than after. The card leads with two
-  figures side by side: what is left to spend — or by how much the month went
-  over — and what has not been handed out yet, the second one drawn as success
-  at zero, which is its goal. The bar belongs to the first and so measures
-  spending against the month's money. Under them, the arithmetic and nothing
-  else: the month's budget, then what came in and what last month left behind,
-  which add up to it, and what has gone. The month's budget is the larger of what
-  came in and what you expected, plus last month's remainder — so a figure typed
+  a warning before a limit is passed rather than after. The card is a column
+  sum, in the order the money arrives: what came in, plus what last month left,
+  a rule, the month's budget, less what has gone, a rule — and then the figure
+  all of that was for, what is left to spend, or by how much the month went
+  over. The bar under it measures spending against the month's budget, and one
+  small line at the foot carries the planning pair, what is planned and what is
+  left to plan, red when more has been handed out than the month has. The
+  month's budget is the larger of what came in and what you expected, plus last
+  month's remainder — so a figure typed
   in advance can raise the month's pot but never make it poorer than the account
   already is, and a month nobody planned still shows real figures the moment pay
   lands. There is no ritual to start a month. Typing a figure is for planning
