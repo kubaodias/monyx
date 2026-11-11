@@ -387,3 +387,36 @@ the rows' three. And the planning line said „do zaplanowania -0,78 zł" — th
 place on a card built out of operators where a minus sign was not an operator but
 a sign the reader had to apply. It says the size instead: „Zaplanowane 24 837,97
 · 0,78 ponad budżet".
+
+### A branch belongs next to what it branches off (2026-11-11)
+
+Three addenda in a row have moved „do zaplanowania" around this card, and this
+one says why the last position was wrong. The column sum (2026-11-09) demoted it
+from a headline on a correct argument: spending and assigning are two branches
+off the SAME subtotal, so a column that subtracted one after the other would be
+arithmetic that produces nonsense. But "not a term of the column" was then read
+as "put it at the foot", under the headline and under the bar, in `bodySmall`
+grey — the smallest type on a card made of numbers.
+
+The household's own reading, while planning November on the phone: „budżet na
+miesiąc jest powiązany z zaplanowane i ponad budżet lub pozostało do
+zaplanowania". That is the defect stated exactly. Position is an argument about
+what a figure relates to, and the figure was sitting under „zostało do wydania",
+which it is not computed from and does not move with. Being correct about the
+arithmetic bought nothing if the layout then pointed at the wrong parent.
+
+So it now sits directly under „Budżet na miesiąc", before the subtraction that
+is the other branch, drawn as a tile rather than a term: a fill, no operator, and
+`titleMedium` for the figure. The fill is what carries the state, which is also
+what keeps it from shouting all month — `PlanningState` has four values and only
+`ToPlan` takes a loud colour. A month handed out to the grosz, and a month that
+has ended with money never handed out, are both grey: money nobody can assign any
+more is not a task. Over is the exception that keeps its colour on a closed month,
+because that is a fact about what happened rather than an offer.
+
+One mechanical note, since it will look like a hack: the tile's background is
+drawn by `drawBehind` with a negative inset instead of by a padded container. The
+card's governing rule is that every figure ends on the same x. A tile with
+ordinary inner padding would have put its figure 12dp short of the column it is
+taken from, and the right edge is the one thing on this card that has already
+been fixed once.
