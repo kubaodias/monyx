@@ -14,6 +14,8 @@ import com.monyx.ui.add.familyHasChildren
 import com.monyx.ui.budget.BudgetBand
 import com.monyx.ui.budget.PlanDraft
 import com.monyx.ui.budget.PlanState
+import com.monyx.ui.budget.PlanningState
+import com.monyx.ui.budget.planningState
 import com.monyx.ui.budget.overBudgetBand
 import com.monyx.ui.overview.OverviewViewModel
 import com.monyx.ui.overview.PieSlice
@@ -626,6 +628,65 @@ class InteractionTest {
         assertEquals(false, empty.overAssigned)
         assertEquals(false, empty.seriouslyOverAssigned)
         assertEquals(false, empty.seriouslyOverspent)
+    }
+
+    @Test
+    fun `money nobody has handed out yet is the one state that asks for anything`() {
+        // The report this came from: "w momencie planowania nie jest jasno
+        // zaznaczone ze mam jeszcze pieniadze do zaplanowania". It is the only
+        // state the tile takes a loud colour in, so it had better be the only
+        // state there is something to do in.
+        val november = plan(planned = 22_000_00, assigned = 20_355_00, spent = 6_266_36)
+            .copy(
+                incomeMinor = 24_450_00,
+                carryOverMinor = 387_19,
+                carryOverAccounts = listOf("Portfel"),
+            )
+        assertEquals(4_482_19L, november.leftToAssignMinor)
+        assertEquals(PlanningState.ToPlan, november.planningState)
+    }
+
+    @Test
+    fun `a month handed out to the last grosz has nothing left to ask`() {
+        val finished = plan(planned = 600_00, assigned = 600_00)
+        assertEquals(0L, finished.leftToAssignMinor)
+        assertEquals(PlanningState.Settled, finished.planningState)
+    }
+
+    @Test
+    fun `a month that has ended is not a month to plan`() {
+        // 4 482,19 nobody handed out in October is not a task in November; the
+        // headline stops offering it to be spent for the same reason.
+        val october = plan(planned = 24_450_00, assigned = 19_967_81).copy(closed = true)
+        assertEquals(4_482_19L, october.leftToAssignMinor)
+        assertEquals(PlanningState.Settled, october.planningState)
+    }
+
+    @Test
+    fun `being over is still reported on a month that has ended`() {
+        // That is a fact about what happened, not an offer, so it keeps its
+        // colour where "left to plan" loses its.
+        val october = plan(planned = 24_450_00, assigned = 25_000_00).copy(closed = true)
+        assertEquals(PlanningState.SeriouslyOver, october.planningState)
+    }
+
+    @Test
+    fun `the tile uses the rows' threshold, not its own`() {
+        val hair = plan(planned = 22_000_00, assigned = 24_837_97, spent = 0)
+            .copy(incomeMinor = 24_450_00, carryOverMinor = 387_19)
+        // 78 grosze: said in words, drawn in amber.
+        assertEquals(PlanningState.Over, hair.planningState)
+        val serious = hair.copy(assignedMinor = 25_500_00)
+        assertEquals(PlanningState.SeriouslyOver, serious.planningState)
+    }
+
+    @Test
+    fun `a month with no pot has no planning to report`() {
+        // Limits carry forward, so this month opens 19 099,00 handed out
+        // against nothing at all. The tile does not draw rather than drawing a
+        // large red number about a budget nobody has set.
+        val empty = PlanState("2026-12", hasPlan = false, assignedMinor = 19_099_00)
+        assertEquals(null, empty.planningState)
     }
 
     @Test

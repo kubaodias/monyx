@@ -247,6 +247,53 @@ data class PlanDraft(
  * which keeps the escalation monotone — nothing may look calmer than the state
  * before it, so a hair over the limit can never come out gentler than 95%.
  */
+/**
+ * What the planning line has to say, which is not always "there is work to do".
+ *
+ * Planning is the OTHER branch off "Budżet na miesiąc" — the household's own
+ * observation, and the reason the figure moved up the card: "budżet na miesiąc
+ * jest powiązany z zaplanowane i ponad budżet lub pozostało do zaplanowania".
+ * Spending is not what unassigned money is measured against, so a figure
+ * printed under "zostało do wydania" was attached by position to a number it
+ * does not come from.
+ *
+ * Four states and not two, because the same line is a to-do list for three days
+ * a month and a receipt for the other twenty-seven. [ToPlan] is the only one
+ * that asks for anything, and it is the only one that gets a colour loud enough
+ * to interrupt the column.
+ */
+enum class PlanningState {
+    /** Money nobody has handed out yet, in a month that can still take it. */
+    ToPlan,
+
+    /** Nothing left to hand out — or nothing left to do about it. */
+    Settled,
+
+    /** Handed out more than the month has, by a margin worth saying only. */
+    Over,
+
+    /** Handed out more than the month has, by enough to be worth an alarm. */
+    SeriouslyOver,
+}
+
+/**
+ * Null when the month has no pot: there is no planning to report on a month
+ * that does not yet know how much money it is.
+ *
+ * A month that has ENDED is [Settled] whatever is left in it, for the same
+ * reason the headline stops saying "left to spend" on it: money nobody can
+ * hand out any more is not a task. Being over is still reported on a closed
+ * month, because that is a fact about what happened rather than an offer.
+ */
+val PlanState.planningState: PlanningState?
+    get() = when {
+        !hasPot -> null
+        seriouslyOverAssigned -> PlanningState.SeriouslyOver
+        overAssigned -> PlanningState.Over
+        closed || leftToAssignMinor == 0L -> PlanningState.Settled
+        else -> PlanningState.ToPlan
+    }
+
 enum class BudgetBand { Under, Close, Over }
 
 /** Over the limit by at least this much of it before the row turns red. */

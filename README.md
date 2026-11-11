@@ -99,9 +99,12 @@ cannot answer says what is still missing instead — see
   sum, in the order the money arrives: what came in, plus what last month left,
   a rule, the month's budget, less what has gone, a rule — and then the figure
   all of that was for, what is left to spend, or by how much the month went
-  over. The bar under it measures spending against the month's budget, and one
-  small line at the foot carries the planning pair, what is planned and what is
-  left to plan, red when more has been handed out than the month has. The
+  over. The bar under it measures spending against the month's budget. Planning
+  is the other branch off the same subtotal, so it sits against that subtotal
+  rather than at the foot of the card: a tile under the month's budget saying
+  what is left to plan, or by how much more than the month has was handed out.
+  It is coloured only while there is something to do — a month fully handed out,
+  and a month that has ended, are grey. The
   month's budget is the larger of what came in and what you expected, plus last
   month's remainder — so a figure typed
   in advance can raise the month's pot but never make it poorer than the account

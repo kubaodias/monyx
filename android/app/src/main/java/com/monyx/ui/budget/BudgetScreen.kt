@@ -54,6 +54,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -396,14 +400,22 @@ private fun SortRow(sort: BudgetSort, onSelect: (BudgetSort) -> Unit) {
  * The first term is therefore whichever figure WON, with what has arrived so
  * far as a sub-line under it. A column cannot lie about its own addends.
  *
- * **One figure leads now, not two.** "Left to plan" was a headline beside this
- * one since 0.29.1, deliberately, and it loses that place for a reason the sum
- * makes plain: it is not the next step of this column. Spending and assigning
- * are two branches off the SAME subtotal — both come off the budget, neither
- * off the other — so a column that subtracted one after the other would read as
- * arithmetic and produce nonsense. Planning happens once a month; the figure it
- * needs is the small line at the foot of the card, where it says both halves at
- * once, "zaplanowane … do zaplanowania …".
+ * **One figure leads, but the other one has an address.** "Left to plan" was a
+ * headline beside this one until 0.29.1 and lost that place for a reason the
+ * sum makes plain: it is not the next step of this column. Spending and
+ * assigning are two branches off the SAME subtotal — both come off the budget,
+ * neither off the other — so a column that subtracted one after the other would
+ * read as arithmetic and produce nonsense.
+ *
+ * It does not follow that it belongs at the FOOT, which is where it went, and
+ * that was wrong in the household's own words: "budżet na miesiąc jest
+ * powiązany z zaplanowane i ponad budżet lub pozostało do zaplanowania".
+ * Printed under the headline it was attached by position to "zostało do
+ * wydania", a figure it is not computed from and does not move with; the reader
+ * had to know to look two lines up. It now sits against the subtotal it comes
+ * from, between that line and the subtraction that is the other branch — as a
+ * tile, not a term, because a term of the column would claim to be the next
+ * step of the sum. See [PlanningTile].
  *
  * Two things the headline does rather than print a negative: it says "over by"
  * the way every row of the list below it has always said it, and on a month
@@ -484,6 +496,13 @@ private fun PlanCard(plan: PlanState, onEditPlan: () -> Unit) {
                 value = Money.formatWithCurrency(plan.availableMinor),
                 emphasis = true,
             )
+            // The other branch off the line above, drawn where it branches.
+            // It used to be the smallest, greyest text on the card, three
+            // figures and a progress bar below the number it has nothing to do
+            // with — so the one line that is a TASK was the one the eye found
+            // last, in the week of the month when it is the only line that
+            // matters.
+            PlanningTile(plan)
             SumRow(
                 sign = "−",
                 label = stringResource(R.string.budget_plan_spent),
@@ -528,39 +547,115 @@ private fun PlanCard(plan: PlanState, onEditPlan: () -> Unit) {
                     else -> MaterialTheme.colorScheme.primary
                 },
             )
-            Spacer(Modifier.height(12.dp))
-            // Planning, in one line, at the foot of the card: the branch off
-            // the subtotal that the column above cannot carry. Red when more
-            // has been handed out than the month has.
-            val leftToAssign = plan.leftToAssignMinor ?: 0
-            Text(
-                text = if (plan.overAssigned) {
-                    // "do zaplanowania -0,78 zł" made the reader do the sign, in
-                    // the one place on this card where a minus is not an
-                    // operator. Said as a size, the way a row has always said
-                    // "przekroczono o".
-                    stringResource(
-                        R.string.budget_plan_assigned_over,
-                        Money.formatWithCurrency(plan.assignedMinor),
-                        Money.formatWithCurrency(-leftToAssign),
-                    )
-                } else {
-                    stringResource(
-                        R.string.budget_plan_assigned_hint,
-                        Money.formatWithCurrency(plan.assignedMinor),
-                        Money.formatWithCurrency(leftToAssign),
-                    )
-                },
-                style = MaterialTheme.typography.bodySmall,
-                color = when {
-                    plan.seriouslyOverAssigned -> MaterialTheme.colorScheme.error
-                    plan.overAssigned -> MaterialTheme.colorScheme.tertiary
-                    else -> MaterialTheme.colorScheme.onSurfaceVariant
-                },
-            )
         }
     }
 }
+
+/**
+ * The planning branch, as a tile under the subtotal it is taken from.
+ *
+ * Everything about it is chosen to be found without being looked for, because
+ * for three days a month this is the only line on the card with anything to do:
+ *
+ *  * **It sits under "Budżet na miesiąc"**, not under the headline. Both are
+ *    `budget − something`; only one of them was next to the budget.
+ *  * **It is a tile, not a row of the column.** The sum's terms are plain lines
+ *    with an operator; this has a fill and no operator, so it cannot be read as
+ *    the next step of the arithmetic it interrupts. Its background bleeds
+ *    [TileBleed] past the card's padding on both sides, which is the whole
+ *    reason for [drawBehind] here: the figure inside it still has to end on the
+ *    same x as every figure above and below, and a tile with ordinary padding
+ *    would have put it 12dp short of the column it belongs to.
+ *  * **The figure is [MaterialTheme.typography.titleMedium], not bodySmall.**
+ *    It was the smallest type on a card of numbers.
+ *  * **The fill carries the state**, and goes quiet when there is nothing to do:
+ *    a month handed out to the grosz, or one that has ended, is grey. Eleven
+ *    days in twelve this tile is background; the colour means "your move".
+ *
+ * Over budget is said as a size and in a label, never as a minus glued to a
+ * figure — the same rule the rows have followed since 0.21, and the rule the
+ * foot line broke with "do zaplanowania −0,78 zł".
+ */
+@Composable
+private fun PlanningTile(plan: PlanState) {
+    val state = plan.planningState ?: return
+    val leftToAssign = plan.leftToAssignMinor ?: return
+    val over = state == PlanningState.Over || state == PlanningState.SeriouslyOver
+    // The same three bands the rows and the bar above draw, in the same
+    // colours. Settled borrows the card's quiet grey instead of a fourth one.
+    val accent = when (state) {
+        PlanningState.SeriouslyOver -> MaterialTheme.colorScheme.error
+        PlanningState.Over -> MaterialTheme.colorScheme.tertiary
+        PlanningState.Settled -> MaterialTheme.colorScheme.onSurfaceVariant
+        PlanningState.ToPlan -> MaterialTheme.colorScheme.primary
+    }
+    // A wash of the accent rather than a container role: this scheme names
+    // primary, tertiary and error and leaves the *Container roles to Material's
+    // baseline, which is a lavender nobody here chose. The row icons have taken
+    // their tint the same way since the first version.
+    val fill = if (state == PlanningState.Settled) {
+        MaterialTheme.colorScheme.surfaceVariant
+    } else {
+        accent.copy(alpha = 0.12f)
+    }
+
+    Spacer(Modifier.height(8.dp))
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .drawBehind {
+                val bleed = TileBleed.toPx()
+                drawRoundRect(
+                    color = fill,
+                    topLeft = Offset(-bleed, 0f),
+                    size = Size(size.width + bleed * 2, size.height),
+                    cornerRadius = CornerRadius(TileCorner.toPx()),
+                )
+            }
+            .padding(vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(modifier = Modifier.weight(1f).padding(end = 12.dp)) {
+            Text(
+                text = if (over) {
+                    stringResource(R.string.budget_plan_over_budget)
+                } else {
+                    stringResource(R.string.budget_plan_left_to_assign)
+                },
+                style = MaterialTheme.typography.titleSmall,
+                color = accent,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            // What the figure above is the remainder of, so the tile answers
+            // "and how much did I hand out, then?" without a second tap.
+            Text(
+                text = stringResource(
+                    R.string.budget_plan_assigned_so_far,
+                    Money.formatWithCurrency(plan.assignedMinor),
+                ),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        Text(
+            text = Money.formatWithCurrency(if (leftToAssign < 0) -leftToAssign else leftToAssign),
+            softWrap = false,
+            style = MaterialTheme.typography.titleMedium.copy(fontFeatureSettings = "tnum"),
+            fontWeight = FontWeight.SemiBold,
+            color = accent,
+        )
+    }
+    Spacer(Modifier.height(8.dp))
+}
+
+/** How far the tile's fill reaches past the card's own padding, on each side. */
+private val TileBleed = 12.dp
+
+/** Rounded enough to read as a panel, not so much that it reads as a button. */
+private val TileCorner = 10.dp
 
 /**
  * The card's one leading figure: the last line of the column, in the size that
